@@ -18,7 +18,7 @@ React Three Fiber can emit `onClick` after a drag. Gate scene navigation by the 
 
 Keep `/api/signals` responses uncached when classification or feed display logic changes; upstream source fetches may retain a short revalidation window. Verify the rendered panel against the current classifier after such edits.
 
-Before Vercel deployment work, run `vercel whoami` and check whether `.vercel` links a project. CLI credentials have been absent across setup attempts; request login and project access only after the local build and configuration are ready.
+Before Vercel deployment work, run `vercel whoami` and check whether `.vercel` links a project. CLI sign-in does not guarantee project creation access. If project creation returns a 402 fair-use block, stop retries and ask the owner to resolve the block or name an authorized, unblocked team before connecting GitHub. Request login and project access only after the local build and configuration are ready.
 
 For Postgres writes, run `npm run test:storage` with `SYMTRI_TEST_DATABASE_URL` pointed at an isolated loopback database. Postgres.js `sql.json(rows)` must be used for bulk JSON parameters; passing `JSON.stringify(rows)` produced a JSON string and broke `jsonb_to_recordset` at runtime despite passing typecheck.
 
