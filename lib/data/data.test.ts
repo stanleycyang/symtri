@@ -18,6 +18,14 @@ test("solar wind research does not create a false energy connection", () => {
   assert.ok(!wind.some((match) => match.topicId === "energy"));
   const power = classifySignal("Solar power forecasting with AI", "Photovoltaic energy research", ["cs.AI"]);
   assert.ok(power.some((match) => match.topicId === "energy" && match.subtopicId === "energy-solar"));
+  assert.ok(classifySignal("Solar panels built over irrigation canals", "Hacker News discussion").some((match) => match.topicId === "energy" && match.subtopicId === "energy-solar"));
+});
+
+test("specific story titles map to regions without inferring unrelated ones", () => {
+  assert.equal(classifySignal("Obscura: VPN that cannot log your activity", "Hacker News discussion")[0]?.topicId, "security");
+  assert.equal(classifySignal("GPT-6 Sol performance analysis", "Hacker News discussion")[0]?.topicId, "ai");
+  assert.equal(classifySignal("Launch HN: Coverage Cat (YC S22)", "Umbrella insurance")[0]?.topicId, "startups");
+  assert.deepEqual(classifySignal("Umbrella insurance via your personal agent", "Hacker News discussion"), []);
 });
 
 test("Hacker News normalization rejects dead stories and unsafe URLs", () => {

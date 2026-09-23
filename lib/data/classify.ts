@@ -2,15 +2,15 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 const topicTerms: Record<string, string[]> = {
-  ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "large language model", "ai agent", "agentic", "transformer", "generative ai"],
+  ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai"],
   software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "sdk"],
   science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical"],
   space: ["space", "satellite", "rocket", "astronomy", "cosmology", "orbital", "spacecraft", "nasa"],
-  energy: ["energy", "nuclear", "solar power", "solar panel", "solar cell", "photovoltaic", "power grid", "battery", "fusion", "geothermal", "electricity"],
+  energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
-  security: ["security", "cyber", "vulnerability", "malware", "privacy", "encryption", "cryptography", "identity"],
+  security: ["security", "cyber", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity"],
   hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "device", "sensor", "manufacturing"],
-  startups: ["startup", "founder", "funding", "seed round", "product launch", "venture", "growth"],
+  startups: ["startup", "founder", "funding", "seed round", "product launch", "launch hn", "venture", "growth"],
   crypto: ["crypto", "bitcoin", "ethereum", "blockchain", "stablecoin", "web3", "onchain"],
 };
 
@@ -34,7 +34,7 @@ const childTerms: Record<string, string[]> = {
   "space-satellites": ["satellite"],
   "space-astronomy": ["astronomy", "telescope", "galaxy"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
-  "energy-solar": ["solar energy", "solar power", "solar panel", "solar cell", "photovoltaic"],
+  "energy-solar": ["solar energy", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic"],
   "energy-battery-storage": ["battery", "storage"],
   "energy-power-demand": ["power demand", "data center power"],
   "markets-venture-capital": ["venture capital", "vc funding"],
