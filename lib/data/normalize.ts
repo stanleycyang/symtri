@@ -1,0 +1,71 @@
+import { XMLParser } from "fast-xml-parser";
+import { classifySignal } from "./classify";
+import type { SignalEvent } from "./model";
+
+function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
+function text(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
+function number(value: unknown): number { return typeof value === "number" && Number.isFinite(value) ? value : 0; }
+function clean(value: unknown): string { return text(value).replace(/<[^>]*>/g, " ").replace(/&(?:amp|#38);/g, "&").replace(/&(?:lt|#60);/g, "<").replace(/&(?:gt|#62);/g, ">").replace(/&(?:quot|#34);/g, '"').replace(/\s+/g, " ").trim(); }
+function safeUrl(value: unknown, fallback: string): string {
+  try { const url = new URL(text(value)); return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : fallback; } catch { return fallback; }
+}
+function iso(value: unknown): string | null { const date = new Date(typeof value === "number" ? value * 1000 : text(value)); return Number.isNaN(date.getTime()) ? null : date.toISOString(); }
+function short(value: string, max = 450) { return value.length > max ? `${value.slice(0, max).trimEnd()}…` : value; }
+
+export function normalizeHackerNews(input: unknown): SignalEvent | null {
+  const item = record(input);
+  if (!item || item.type !== "story" || item.deleted || item.dead) return null;
+  const externalId = String(number(item.id));
+  const title = clean(item.title);
+  const publishedAt = iso(item.time);
+  if (!title || !publishedAt || externalId === "0") return null;
+  const score = number(item.score);
+  const comments = number(item.descendants);
+  const summary = short(clean(item.text) || `Hacker News discussion · ${score} points · ${comments} comments.`);
+  return { id: `hacker-news:${externalId}`, source: "hacker-news", externalId, title, url: safeUrl(item.url, `https://news.ycombinator.com/item?id=${externalId}`), summary, publishedAt, importance: Math.min(100, Math.log1p(score + comments * 2) * 14), topics: classifySignal(title, summary) };
+}
+
+export function normalizeGitHub(input: unknown): SignalEvent | null {
+  const item = record(input);
+  if (!item || item.private || item.archived || item.fork) return null;
+  const externalId = String(number(item.id));
+  const title = clean(item.full_name);
+  const publishedAt = iso(item.created_at);
+  const url = safeUrl(item.html_url, "");
+  if (!title || !publishedAt || !url || externalId === "0") return null;
+  const description = clean(item.description);
+  const tags = Array.isArray(item.topics) ? item.topics.filter((tag): tag is string => typeof tag === "string").join(" ") : "";
+  const summary = short(description || `Open-source repository${text(item.language) ? ` in ${text(item.language)}` : ""}.`);
+  const stars = number(item.stargazers_count);
+  return { id: `github:${externalId}`, source: "github", externalId, title, url, summary, publishedAt, importance: Math.min(100, Math.log1p(stars + number(item.forks_count) * 2) * 13), topics: classifySignal(`${title} ${tags}`, `${summary} ${text(item.language)}`) };
+}
+
+const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", removeNSPrefix: true, trimValues: true });
+export function normalizeArxivFeed(xml: string): SignalEvent[] {
+  const feed = record(record(parser.parse(xml))?.feed);
+  const entries = feed?.entry ? (Array.isArray(feed.entry) ? feed.entry : [feed.entry]) : [];
+  return entries.flatMap((input): SignalEvent[] => {
+    const entry = record(input);
+    if (!entry) return [];
+    const sourceUrl = text(entry.id);
+    const externalId = sourceUrl.split("/").pop()?.replace(/v\d+$/, "") ?? "";
+    const title = clean(entry.title);
+    const publishedAt = iso(entry.published);
+    if (!externalId || !title || !publishedAt) return [];
+    const summary = short(clean(entry.summary), 600);
+    const rawCategories = entry.category ? (Array.isArray(entry.category) ? entry.category : [entry.category]) : [];
+    const categories = rawCategories.map((category) => text(record(category)?.["@term"])).filter(Boolean);
+    return [{ id: `arxiv:${externalId}`, source: "arxiv", externalId, title, url: `https://arxiv.org/abs/${encodeURIComponent(externalId)}`, summary, publishedAt, importance: 25, topics: classifySignal(title, summary, categories) }];
+  });
+}
+
+export function deduplicateSignals(events: SignalEvent[]): SignalEvent[] {
+  const seenIds = new Set<string>();
+  const seenUrls = new Set<string>();
+  return [...events].sort((a, b) => b.importance - a.importance).filter((event) => {
+    let canonical = event.url;
+    try { const url = new URL(event.url); canonical = `${url.host.toLowerCase()}${url.pathname.replace(/\/$/, "")}`; } catch { /* normalization already validates URLs */ }
+    if (seenIds.has(event.id) || seenUrls.has(canonical)) return false;
+    seenIds.add(event.id); seenUrls.add(canonical); return true;
+  });
+}
