@@ -76,11 +76,29 @@ async function main() {
     await persistSnapshot(feed);
     event.title = "Snapshot updated";
     await persistSnapshot(feed);
+    const twoSourceFeed: SignalFeed = {
+      ...feed, sources: { "hacker-news": "ok", github: "ok", arxiv: "unavailable" },
+    };
+    event.title = "Two-source snapshot";
+    await persistSnapshot(twoSourceFeed);
+    event.title = "One-source retry";
+    await persistSnapshot(feed);
+    assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
+    const completeFeed: SignalFeed = {
+      ...feed, partial: false,
+      sources: { "hacker-news": "ok", github: "ok", arxiv: "ok" },
+    };
+    event.title = "Complete snapshot";
+    await persistSnapshot(completeFeed);
+    event.title = "Partial retry";
+    await persistSnapshot(twoSourceFeed);
     const days = await getSnapshotDays();
     assert.deepEqual(days.slice(0, 2).map((item) => item.day), [secondDay, firstDay]);
-    assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Snapshot updated");
-    assert.equal((await getSnapshotFeed(secondDay))?.scope, "history");
-    console.log("Postgres migrations, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot readback passed");
+    const snapshot = await getSnapshotFeed(secondDay);
+    assert.equal(snapshot?.events[0].title, "Complete snapshot");
+    assert.equal(snapshot?.partial, false);
+    assert.equal(snapshot?.scope, "history");
+    console.log("Postgres migrations, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot source coverage preservation passed");
   } finally {
     await sql`delete from signal_events where id = ${id}`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;
