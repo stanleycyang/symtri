@@ -92,13 +92,24 @@ async function main() {
     await persistSnapshot(completeFeed);
     event.title = "Partial retry";
     await persistSnapshot(twoSourceFeed);
+    const richerFeed: SignalFeed = {
+      ...completeFeed,
+      events: [
+        { ...event, title: "Two-event snapshot" },
+        { ...event, id: `${id}-additional`, externalId: `${externalId}-additional`, title: "Additional signal" },
+      ],
+    };
+    await persistSnapshot(richerFeed);
+    event.title = "Sparse retry";
+    await persistSnapshot(completeFeed);
     const days = await getSnapshotDays();
     assert.deepEqual(days.slice(0, 2).map((item) => item.day), [secondDay, firstDay]);
     const snapshot = await getSnapshotFeed(secondDay);
-    assert.equal(snapshot?.events[0].title, "Complete snapshot");
+    assert.equal(snapshot?.events[0].title, "Two-event snapshot");
+    assert.equal(snapshot?.events.length, 2);
     assert.equal(snapshot?.partial, false);
     assert.equal(snapshot?.scope, "history");
-    console.log("Postgres migrations, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot source coverage preservation passed");
+    console.log("Postgres migrations, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
   } finally {
     await sql`delete from signal_events where id = ${id}`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;
