@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { classifySignal } from "./classify";
+import { selectFeedEvents } from "./feed";
 import { deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
@@ -53,4 +54,13 @@ test("deduplication keeps the stronger observation for the same URL", () => {
   const input = [second, first];
   assert.deepEqual(deduplicateSignals(input).map((event) => event.id), [first.id]);
   assert.deepEqual(input.map((event) => event.id), [second.id, first.id]);
+});
+
+test("feed selection keeps mapped signals before applying the cap or deduplicating", () => {
+  const mapped = normalizeHackerNews({ id: 71, type: "story", title: "AI agent toolkit", time: Date.parse("2026-09-22T12:00:00Z") / 1000, score: 2, url: "https://example.com/agent" })!;
+  const unmapped = { ...mapped, id: "hacker-news:72", externalId: "72", title: "Garden calendar", topics: [], importance: 99, publishedAt: "2026-09-23T12:00:00Z" };
+  const second = normalizeGitHub({ id: 73, full_name: "example/database", created_at: "2026-09-21T12:00:00Z", html_url: "https://github.com/example/database", description: "Open source database", stargazers_count: 20, fork: false })!;
+  const input = [unmapped, mapped, second];
+  assert.deepEqual(selectFeedEvents(input, 2).map((event) => event.id), [mapped.id, second.id]);
+  assert.equal(input.length, 3);
 });

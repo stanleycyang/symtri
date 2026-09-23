@@ -4,7 +4,7 @@
 
 ## Current state
 
-The universe has 10 stable regions, 66 subtopics, ambient and incoming signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, a cinematic entrance, and a region → subtopic → signal exploration path. It begins with simulated activity, then uses observed sample counts when the Hacker News, GitHub, and arXiv feed loads. Topic panels show matching real signals with source links; topics with no matching live events clearly show simulated examples.
+The universe has 10 stable regions, 66 subtopics, ambient and incoming signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, a cinematic entrance, and a region → subtopic → signal exploration path. It begins with simulated activity, then uses observed sample counts when the Hacker News, GitHub, and arXiv feed loads. Region panels expose recent signals that do not fit a named subtopic; topic panels show matching real signals with source links. Topics with no matching live events clearly show simulated examples.
 
 ## Run locally
 
@@ -29,6 +29,8 @@ To verify the Postgres path with PostgreSQL and pgvector installed locally, run 
 ## Interaction QA
 
 After a production build, check that the entrance button is visible and usable in a short desktop window (756 × 469 px) and a short phone viewport (390 × 480 px). The entrance should show the map's motion without region labels crossing the headline; entering should reveal those labels. Then focus AI, select Agents, open a signal, and use Escape to return outward. Drag and scroll after the entrance animation finishes; the camera must keep the visitor's chosen view. While focused, drag from empty space and from a node; neither drag should navigate away. A deliberate empty click or tap should return to the overview. Check that subtopics appear as the camera approaches a region, and that the mobile region selector and detail sheet remain usable at 390 px width. Open Ask Symtri, try both example questions, confirm the camera follows the answer, and verify the linked sources and the mobile panel. On mobile, the focused region and any selected route stop should remain visible below the Ask panel; closing it should restore the normal topic view. When two database snapshots exist, switch dates in the timeline, inspect a historical signal, return to NOW, and check timeline placement beside a focused region on mobile. On a slow connection, confirm the loading label appears while the header and map stay on the current date; they should switch together when the snapshot arrives. Returning to NOW before it arrives must keep the live map visible even if the old request finishes later.
+
+With a live feed, focus a region containing signals without a named thread. Open one from RECENT SIGNALS, check its source link, and return to the region. On mobile, verify the thread list remains reachable by scrolling the panel.
 
 For a repeatable frame pacing check, use a hardware-backed browser on the target device. After entering and letting camera motion settle, run this in DevTools in both the overview and a focused region. Repeat while orbiting and zooming. Headless Chrome results are useful smoke checks but do not establish real-device performance.
 
@@ -57,7 +59,7 @@ console.log({ fps: frameTimes.length / (frameTimes.reduce((sum, ms) => sum + ms,
 
 ## Data and deployment
 
-`/api/signals` fetches a recent sample from the three sources. Its response is uncached, while upstream source requests are cached for 15 minutes. The open map refreshes every 15 minutes and when a hidden tab becomes visible. If all sources fail and a database is configured, it serves recent archived signals. The map labels archive, partial live, and simulated states. This is a sample feed, not a complete count of internet activity.
+`/api/signals` fetches a recent sample from the three sources. Only signals classified into at least one map region enter the feed; filtering happens before deduplication and the 150-signal cap so unrelated stories cannot displace mapped ones. Its response is uncached, while upstream source requests are cached for 15 minutes. The open map refreshes every 15 minutes and when a hidden tab becomes visible. If all sources fail and a database is configured, it serves recent archived signals. The map labels archive, partial live, and simulated states. This is a sample feed, not a complete count of internet activity.
 
 Once a feed loads, region counts show classified events **in that sample**. Region brightness, cloud density, and incoming particles follow a score that weights topic relevance, source importance, and a 24-hour exponential decay. “Rising” compares weighted events from the latest 24 hours with the preceding 24 hours; it does not claim a platform-wide growth rate. Region positions stay fixed so the map remains learnable. Before the feed loads, the simulated universe remains visible.
 

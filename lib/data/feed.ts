@@ -2,6 +2,12 @@ import { deduplicateSignals } from "./normalize";
 import { fetchArxiv, fetchGitHub, fetchHackerNews } from "./sources";
 import type { SignalEvent, SignalFeed, SourceId, SourceStatus } from "./model";
 
+export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEvent[] {
+  return deduplicateSignals(events.filter((event) => event.topics.length > 0))
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .slice(0, limit);
+}
+
 export async function getSignalFeed(): Promise<SignalFeed> {
   const sources: [SourceId, () => Promise<SignalEvent[]>][] = [
     ["hacker-news", fetchHackerNews], ["github", fetchGitHub], ["arxiv", fetchArxiv],
@@ -16,7 +22,7 @@ export async function getSignalFeed(): Promise<SignalFeed> {
   });
   return {
     observedAt: new Date().toISOString(),
-    events: deduplicateSignals(events).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, 150),
+    events: selectFeedEvents(events),
     sources: status,
     partial: Object.values(status).some((value) => value !== "ok"),
     scope: "sample",
