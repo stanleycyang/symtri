@@ -51,12 +51,12 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
     const toPosition = new THREE.Vector3();
     if (child) {
       toTarget.set(child.position[0] + (compact ? 0 : 2.2), child.position[1] - (compact ? 2.5 : 0), child.position[2]);
-      toPosition.copy(toTarget).add(new THREE.Vector3(0, 0, compact ? 27 : 15));
+      toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 3, compact ? 0 : 2, compact ? 27 : 15));
     } else if (topic) {
       toTarget.set(topic.position[0] + (compact ? 0 : 3), topic.position[1] - (compact ? 4 : 0), topic.position[2]);
-      toPosition.copy(toTarget).add(new THREE.Vector3(0, 0, compact ? 43 : 27));
+      toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 5, compact ? 0 : 4, compact ? 43 : 27));
     } else {
-      toPosition.set(0, 0, compact ? 103 : 54);
+      toPosition.set(compact ? 0 : 7, compact ? 0 : 5, compact ? 103 : 56);
     }
     if (askOverlay && topic) {
       const offset = child ? 6 : 10;
@@ -171,7 +171,7 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
   });
   return <group position={topic.position}>
     <sprite ref={glow} scale={[glowSize, glowSize, 1]} raycast={() => null}><spriteMaterial ref={glowMaterial} map={glowTexture} transparent opacity={muted ? .06 : hovered ? 1 : focused || emphasized ? .82 : .48 + topic.change / 650} depthWrite={false} blending={THREE.AdditiveBlending} /></sprite>
-    <mesh ref={core} scale={coreSize} onClick={(event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); onFocus(topic.id); }} onPointerOver={(event) => { event.stopPropagation(); onHover(topic.id); document.body.style.cursor = "pointer"; }} onPointerOut={() => { onHover(null); document.body.style.cursor = "auto"; }}>
+    <mesh ref={core} scale={coreSize} onClick={(event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); if (event.delta <= 8) onFocus(topic.id); }} onPointerOver={(event) => { event.stopPropagation(); onHover(topic.id); document.body.style.cursor = "pointer"; }} onPointerOut={() => { onHover(null); document.body.style.cursor = "auto"; }}>
       <sphereGeometry args={[1, 24, 16]} />
       <meshBasicMaterial color={topic.color} transparent opacity={muted ? .28 : 1} />
     </mesh>
@@ -182,7 +182,7 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
 
 function ChildNode({ position, name, color, active, onClick }: { position: Vec3; name: string; color: string; active: boolean; onClick: () => void }) {
   return <group position={position}>
-    <mesh onClick={(event) => { event.stopPropagation(); onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+    <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
       <sphereGeometry args={[.18, 14, 10]} />
       <meshBasicMaterial color={color} />
     </mesh>
@@ -194,7 +194,7 @@ function ChildNode({ position, name, color, active, onClick }: { position: Vec3;
 function SignalMote({ position, source, color, active, onClick }: { position: Vec3; source: string; color: string; active: boolean; onClick: () => void }) {
   const short = source === "Hacker News" ? "HN" : source === "GitHub" ? "GH" : "ARX";
   return <group position={position}>
-    <mesh onClick={(event) => { event.stopPropagation(); onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+    <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
       <octahedronGeometry args={[active ? .18 : .12, 0]} />
       <meshBasicMaterial color={active ? "#f5e6d4" : color} />
     </mesh>
@@ -400,7 +400,7 @@ function World({ entered, askOpen, allowSimulatedSignals, focusedId, selectedChi
         })}
       </group>)}
     </group>)}
-    <mesh onClick={() => onFocus(null)} position={[0, 0, -35]}><planeGeometry args={[250, 250]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
+    <mesh onClick={(event) => { if (event.delta <= 8) onFocus(null); }} position={[0, 0, -35]}><planeGeometry args={[250, 250]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
   </>;
 }
 
