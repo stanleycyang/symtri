@@ -104,26 +104,31 @@ function Filament({ from, to, color = "#7c8896", opacity = .16, bend = .8 }: { f
 }
 
 function Label({ title, subtitle, color = "#e3e4e1", size = 4.9 }: { title: string; subtitle?: string; color?: string; size?: number }) {
-  const texture = useMemo(() => {
+  const { texture, width } = useMemo(() => {
     const canvas = document.createElement("canvas");
-    canvas.width = 640; canvas.height = 160;
-    const context = canvas.getContext("2d")!;
-    context.clearRect(0, 0, 640, 160);
+    let context = canvas.getContext("2d")!;
+    context.font = "600 75px Arial";
+    const titleWidth = context.measureText(title).width;
+    context.font = "36px monospace";
+    const subtitleWidth = subtitle ? context.measureText(subtitle).width : 0;
+    const width = Math.max(640, Math.ceil(Math.max(titleWidth, subtitleWidth) + 80));
+    canvas.width = width; canvas.height = 160;
+    context = canvas.getContext("2d")!;
     context.textAlign = "center";
     context.font = "600 75px Arial";
     context.fillStyle = color;
-    context.fillText(title, 320, subtitle ? 84 : 107);
+    context.fillText(title, width / 2, subtitle ? 84 : 107);
     if (subtitle) {
       context.font = "36px monospace";
       context.fillStyle = "#a5afb8";
-      context.fillText(subtitle, 320, 139);
+      context.fillText(subtitle, width / 2, 139);
     }
     const output = new THREE.CanvasTexture(canvas);
     output.colorSpace = THREE.SRGBColorSpace;
-    return output;
+    return { texture: output, width };
   }, [title, subtitle, color]);
   useEffect(() => () => texture.dispose(), [texture]);
-  return <sprite scale={[size, size / 4, 1]} raycast={() => null}><spriteMaterial map={texture} transparent depthWrite={false} /></sprite>;
+  return <sprite scale={[size * width / 640, size / 4, 1]} raycast={() => null}><spriteMaterial map={texture} transparent depthWrite={false} /></sprite>;
 }
 
 function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover, reducedMotion, compact, measured }: { topic: Topic; focused: boolean; hovered: boolean; muted: boolean; emphasized: boolean; onFocus: (id: string) => void; onHover: (id: string | null) => void; reducedMotion: boolean; compact: boolean; measured: boolean }) {

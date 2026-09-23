@@ -30,6 +30,24 @@ To verify the Postgres path with PostgreSQL and pgvector installed locally, run 
 
 After a production build, enter the universe, focus AI, select Agents, open a signal, and use Escape to return outward. Drag and scroll after the entrance animation finishes; the camera must keep the visitor's chosen view. Check that subtopics appear as the camera approaches a region, and that the mobile region selector and detail sheet remain usable at 390 px width. Open Ask Symtri, try both example questions, confirm the camera follows the answer, and verify the linked sources and the mobile panel. On mobile, the focused region and any selected route stop should remain visible below the Ask panel; closing it should restore the normal topic view. When two database snapshots exist, switch dates in the timeline, inspect a historical signal, return to NOW, and check timeline placement beside a focused region on mobile.
 
+For a repeatable frame pacing check, use a hardware-backed browser on the target device. After entering and letting camera motion settle, run this in DevTools in both the overview and a focused region. Repeat while orbiting and zooming. Headless Chrome results are useful smoke checks but do not establish real-device performance.
+
+```js
+const frameTimes = [];
+await new Promise((done) => {
+  const start = performance.now();
+  let previous = start;
+  function sample(now) {
+    frameTimes.push(now - previous);
+    previous = now;
+    if (now - start < 4000) requestAnimationFrame(sample);
+    else done();
+  }
+  requestAnimationFrame(sample);
+});
+console.log({ fps: frameTimes.length / (frameTimes.reduce((sum, ms) => sum + ms, 0) / 1000), slowFrames: frameTimes.filter((ms) => ms > 33).length });
+```
+
 ## Implementation plan
 
 1. **Universe and polish:** Keep the entrance and map visually coherent, tune camera paths and labels, check desktop and touch navigation, and measure frame rate on target hardware.
