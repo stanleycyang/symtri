@@ -131,7 +131,7 @@ function Label({ title, subtitle, color = "#e3e4e1", size = 4.9 }: { title: stri
   return <sprite scale={[size * width / 640, size / 4, 1]} raycast={() => null}><spriteMaterial map={texture} transparent depthWrite={false} /></sprite>;
 }
 
-function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover, reducedMotion, compact, measured }: { topic: Topic; focused: boolean; hovered: boolean; muted: boolean; emphasized: boolean; onFocus: (id: string) => void; onHover: (id: string | null) => void; reducedMotion: boolean; compact: boolean; measured: boolean }) {
+function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover, reducedMotion, compact, measured, showLabel }: { topic: Topic; focused: boolean; hovered: boolean; muted: boolean; emphasized: boolean; onFocus: (id: string) => void; onHover: (id: string | null) => void; reducedMotion: boolean; compact: boolean; measured: boolean; showLabel: boolean }) {
   const glow = useRef<THREE.Sprite>(null);
   const glowMaterial = useRef<THREE.SpriteMaterial>(null);
   const core = useRef<THREE.Mesh>(null);
@@ -176,7 +176,7 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
       <meshBasicMaterial color={topic.color} transparent opacity={muted ? .28 : 1} />
     </mesh>
     <Billboard follow><mesh raycast={() => null}><ringGeometry args={[.86, .875, 64]} /><meshBasicMaterial color={topic.color} transparent opacity={muted ? .07 : hovered || emphasized ? .68 : .35} side={THREE.DoubleSide} /></mesh></Billboard>
-    {!muted && <group position={[0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : `${topic.signals.toLocaleString()} SIM.`} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 4.9} /></group>}
+    {!muted && <group visible={showLabel} position={[0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : `${topic.signals.toLocaleString()} SIM.`} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 4.9} /></group>}
   </group>;
 }
 
@@ -389,7 +389,7 @@ function World({ entered, askOpen, allowSimulatedSignals, focusedId, selectedChi
     {askSteps.map((step, index) => index > 0 && step.subtopicId && askSteps[index - 1].subtopicId ? <Filament key={`ask-${index}`} from={pathPosition(askSteps[index - 1])} to={pathPosition(step)} color="#e6b988" opacity={.82} bend={.8} /> : null)}
     {activeTopics.map((topic) => <group key={topic.id}>
       <SignalCloud topic={topic} reducedMotion={reducedMotion} />
-      <GlowNode topic={topic} focused={focusedId === topic.id} hovered={hoveredId === topic.id} muted={Boolean(focused && focused.id !== topic.id && !askPathIds.includes(topic.id))} emphasized={askPathIds.includes(topic.id)} onFocus={(id) => onFocus(id)} onHover={onHover} reducedMotion={reducedMotion} compact={compact} measured={Boolean(regionActivity)} />
+      <GlowNode topic={topic} focused={focusedId === topic.id} hovered={hoveredId === topic.id} muted={Boolean(focused && focused.id !== topic.id && !askPathIds.includes(topic.id))} emphasized={askPathIds.includes(topic.id)} onFocus={(id) => onFocus(id)} onHover={onHover} reducedMotion={reducedMotion} compact={compact} measured={Boolean(regionActivity)} showLabel={entered} />
       {topic.children.filter((child) => revealId === topic.id || pathChildren.has(child.id)).map((child) => <group key={child.id}>
         <Filament from={topic.position} to={child.position} color={pathChildren.has(child.id) ? "#e6b988" : topic.color} opacity={pathChildren.has(child.id) ? .55 : .21} bend={.45} />
         <ChildNode position={child.position} name={child.name} color={topic.color} active={selectedChildId === child.id || pathChildren.has(child.id)} onClick={() => { if (focusedId !== topic.id) onFocus(topic.id); onChild(child.id); }} />
