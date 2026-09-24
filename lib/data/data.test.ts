@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { classifySignal } from "./classify";
 import { selectFeedEvents } from "./feed";
-import { selectDistinctHeadlines, selectRegionHighlights } from "./select";
+import { selectDistinctHeadlines, selectFocusedSignals, selectRegionHighlights } from "./select";
 import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
@@ -116,6 +116,14 @@ test("region highlights surface the newest thread stories without losing region 
   assert.equal(newerThread.topics[0]?.subtopicId, "ai-coding-agents");
   assert.equal(oldBare.topics[0]?.subtopicId, null);
   assert.deepEqual(selectRegionHighlights([oldBare, unrelated, newerThread], "ai", 2).map((event) => event.id), [newerThread.id, oldBare.id]);
+});
+
+test("focused exploration reaches a recent niche source beyond the map sample", () => {
+  const map = normalizeHackerNews({ id: 91, type: "story", title: "AI coding agents", time: Date.parse("2026-09-24T08:00:00Z") / 1000, url: "https://example.com/agents" })!;
+  const niche = normalizeHackerNews({ id: 92, type: "story", title: "New nuclear reactor", time: Date.parse("2026-09-23T08:00:00Z") / 1000, url: "https://example.com/reactor" })!;
+  const mirror = { ...niche, id: "hacker-news:93", externalId: "93", url: "https://mirror.example/reactor" };
+  assert.deepEqual(selectFocusedSignals([map], [niche, mirror], "energy").map((item) => item.id), [niche.id]);
+  assert.deepEqual(selectFocusedSignals([map], [niche], "ai"), [map]);
 });
 
 test("nearby ideas skip alternate headlines about the same incident", () => {

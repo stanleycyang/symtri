@@ -7,12 +7,13 @@ import type { AskResult } from "@/lib/ai/ask";
 import { getTopic, topics } from "@/lib/universe";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay } from "@/lib/data/model";
 import { regionActivity, regionRelationships, relationshipKey } from "@/lib/data/activity";
-import { selectRegionHighlights } from "@/lib/data/select";
+import { selectFocusedSignals } from "@/lib/data/select";
 
 const Universe = dynamic(() => import("@/components/universe/Universe"), { ssr: false, loading: () => <div className="universe-loading">AWAKENING THE MAP</div> });
 
 type DisplaySignal = { id: string; title: string; source: string; age: string; summary: string; url?: string; live: boolean };
 const sourceLabels = { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv" } as const;
+const emptySignals: SignalEvent[] = [];
 function ageOf(publishedAt: string, observedAt: string) {
   const hours = Math.max(0, Math.floor((Date.parse(observedAt) - new Date(publishedAt).getTime()) / 3600000));
   return hours < 1 ? "just now" : hours < 24 ? `${hours} hour${hours === 1 ? "" : "s"} ago` : `${Math.floor(hours / 24)} day${hours < 48 ? "" : "s"} ago`;
@@ -32,6 +33,7 @@ export default function Experience() {
   const [nearbyResult, setNearbyResult] = useState<{ id: string; signals: RelatedSignal[] } | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [liveFeed, setLiveFeed] = useState<SignalFeed | null>(null);
+  const [topicArchive, setTopicArchive] = useState<{ key: string; events: SignalEvent[] } | null>(null);
   const [historyDays, setHistoryDays] = useState<SnapshotDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [pendingDay, setPendingDay] = useState<string | null>(null);
@@ -57,8 +59,13 @@ export default function Experience() {
     .filter((item) => item.count > 0)
     .sort((a, b) => b.count - a.count).slice(0, 3) : [];
   const child = focus?.children.find((item) => item.id === childId);
-  const liveForChild = child && displayFeed && (!selectedDay || historicalFeed?.day === selectedDay) ? displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === child.id)).slice(0, 3) : [];
-  const regionSignals = focus && displayFeed ? selectRegionHighlights(displayFeed.events, focus.id).map((event) => showLive(event, displayFeed.observedAt)) : [];
+  const topicKey = focus ? `${focus.id}:${childId ?? ""}` : null;
+  const archiveForFocus = !selectedDay && topicArchive?.key === topicKey ? topicArchive.events : emptySignals;
+  const focusedSignals = focus && displayFeed ? selectFocusedSignals(displayFeed.events, archiveForFocus, focus.id) : emptySignals;
+  const visibleIds = new Set(displayFeed?.events.map((event) => event.id));
+  const archiveExpansion = focusedSignals.some((event) => !visibleIds.has(event.id));
+  const liveForChild = child ? focusedSignals.filter((event) => event.topics.some((match) => match.subtopicId === child.id)).slice(0, 3) : [];
+  const regionSignals = focus && displayFeed ? focusedSignals.slice(0, 3).map((event) => showLive(event, displayFeed.observedAt)) : [];
   const visibleSignals: DisplaySignal[] = child
     ? liveForChild.length ? liveForChild.map((event) => showLive(event, displayFeed!.observedAt)) : []
     : regionSignals;
@@ -142,6 +149,19 @@ export default function Experience() {
     return () => controller.abort();
   }, [pendingDay]);
   useEffect(() => {
+    if (!entered || !focusedId || selectedDay || !liveFeed) return;
+    const controller = new AbortController();
+    const key = `${focusedId}:${childId ?? ""}`;
+    const params = new URLSearchParams({ regionId: focusedId });
+    if (childId) params.set("childId", childId);
+    fetch(`/api/topic?${params}`, { cache: "no-store", signal: controller.signal }).then(async (response) => {
+      if (!response.ok) return;
+      const result: { events: SignalEvent[] } = await response.json();
+      if (!controller.signal.aborted && Array.isArray(result.events)) setTopicArchive({ key, events: result.events });
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [entered, focusedId, childId, selectedDay, liveFeed]);
+  useEffect(() => {
     if (!signalId || selectedDay || !entered) return;
     const controller = new AbortController();
     fetch(`/api/related?id=${encodeURIComponent(signalId)}`, { cache: "no-store", signal: controller.signal })
@@ -180,7 +200,7 @@ export default function Experience() {
       {focus && <aside key={signalId ?? childId ?? focusedId} className="detail-panel">
         <div className="panel-top"><span className="eyebrow">{signal ? "SIGNAL / SOURCE" : child ? liveForChild.length ? selectedDay ? "TOPIC / HISTORICAL SIGNALS" : "TOPIC / LIVE SIGNALS" : selectedDay ? "TOPIC / NO HISTORICAL SIGNALS" : "TOPIC / NO OBSERVED SIGNALS" : "REGION / ACTIVE TOPICS"}</span><button className="icon-button" onClick={goBack} aria-label="Go back">↗</button></div>
         <h3>{signal ? signal.title : child ? child.name : focus.name}</h3>
-        {signal ? <div className="signal-detail"><p>{signal.summary}</p><div className="signal-meta"><span>{signal.source}</span><span>{signal.age}</span></div>{signal.live && signal.url ? <a className="read-source" href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span>↗</span></a> : <span className="mock-notice">SOURCE UNAVAILABLE</span>}{!selectedDay && nearbySignals.length > 0 && <div className="nearby-signals"><span>NEARBY IDEAS IN THE ARCHIVE</span>{nearbySignals.map((item) => <button key={item.id} type="button" onClick={() => followNearby(item)}><small>{sourceLabels[item.source].toUpperCase()} · {getTopic(item.topics[0]?.topicId)?.short.toUpperCase() ?? "TECHNOLOGY"}</small><strong>{item.title}</strong><b aria-hidden="true">↗</b></button>)}</div>}</div> : child ? <><p className="panel-description">{liveForChild.length ? `${selectedDay ? "Observed then" : "Recent observations"} about ${child.name.toLowerCase()}.` : selectedDay ? `No sampled signals matched ${child.name.toLowerCase()} on ${shortDay(selectedDay)}.` : `No observed signals yet for ${child.name.toLowerCase()}.`}</p>{visibleSignals.length ? <div className="signal-list">{visibleSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div> : <p className="history-empty" role="status">NO OBSERVED SIGNALS YET</p>}</> : <><p className="panel-description">{focusActivity ? focusActivity.count ? `A sample of research, code, and conversation matched to ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : " recently"}.` : `No sampled signals matched ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : " recently"}.${selectedDay ? "" : " Explore its topics while the feed updates."}` : focus.description}</p><div className="activity-readout"><span>{focusActivity ? displayFeed?.partial ? sampleProvenance : "OBSERVED SAMPLE · PAST 14 DAYS" : "AWAITING OBSERVATIONS"}</span><strong>{focusActivity ? focusActivity.momentum.toUpperCase() : "PENDING"}</strong><span>{focusActivity ? focusActivity.count : 0} SIGNALS</span></div>{relatedRegions.length > 0 && <div className="related-regions"><span>{archiveRelationships ? "KNOWLEDGE LINKS" : "SHARED SIGNALS WITH"}</span><div>{relatedRegions.map(({ topic, count }) => <button key={topic.id} onClick={() => chooseTopic(topic.id)}>{topic.short} <small>{count}</small> ↗</button>)}</div></div>}{regionSignals.length > 0 && <><div className="panel-section-title">RECENT SIGNALS</div><div className="signal-list">{regionSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div></>}<div className="panel-section-title">FOLLOW A THREAD <span>{focus.children.length.toString().padStart(2, "0")}</span></div><div className="topic-list">{focus.children.map((item) => <button key={item.id} onClick={() => { setChildId(item.id); setSignalId(null); }}><span>{item.name}</span><small>{displayFeed ? displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === item.id)).length : 0} {displayFeed ? "SEEN" : "PENDING"}</small><b>↗</b></button>)}</div></>}
+        {signal ? <div className="signal-detail"><p>{signal.summary}</p><div className="signal-meta"><span>{signal.source}</span><span>{signal.age}</span></div>{signal.live && signal.url ? <a className="read-source" href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span>↗</span></a> : <span className="mock-notice">SOURCE UNAVAILABLE</span>}{!selectedDay && nearbySignals.length > 0 && <div className="nearby-signals"><span>NEARBY IDEAS IN THE ARCHIVE</span>{nearbySignals.map((item) => <button key={item.id} type="button" onClick={() => followNearby(item)}><small>{sourceLabels[item.source].toUpperCase()} · {getTopic(item.topics[0]?.topicId)?.short.toUpperCase() ?? "TECHNOLOGY"}</small><strong>{item.title}</strong><b aria-hidden="true">↗</b></button>)}</div>}</div> : child ? <><p className="panel-description">{liveForChild.length ? `${selectedDay ? "Observed then" : "Recent observations"} about ${child.name.toLowerCase()}.` : selectedDay ? `No sampled signals matched ${child.name.toLowerCase()} on ${shortDay(selectedDay)}.` : `No observed signals yet for ${child.name.toLowerCase()}.`}</p>{visibleSignals.length ? <div className="signal-list">{visibleSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div> : <p className="history-empty" role="status">NO OBSERVED SIGNALS YET</p>}</> : <><p className="panel-description">{focusActivity ? focusedSignals.length ? `Recent research, code, and conversation matched to ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : ""}.` : `No sampled signals matched ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : " recently"}.${selectedDay ? "" : " Explore its topics while the feed updates."}` : focus.description}</p><div className="activity-readout"><span>{focusActivity ? archiveExpansion ? "MAP SAMPLE · PAST 14 DAYS" : displayFeed?.partial ? sampleProvenance : "OBSERVED SAMPLE · PAST 14 DAYS" : "AWAITING OBSERVATIONS"}</span><strong>{focusActivity ? focusActivity.momentum.toUpperCase() : "PENDING"}</strong><span>{focusActivity ? focusActivity.count : 0} SIGNALS</span></div>{relatedRegions.length > 0 && <div className="related-regions"><span>{archiveRelationships ? "KNOWLEDGE LINKS" : "SHARED SIGNALS WITH"}</span><div>{relatedRegions.map(({ topic, count }) => <button key={topic.id} onClick={() => chooseTopic(topic.id)}>{topic.short} <small>{count}</small> ↗</button>)}</div></div>}{regionSignals.length > 0 && <><div className="panel-section-title">{archiveExpansion ? "RECENT SIGNALS · INCLUDING ARCHIVE" : "RECENT SIGNALS"}</div><div className="signal-list">{regionSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div></>}<div className="panel-section-title">FOLLOW A THREAD <span>{focus.children.length.toString().padStart(2, "0")}</span></div><div className="topic-list">{focus.children.map((item) => <button key={item.id} onClick={() => { setChildId(item.id); setSignalId(null); }}><span>{item.name}</span><small>{displayFeed ? displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === item.id)).length : 0} {displayFeed ? "SEEN" : "PENDING"}</small><b>↗</b></button>)}</div></>}
       </aside>}
       {historyDays.length > 1 && <div className={`history-timeline ${focus ? "history-timeline--focused" : ""}`} role="group" aria-label="Explore historical snapshots" aria-busy={Boolean(pendingDay)}>
         <span className="history-caption" role="status">{pendingDay ? `LOADING ${shortDay(pendingDay)}` : historyError ? "ARCHIVE UNAVAILABLE" : selectedDay ? `VIEWING ${shortDay(selectedDay)}` : "MOVE THROUGH TIME"}</span>

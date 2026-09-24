@@ -30,6 +30,8 @@ Same-day snapshot retries must preserve both source coverage and mapped event co
 
 For ingestion changes, test the canonical URL uniqueness and hourly slot claim in `scripts/check-storage.ts`. The cron route only queues a Vercel Workflow; check `/api/status` for completion after triggering it. When rotating `CRON_SECRET`, deploy fresh production functions before testing authorization because redeploying an older build may retain its environment snapshot. Keep the value out of logs and command output.
 
+The overview caps its event payload. A focused region or thread fetches recent matching archive events through `/api/topic`; keep those detail results distinct from the capped map activity calculation, and verify a niche source remains reachable beyond the overview cap.
+
 The Workflow CLI `start` command selects the deployment of its newest prior run, even after a newer Git deployment is Ready; setting `VERCEL_DEPLOYMENT_ID` does not override that selection. Inspect the new run's `deploymentId` before using its result to verify new workflow code. Prefer the cron route on the current production alias for an end-to-end check.
 
 After a Git deployment, wait for the production deployment to report Ready before judging dynamic API health. `/api/status` has stalled after rollout, including one logged 300-second runtime timeout; retry with a bounded timeout and inspect runtime logs if it remains slow. For universe navigation changes, inspect 1440px desktop, 756×469 short desktop, and narrow mobile viewports, and verify a near-node click selects while a drag does not.

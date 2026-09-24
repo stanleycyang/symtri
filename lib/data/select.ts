@@ -1,9 +1,26 @@
 import type { SignalEvent } from "./model";
+import { canonicalSignalUrl, signalContentKey } from "./normalize";
 
 export function selectRegionHighlights(events: SignalEvent[], regionId: string, limit = 3): SignalEvent[] {
   return events.filter((event) => event.topics.some((match) => match.topicId === regionId))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, limit);
+}
+
+export function selectFocusedSignals(visible: SignalEvent[], archive: SignalEvent[], regionId: string): SignalEvent[] {
+  const ids = new Set<string>();
+  const urls = new Set<string>();
+  const content = new Set<string>();
+  return [...visible, ...archive]
+    .filter((event) => event.topics.some((match) => match.topicId === regionId))
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .filter((event) => {
+      const url = canonicalSignalUrl(event.url);
+      const key = signalContentKey(event);
+      if (ids.has(event.id) || urls.has(url) || content.has(key)) return false;
+      ids.add(event.id); urls.add(url); content.add(key);
+      return true;
+    });
 }
 
 export function selectDistinctHeadlines<T extends { title: string }>(items: T[], limit: number, excludedTitles: string[] = []): T[] {

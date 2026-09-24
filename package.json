@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test lib/data/*.test.ts lib/ai/*.test.ts",
     "test:storage": "tsx scripts/check-storage.ts",
     "test:storage:local": "bash scripts/check-storage-local.sh"
