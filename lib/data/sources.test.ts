@@ -7,7 +7,7 @@ test("hourly source sampling finds new items without widening the public sample"
   const requests: string[] = [];
   const requestOptions: { cache: RequestCache | undefined; revalidate: number | false | undefined }[] = [];
   const pauses: number[] = [];
-  const story = (id: number) => ({ id, type: "story", title: `AI agent story ${id}`, time: 1780000000, score: 10, url: `https://example.com/${id}` });
+  const story = (id: number) => ({ id, type: "story", title: `AI agent story ${id}`, time: Math.floor(Date.now() / 1000), score: 10, url: `https://example.com/${id}` });
   const repo = (id: number) => ({ id, full_name: `example/repo-${id}`, created_at: "2026-09-22T12:00:00Z", html_url: `https://github.com/example/repo-${id}`, description: "Open source database", stargazers_count: 10, fork: false });
   globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -68,7 +68,7 @@ test("hourly Hacker News replay covers stories missed by a previous run", async 
     if (item) {
       const id = Number(item[1]);
       requestedItems.push(id);
-      return Response.json({ id, type: "story", title: `AI agent story ${id}`, time: 1780000000, score: 10, url: `https://example.com/${id}` });
+      return Response.json({ id, type: "story", title: `AI agent story ${id}`, time: Math.floor(Date.now() / 1000), score: 10, url: `https://example.com/${id}` });
     }
     throw new Error(`Unexpected source request: ${url}`);
   };
@@ -78,6 +78,30 @@ test("hourly Hacker News replay covers stories missed by a previous run", async 
     assert.ok(requestedItems.includes(181));
     assert.equal(requestedItems.includes(182), false);
     assert.equal(requestedItems.includes(201), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hourly Hacker News ingestion reports stale or unavailable new stories", async () => {
+  const originalFetch = globalThis.fetch;
+  let failNewStories = false;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/topstories.json")) return Response.json([1]);
+    if (url.endsWith("/newstories.json")) {
+      if (failNewStories) return new Response("Unavailable", { status: 503 });
+      return Response.json([2]);
+    }
+    const item = url.match(/\/item\/(\d+)\.json$/);
+    if (item) return Response.json({ id: Number(item[1]), type: "story", title: "AI agent story", time: Number(item[1]) === 1 ? Math.floor(Date.now() / 1000) : Math.floor(Date.now() / 1000) - 3600, url: `https://example.com/${item[1]}` });
+    throw new Error(`Unexpected source request: ${url}`);
+  };
+  try {
+    await assert.rejects(fetchHackerNews(true), /new stories are stale/);
+    failNewStories = true;
+    await assert.rejects(fetchHackerNews(true), /HTTP 503/);
+    assert.equal((await fetchHackerNews()).length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }

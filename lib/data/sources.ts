@@ -2,6 +2,7 @@ import { normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./norm
 import type { SignalEvent } from "./model";
 
 const hackerNewsReplayLimit = 180;
+const hackerNewsFreshnessLimitMs = 45 * 60 * 1000;
 
 async function request(url: string, headers?: HeadersInit, fresh = false): Promise<Response> {
   const response = await fetch(url, { headers, ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: 900 } }), signal: AbortSignal.timeout(12000) });
@@ -14,14 +15,13 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
   if (!Array.isArray(ids)) throw new Error("Invalid Hacker News story list");
   const topIds = ids.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, 60);
   let storyIds = topIds;
+  let newestIds: number[] = [];
   if (forIngestion) {
-    try {
-      const newest: unknown = await (await request("https://hacker-news.firebaseio.com/v0/newstories.json", undefined, true)).json();
-      if (!Array.isArray(newest)) throw new Error("Invalid Hacker News new story list");
-      storyIds = [...new Set([...topIds, ...newest.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, hackerNewsReplayLimit)])];
-    } catch (error) {
-      console.warn("SYMTRI Hacker News new stories unavailable", error instanceof Error ? error.message : "unknown error");
-    }
+    const newest: unknown = await (await request("https://hacker-news.firebaseio.com/v0/newstories.json", undefined, true)).json();
+    if (!Array.isArray(newest)) throw new Error("Invalid Hacker News new story list");
+    newestIds = newest.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, hackerNewsReplayLimit);
+    if (!newestIds.length) throw new Error("Hacker News returned no new story IDs");
+    storyIds = [...new Set([...topIds, ...newestIds])];
   }
   const output: SignalEvent[] = [];
   for (let offset = 0; offset < storyIds.length; offset += 12) {
@@ -32,6 +32,13 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
     for (const result of batch) if (result.status === "fulfilled" && result.value) output.push(result.value);
   }
   if (!output.length) throw new Error("Hacker News returned no usable stories");
+  if (forIngestion) {
+    const newestSet = new Set(newestIds.map(String));
+    const latest = Math.max(...output.filter((event) => newestSet.has(event.externalId)).map((event) => Date.parse(event.publishedAt)));
+    if (!Number.isFinite(latest) || Date.now() - latest > hackerNewsFreshnessLimitMs) {
+      throw new Error("Hacker News new stories are stale or unavailable");
+    }
+  }
   return output;
 }
 
