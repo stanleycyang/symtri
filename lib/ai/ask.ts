@@ -41,6 +41,9 @@ const subtopicAliases: Record<string, string[]> = {
   "energy-power-demand": ["power demand", "data center power"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
   "energy-fusion": ["fusion", "tokamak", "tokamaks", "stellarator", "stellarators"],
+  "hardware-networks": ["network hardware", "network devices", "hardware networks"],
+  "startups-product": ["startup product", "product launch"],
+  "startups-growth": ["startup growth", "company growth"],
   "startups-design": ["startup design", "design for startups"],
 };
 
