@@ -18,6 +18,7 @@ const id = `github:${externalId}`;
 const unclassifiedId = `github:${externalId}-unclassified`;
 const relatedId = `github:${externalId}-related`;
 const foreignId = `github:${externalId}-foreign`;
+const crowdPrefix = `github:${externalId}-crowd-`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
 
@@ -105,6 +106,22 @@ async function main() {
     assert.ok(!(await getRelatedSignals(id)).some((item) => item.id === id));
     assert.deepEqual(await getRelatedSignals(unclassifiedId), []);
     await sql`delete from signal_events where id = ${relatedId}`;
+    const crowd = Array.from({ length: 300 }, (_, index) => ({
+      id: `${crowdPrefix}${index}`, source: "github", external_id: `${externalId}-crowd-${index}`,
+      title: "Software sample", url: `https://github.com/symtri/${externalId}-crowd-${index}`,
+      summary: "A newer unrelated signal", published_at: new Date(Date.now() + 7_200_000 + index).toISOString(),
+      importance: 10, topics: [{ topicId: "software", subtopicId: null, relevance: 1 }],
+    }));
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      select id, source, external_id, title, url, summary, published_at::timestamptz, importance, topics
+      from jsonb_to_recordset(${sql.json(crowd)}::jsonb) as incoming
+        (id text, source text, external_id text, title text, url text, summary text,
+         published_at text, importance double precision, topics jsonb)
+    `;
+    assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === id));
+    assert.ok((await getRecentTopicEvents([{ id: "ai", childId: "ai-agents" }])).some((item) => item.id === id));
+    await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     const semanticRelationships = await getSemanticRelationships();
     assert.ok(Number.isFinite(semanticRelationships["ai:energy"]));
     const aiHash = (await sql`select embedding_input_hash from topic_embeddings where topic_id = 'ai'`)[0].embedding_input_hash;
@@ -189,9 +206,10 @@ async function main() {
     assert.equal(snapshot?.events.length, 2);
     assert.equal(snapshot?.partial, false);
     assert.equal(snapshot?.scope, "history");
-    console.log("Postgres migrations, API table protection, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
+    console.log("Postgres migrations, API table protection, signal upsert, topic lookup beyond the map cap, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId})`;
+    await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;
