@@ -2,13 +2,13 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 2;
+export const CLASSIFIER_VERSION = 3;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
   software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "browsers", "sdk", "vscode", "vs code", "kafka", "nixos", "http", "debugger", "terminal", "tailscale"],
   science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical", "crispr", "enzyme", "vaccine", "mrna", "dna", "quantum computing", "quantum computer", "quantum computers", "quantum software", "quantum algorithm", "quantum circuit", "quantum machine learning", "qubit", "qubits", "entanglement"],
-  space: ["space", "satellite", "satellites", "rocket", "astronomy", "cosmology", "orbital", "spacecraft", "nasa"],
+  space: ["space", "satellite", "satellites", "rocket", "astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "orbital", "spacecraft", "nasa"],
   energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
   security: ["security", "cyber", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity", "hacked", "hacking", "supply-chain attack"],
@@ -74,6 +74,12 @@ function hasTerm(text: string, term: string) {
 function matched(text: string, terms: string[]) { return terms.some((term) => hasTerm(text, term)); }
 function strongestTerm(text: string, terms: string[]) { return terms.filter((term) => hasTerm(text, term)).reduce((length, term) => Math.max(length, term.length), 0); }
 
+function astronomicalSense(text: string): string {
+  return text
+    .replace(/\b(?:constant|linear|logarithmic|sublinear|state|feature|latent|vector|embedding|search|parameter|phase|sample|hilbert|memory|storage)[ -]space\b/gi, "")
+    .replace(/\bspace[ -](?:overhead|complexity|usage|efficiency|efficient|bound|requirements?)\b/gi, "");
+}
+
 export function classifySignal(title: string, summary: string, categories: string[] = []): TopicMatch[] {
   const scored = topics.map((topic) => {
     const terms = topicTerms[topic.id] ?? [];
@@ -84,10 +90,11 @@ export function classifySignal(title: string, summary: string, categories: strin
     if (physicalEnergy && !matched(`${title} ${summary}`, terms.filter((term) => term !== "energy"))) {
       return { topicId: topic.id, subtopicId: null, score: 0 };
     }
-    const parentInTitle = matched(title, terms);
-    const parentInSummary = matched(summary, terms);
+    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : title, terms);
+    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : summary, terms);
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));
-    let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? 6 : 0);
+    const categoryWeight = topic.id === "space" && parentInCategory ? 8 : 6;
+    let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? categoryWeight : 0);
     let bestChild: { id: string; score: number } | null = null;
     for (const child of topic.children) {
       const childAliases = childTerms[child.id] ?? [child.name.toLowerCase()];

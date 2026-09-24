@@ -35,6 +35,17 @@ test("cosmology dark energy stays in space without an applied energy link", () =
     .some((match) => match.topicId === "energy"));
 });
 
+test("computational space is not astronomy and astro-ph outweighs incidental GPU wording", () => {
+  const quantum = classifySignal("Constant-space-overhead fault-tolerant quantum computation", "Uses constant-space overhead", ["quant-ph"]);
+  assert.equal(quantum[0]?.topicId, "science");
+  assert.ok(!quantum.some((match) => match.topicId === "space"));
+  assert.ok(!classifySignal("Learning in latent space", "A vector space model", ["cs.AI"])
+    .some((match) => match.topicId === "space"));
+  const astrophysics = classifySignal("Differentiable astrophysics on the GPU", "Astronomers use graphics processing units", ["astro-ph.IM", "physics.comp-ph"]);
+  assert.equal(astrophysics[0]?.topicId, "space");
+  assert.ok(classifySignal("New space telescope photographs a galaxy", "", []).some((match) => match.topicId === "space"));
+});
+
 test("arXiv quantum subjects keep their physics location beside cross-domain topics", () => {
   const battery = classifySignal("Simulation of a Battery Cell on Quantum Computers: Reactions & Transport", "", ["quant-ph"]);
   assert.equal(battery[0]?.topicId, "science");
