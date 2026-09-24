@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { classifySignal } from "./classify";
 import { selectFeedEvents } from "./feed";
-import { deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
+import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
   assert.deepEqual(classifySignal("AI coding agents use tools", "A benchmark of tool use")[0]?.subtopicId, "ai-coding-agents");
@@ -54,6 +54,7 @@ test("deduplication keeps the stronger observation for the same URL", () => {
   const input = [second, first];
   assert.deepEqual(deduplicateSignals(input).map((event) => event.id), [first.id]);
   assert.deepEqual(input.map((event) => event.id), [second.id, first.id]);
+  assert.equal(canonicalSignalUrl("https://EXAMPLE.com/Agent/?ref=hn"), "example.com/agent");
 });
 
 test("feed selection keeps mapped signals before applying the cap or deduplicating", () => {

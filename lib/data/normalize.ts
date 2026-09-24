@@ -63,9 +63,17 @@ export function deduplicateSignals(events: SignalEvent[]): SignalEvent[] {
   const seenIds = new Set<string>();
   const seenUrls = new Set<string>();
   return [...events].sort((a, b) => b.importance - a.importance).filter((event) => {
-    let canonical = event.url;
-    try { const url = new URL(event.url); canonical = `${url.host.toLowerCase()}${url.pathname.replace(/\/$/, "")}`; } catch { /* normalization already validates URLs */ }
+    const canonical = canonicalSignalUrl(event.url);
     if (seenIds.has(event.id) || seenUrls.has(canonical)) return false;
     seenIds.add(event.id); seenUrls.add(canonical); return true;
   });
+}
+
+export function canonicalSignalUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return `${url.host}${url.pathname}`.replace(/\/+$/, "").toLowerCase();
+  } catch {
+    return value.replace(/^https?:\/\//, "").split(/[?#]/, 1)[0].replace(/\/+$/, "").toLowerCase();
+  }
 }
