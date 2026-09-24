@@ -49,6 +49,14 @@ test("computational space is not astronomy and astro-ph outweighs incidental GPU
   assert.ok(classifySignal("New space telescope photographs a galaxy", "", []).some((match) => match.topicId === "space"));
 });
 
+test("disk space and device activity do not create false map regions", () => {
+  assert.ok(!classifySignal("cleanupper disk-space", "Open-source macOS disk cleanup CLI")
+    .some((match) => match.topicId === "space"));
+  assert.deepEqual(classifySignal("A 3D visualization for user/device activity data", "Hacker News discussion."), []);
+  assert.ok(classifySignal("The newest ESP32 can run Linux", "A tiny microcontroller board")
+    .some((match) => match.topicId === "hardware"));
+});
+
 test("arXiv quantum subjects keep their physics location beside cross-domain topics", () => {
   const battery = classifySignal("Simulation of a Battery Cell on Quantum Computers: Reactions & Transport", "", ["quant-ph"]);
   assert.equal(battery[0]?.topicId, "science");
