@@ -98,6 +98,24 @@ test("semantic similarity reorders sources only within the identified region", (
   assert.equal(result.retrieval, "semantic-assisted");
 });
 
+test("recent equally relevant evidence leads an answer as the archive grows", () => {
+  const old = { ...event("old-agents", "Coding agents for repositories", "ai", "ai-agents"),
+    publishedAt: "2026-09-15T12:00:00.000Z", importance: 100 };
+  const recent = { ...event("recent-agents", "Coding agents for repositories", "ai", "ai-agents"),
+    publishedAt: "2026-09-22T11:00:00.000Z", importance: 20 };
+  const result = answerQuestion("What's happening with AI coding agents?", { ...feed, events: [old, recent] });
+  assert.deepEqual(result.events.map((item) => item.id), [recent.id, old.id]);
+});
+
+test("a specific older source can outrank a newer broad source", () => {
+  const specific = { ...event("specific", "Coding agents for repositories", "ai", "ai-agents"),
+    publishedAt: "2026-09-15T12:00:00.000Z", importance: 20 };
+  const broad = { ...event("broad", "Agents for repositories", "ai", "ai-agents"),
+    publishedAt: "2026-09-22T11:00:00.000Z", importance: 20 };
+  const result = answerQuestion("What's happening with AI coding agents?", { ...feed, events: [broad, specific] });
+  assert.equal(result.events[0].id, specific.id);
+});
+
 test("unmapped subjects use the knowledge archive without inventing a map location", () => {
   assert.deepEqual(questionTopics("What's happening with AI agents?"), [{ id: "ai", childId: "ai-agents" }]);
   assert.deepEqual(questionTopics("What is drawing attention?"), []);

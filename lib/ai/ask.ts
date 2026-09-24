@@ -123,13 +123,18 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
   const scoped = subtopicId ? matching.filter((event) => event.topics.some((match) => match.subtopicId === subtopicId)) : matching;
   const candidates = scoped.length ? scoped : matching;
   const semanticScores = new Map(semanticMatches.filter((match) => Number.isFinite(match.similarity)).map((match) => [match.id, Math.max(0, Math.min(1, match.similarity))]));
+  const observedAt = Date.parse(feed.observedAt);
   const score = (event: SignalEvent) => {
     const text = `${event.title} ${event.summary}`.toLowerCase();
     const overlap = queryWords.filter((word) => text.includes(word)).length;
     const shared = regionIds.length === 2 && regionIds.every((id) => event.topics.some((match) => match.topicId === id));
-    return overlap * 5 + (shared ? 15 : 0) + event.importance / 25 + (semanticScores.get(event.id) ?? 0) * 6;
+    const ageHours = (observedAt - Date.parse(event.publishedAt)) / 3_600_000;
+    const freshness = Number.isFinite(ageHours) ? 5 * 2 ** (-Math.max(0, ageHours) / 48) : 0;
+    return overlap * 5 + (shared ? 15 : 0) + event.importance / 25 + (semanticScores.get(event.id) ?? 0) * 6 + freshness;
   };
-  const ranked = [...candidates].sort((a, b) => score(b) - score(a) || b.publishedAt.localeCompare(a.publishedAt));
+  const ranked = candidates.map((event) => ({ event, rank: score(event) }))
+    .sort((a, b) => b.rank - a.rank || b.event.publishedAt.localeCompare(a.event.publishedAt))
+    .map(({ event }) => event);
   const sharedEvents = regionIds.length === 2
     ? ranked.filter((event) => regionIds.every((id) => event.topics.some((match) => match.topicId === id)))
     : [];
