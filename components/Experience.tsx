@@ -33,6 +33,8 @@ export default function Experience() {
   const [nearbyResult, setNearbyResult] = useState<{ id: string; signals: RelatedSignal[] } | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [liveFeed, setLiveFeed] = useState<SignalFeed | null>(null);
+  const [feedError, setFeedError] = useState(false);
+  const [feedRetry, setFeedRetry] = useState(0);
   const [topicArchive, setTopicArchive] = useState<{ key: string; events: SignalEvent[] } | null>(null);
   const [historyDays, setHistoryDays] = useState<SnapshotDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -104,16 +106,17 @@ export default function Experience() {
     const load = () => {
       if (document.visibilityState === "hidden") return;
       fetch("/api/signals", { cache: "no-store", signal: controller.signal }).then(async (response) => {
-        if (!response.ok) return;
+        if (!response.ok) throw new Error("Signal feed unavailable");
         const feed: SignalFeed = await response.json();
-        if (Array.isArray(feed.events)) setLiveFeed(feed);
-      }).catch(() => { /* Keep the last usable map if sources are unavailable. */ });
+        if (!Array.isArray(feed.events)) throw new Error("Invalid signal feed");
+        if (!controller.signal.aborted) { setLiveFeed(feed); setFeedError(false); }
+      }).catch(() => { if (!controller.signal.aborted) setFeedError(true); });
     };
     load();
     const timer = window.setInterval(load, 15 * 60 * 1000);
     document.addEventListener("visibilitychange", load);
     return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", load); };
-  }, [entered]);
+  }, [entered, feedRetry]);
   useEffect(() => {
     if (!entered) return;
     const controller = new AbortController();
@@ -191,9 +194,9 @@ export default function Experience() {
     </section>
 
     <div className="universe-ui" aria-hidden={!entered} inert={!entered}>
-      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center"><span className="live-pulse" /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "14-DAY SAMPLE" : displayFeed ? "SAMPLE ACTIVITY" : "ACTIVITY LOADING"}</div><button type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { setAskOpen((open) => !open); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></header>
+      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "14-DAY SAMPLE" : displayFeed ? "SAMPLE ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div><div className="topbar-actions">{feedError && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { setAskOpen((open) => !open); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
       {askOpen && <AskSymtri key={selectedDay ?? "now"} day={selectedDay} onClose={() => { setAskOpen(false); setAskSteps([]); }} onResult={followAnswer} onNavigate={(id, subtopicId) => { setFocusedId(id); setChildId(subtopicId); setSignalId(null); setHoveredId(null); }} />}
-      {!focus && <div className="scene-heading"><p className="eyebrow">{displayFeed ? sampleProvenance : "EXPLORE THE SIGNAL"}</p><h2>A map of what matters.</h2><p>Ideas gather. Connections form. Attention moves.</p>{!selectedDay && liveFeed?.archiveCount ? <p className="archive-total">{liveFeed.archiveCount.toLocaleString()} UNIQUE SIGNALS OBSERVED SINCE LAUNCH</p> : null}{leadingRegion && leadingRegionActivity && leadingRegionActivity.count > 0 && <button type="button" className="scene-leader" onClick={() => chooseTopic(leadingRegion.id)}><span>MOST ACTIVE IN THIS SAMPLE</span><strong>{leadingRegion.name}</strong><b aria-hidden="true">↗</b></button>}</div>}
+      {!focus && <div className="scene-heading"><p className="eyebrow">{displayFeed ? sampleProvenance : "EXPLORE THE SIGNAL"}</p><h2>A map of what matters.</h2><p>Ideas gather. Connections form. Attention moves.</p>{feedError && !selectedDay && !liveFeed && <p className="feed-error-copy">Live observations could not load. Explore the map or retry the feed.</p>}{!selectedDay && liveFeed?.archiveCount ? <p className="archive-total">{liveFeed.archiveCount.toLocaleString()} UNIQUE SIGNALS OBSERVED SINCE LAUNCH</p> : null}{leadingRegion && leadingRegionActivity && leadingRegionActivity.count > 0 && <button type="button" className="scene-leader" onClick={() => chooseTopic(leadingRegion.id)}><span>MOST ACTIVE IN THIS SAMPLE</span><strong>{leadingRegion.name}</strong><b aria-hidden="true">↗</b></button>}</div>}
       <div className="breadcrumbs" aria-label="Current location"><button onClick={() => chooseTopic(null)}>UNIVERSE</button>{focus && <><span>/</span><button onClick={() => { setChildId(null); setSignalId(null); }}>{focus.short}</button></>}{child && <><span>/</span><span>{child.name.toUpperCase()}</span></>}</div>
 
       {hover && !focus && <div className="hover-card" aria-live="polite"><span className="hover-card-label">REGION IN FOCUS · {hoverActivity ? sampleProvenance : "AWAITING OBSERVATIONS"}</span><strong>{hover.name}</strong><span><b>{hoverActivity ? hoverActivity.momentum.toUpperCase() : "PENDING"}</b> activity <i /> {hoverActivity ? hoverActivity.count : 0} signals</span></div>}
