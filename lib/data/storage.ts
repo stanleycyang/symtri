@@ -492,11 +492,12 @@ export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed,
   `;
   const latest = rows[0];
   if (!latest) return null;
+  const sources = { ...unavailableSources(), ...latest.source_status };
   return {
     observedAt: new Date(latest.completed_at).toISOString(),
-    sources: latest.source_status,
+    sources,
     activity: Object.keys(latest.activity).length ? latest.activity : undefined,
-    partial: (["hacker-news", "github", "arxiv", "openalex"] as const).some((source) => latest.source_status[source] !== "ok"),
+    partial: Object.values(sources).some((status) => status !== "ok"),
   };
 }
 
