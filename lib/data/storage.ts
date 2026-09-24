@@ -490,11 +490,13 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
     order by embedding <=> ${origin[0].vector}::vector(256)
     limit 24
   `;
-  const originRegions = new Set((origin[0].topics as SignalEvent["topics"]).map((match) => match.topicId));
+  const originTopics = origin[0].topics as SignalEvent["topics"];
+  const originThreads = new Set(originTopics.map((match) => match.subtopicId).filter(Boolean));
   return selectDistinctHeadlines(candidates.filter((row) => {
     const similarity = Number(row.similarity);
-    const sharedRegion = (row.topics as SignalEvent["topics"]).some((match) => originRegions.has(match.topicId));
-    return Number.isFinite(similarity) && similarity >= (sharedRegion ? .55 : .68);
+    const matches = row.topics as SignalEvent["topics"];
+    const sharedThread = matches.some((match) => match.subtopicId && originThreads.has(match.subtopicId));
+    return Number.isFinite(similarity) && similarity >= (sharedThread ? .55 : .68);
   }), 3, [origin[0].title]).map((row) => ({
     id: row.id, source: row.source, title: row.title, url: row.url, summary: row.summary,
     publishedAt: new Date(row.published_at).toISOString(), topics: row.topics,
