@@ -17,7 +17,8 @@ async function withSourceSummary(answer: AskResult, feed: SignalFeed): Promise<A
     const note = await summarizeAnswer(answer, feed);
     const citedOrder = new Map(note.citedEventIds.map((id, index) => [id, index]));
     return { ...answer, summary: note.summary, summaryKind: "model", citedEventIds: note.citedEventIds,
-      events: [...answer.events].sort((a, b) => (citedOrder.get(a.id) ?? 99) - (citedOrder.get(b.id) ?? 99)) };
+      events: answer.events.filter((event) => citedOrder.has(event.id))
+        .sort((a, b) => citedOrder.get(a.id)! - citedOrder.get(b.id)!) };
   } catch (error) {
     console.warn("SYMTRI source synthesis unavailable", error instanceof Error ? error.message : "unknown error");
     return answer;
