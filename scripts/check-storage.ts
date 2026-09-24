@@ -290,6 +290,12 @@ async function main() {
     event.title = "One-source retry";
     await persistSnapshot(feed);
     assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
+    event.title = "Swapped-source retry";
+    await persistSnapshot({ ...feed, sources: { "hacker-news": "ok", github: "unavailable", arxiv: "ok" } });
+    assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
+    event.title = "Partial-source retry";
+    await persistSnapshot({ ...twoSourceFeed, sources: { "hacker-news": "ok", github: "partial", arxiv: "unavailable" } });
+    assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
     const completeFeed: SignalFeed = {
       ...feed, partial: false,
       sources: { "hacker-news": "ok", github: "ok", arxiv: "ok" },

@@ -29,6 +29,7 @@ In Vercel functions, OIDC arrives through the request context/header, not reliab
 For Postgres writes, run `npm run test:storage` with `SYMTRI_TEST_DATABASE_URL` pointed at an isolated loopback database. Postgres.js `sql.json(rows)` must be used for bulk JSON parameters; passing `JSON.stringify(rows)` produced a JSON string and broke `jsonb_to_recordset` at runtime despite passing typecheck.
 
 Same-day snapshot retries must preserve both source coverage and mapped event count. Keep the downgrade cases in `scripts/check-storage.ts` and run `npm run test:storage:local` when changing the snapshot write.
+Compare each source's coverage level (`ok` > `partial` > `unavailable`) when deciding whether a same-day snapshot can be replaced; equal counts of healthy sources can hide a swapped or degraded source.
 
 For ingestion changes, test the canonical URL uniqueness and hourly slot claim in `scripts/check-storage.ts`. The cron route only queues a Vercel Workflow; check `/api/status` for completion after triggering it. When rotating `CRON_SECRET`, deploy fresh production functions before testing authorization because redeploying an older build may retain its environment snapshot. Keep the value out of logs and command output.
 

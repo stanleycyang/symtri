@@ -500,8 +500,11 @@ export async function persistSnapshot(feed: SignalFeed): Promise<void> {
     insert into signal_snapshots (day, captured_at, feed)
     values (${day}::date, ${capturedAt}::timestamptz, ${sql.json(feed)}::jsonb)
     on conflict (day) do update set captured_at = excluded.captured_at, feed = excluded.feed
-    where (select count(*) from jsonb_each_text(coalesce(signal_snapshots.feed->'sources', '{}'::jsonb)) as saved(source_id, status) where saved.status = 'ok')
-       <= (select count(*) from jsonb_each_text(coalesce(excluded.feed->'sources', '{}'::jsonb)) as incoming(source_id, status) where incoming.status = 'ok')
+    where not exists (
+        select 1 from jsonb_each_text(coalesce(signal_snapshots.feed->'sources', '{}'::jsonb)) as saved(source_id, status)
+        where (case saved.status when 'ok' then 2 when 'partial' then 1 else 0 end)
+          > (case excluded.feed->'sources'->>saved.source_id when 'ok' then 2 when 'partial' then 1 else 0 end)
+      )
       and jsonb_array_length(coalesce(signal_snapshots.feed->'events', '[]'::jsonb))
        <= jsonb_array_length(coalesce(excluded.feed->'events', '[]'::jsonb))
   `;
