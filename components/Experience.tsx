@@ -11,20 +11,24 @@ import { selectFocusedSignals } from "@/lib/data/select";
 
 const Universe = dynamic(() => import("@/components/universe/Universe"), { ssr: false, loading: () => <div className="universe-loading">AWAKENING THE MAP</div> });
 
-type DisplaySignal = { id: string; title: string; source: string; age: string; summary: string; url?: string; live: boolean };
+type DisplaySignal = { id: string; title: string; source: string; publishedAt: string; age: string; summary: string; url?: string; live: boolean };
 const sourceLabels = { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv" } as const;
 const emptySignals: SignalEvent[] = [];
-function ageOf(publishedAt: string, observedAt: string) {
-  const hours = Math.max(0, Math.floor((Date.parse(observedAt) - new Date(publishedAt).getTime()) / 3600000));
-  return hours < 1 ? "just now" : hours < 24 ? `${hours} hour${hours === 1 ? "" : "s"} ago` : `${Math.floor(hours / 24)} day${hours < 48 ? "" : "s"} ago`;
+function ageOf(publishedAt: string, referenceAt: string) {
+  const minutes = Math.max(0, Math.floor((Date.parse(referenceAt) - Date.parse(publishedAt)) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours} hour${hours === 1 ? "" : "s"} ago` : `${Math.floor(hours / 24)} day${hours < 48 ? "" : "s"} ago`;
 }
 function showLive(event: Pick<SignalEvent, "id" | "title" | "source" | "publishedAt" | "summary" | "url">, observedAt: string): DisplaySignal {
-  return { id: event.id, title: event.title, source: sourceLabels[event.source], age: ageOf(event.publishedAt, observedAt), summary: event.summary, url: event.url, live: true };
+  return { id: event.id, title: event.title, source: sourceLabels[event.source], publishedAt: event.publishedAt, age: ageOf(event.publishedAt, observedAt), summary: event.summary, url: event.url, live: true };
 }
 function shortDay(day: string) { return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase(); }
 
 export default function Experience() {
   const [entered, setEntered] = useState(false);
+  const [now, setNow] = useState(() => new Date().toISOString());
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [childId, setChildId] = useState<string | null>(null);
@@ -46,6 +50,7 @@ export default function Experience() {
   const [askSteps, setAskSteps] = useState<AskResult["pathSteps"]>([]);
   const askPath = askSteps.map((step) => step.regionId).filter((id, index, ids) => index === 0 || id !== ids[index - 1]);
   const displayFeed = selectedDay && historicalFeed?.day === selectedDay ? historicalFeed.feed : liveFeed;
+  const ageReference = selectedDay && displayFeed ? displayFeed.observedAt : now;
   const sampleProvenance = displayFeed?.scope === "archive" ? "ARCHIVED SAMPLE" : displayFeed?.scope === "rolling" ? displayFeed.partial ? "PARTIAL ROLLING SAMPLE" : "ROLLING SAMPLE" : displayFeed?.partial ? "PARTIAL SAMPLE" : "OBSERVED SAMPLE";
   const measuredActivity = useMemo(() => displayFeed ? displayFeed.activity ?? regionActivity(displayFeed.events, Date.parse(displayFeed.observedAt)) : null, [displayFeed]);
   const measuredRelationships = useMemo(() => displayFeed ? regionRelationships(displayFeed.events, Date.parse(displayFeed.observedAt)) : null, [displayFeed]);
@@ -68,11 +73,11 @@ export default function Experience() {
   const visibleIds = new Set(displayFeed?.events.map((event) => event.id));
   const archiveExpansion = focusedSignals.some((event) => !visibleIds.has(event.id));
   const liveForChild = child ? focusedSignals.filter((event) => event.topics.some((match) => match.subtopicId === child.id)).slice(0, 3) : [];
-  const regionSignals = focus && displayFeed ? focusedSignals.slice(0, 3).map((event) => showLive(event, displayFeed.observedAt)) : [];
+  const regionSignals = focus && displayFeed ? focusedSignals.slice(0, 3).map((event) => showLive(event, ageReference)) : [];
   const visibleSignals: DisplaySignal[] = child
-    ? liveForChild.length ? liveForChild.map((event) => showLive(event, displayFeed!.observedAt)) : []
+    ? liveForChild.length ? liveForChild.map((event) => showLive(event, ageReference)) : []
     : regionSignals;
-  const signal = visibleSignals.find((item) => item.id === signalId) ?? (connectedSignal?.id === signalId ? connectedSignal : null);
+  const signal = visibleSignals.find((item) => item.id === signalId) ?? (connectedSignal?.id === signalId ? { ...connectedSignal, age: ageOf(connectedSignal.publishedAt, ageReference) } : null);
   const nearbySignals = nearbyResult?.id === signalId ? nearbyResult.signals : [];
   const signalMarkers = connectedSignal?.id === signalId && !visibleSignals.some((item) => item.id === signalId)
     ? [...visibleSignals, connectedSignal] : visibleSignals;
@@ -90,6 +95,10 @@ export default function Experience() {
   const followAnswer = (result: AskResult) => { setAskSteps(result.pathSteps); setFocusedId(result.regionIds[0] ?? null); setChildId(result.subtopicId); setSignalId(null); setHoveredId(null); };
   const goBack = () => { if (signalId) setSignalId(null); else if (childId) setChildId(null); else chooseTopic(null); };
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date().toISOString()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReducedMotion(query.matches);
