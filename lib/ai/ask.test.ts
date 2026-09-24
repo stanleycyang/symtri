@@ -89,6 +89,12 @@ test("a thread without exact evidence does not cite unrelated parent-region sour
   const climateResult = answerQuestion("What is new in climate science?", { ...feed, events: [climate] });
   assert.equal(climateResult.subtopicId, "science-climate-science");
   assert.deepEqual(climateResult.events, []);
+  const broadHardware = event("esp32", "ESP32 runs Linux", "hardware", "hardware-devices");
+  const semiconductorResult = answerQuestion("What is new in semiconductor design?", { ...feed, events: [broadHardware] });
+  assert.equal(semiconductorResult.subtopicId, "hardware-semiconductors");
+  assert.equal(semiconductorResult.evidenceCount, 0);
+  assert.deepEqual(semiconductorResult.events, []);
+  assert.match(semiconductorResult.summary, /No sampled signal matches Semiconductors/);
 });
 
 test("semantic similarity reorders sources only within the identified region", () => {
@@ -144,6 +150,7 @@ test("unmapped subjects use the knowledge archive without inventing a map locati
   assert.deepEqual(questionTopics("What is new in startup growth?"), [{ id: "startups", childId: "startups-growth" }]);
   assert.deepEqual(questionTopics("What is new in product launch startups?"), [{ id: "startups", childId: "startups-product" }]);
   assert.deepEqual(questionTopics("What is new in network hardware?"), [{ id: "hardware", childId: "hardware-networks" }]);
+  assert.deepEqual(questionTopics("What is new in semiconductor design?"), [{ id: "hardware", childId: "hardware-semiconductors" }]);
   const garden = { ...event("garden", "Urban gardens", "science", "science-climate-science"), topics: [] };
   const result = answerKnowledgeQuestion("What is new with urban gardening?", [{ event: garden, similarity: .7 }]);
   assert.equal(result.scope, "knowledge");
