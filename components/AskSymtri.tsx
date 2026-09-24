@@ -51,12 +51,13 @@ export default function AskSymtri({ day, sourceLabels, onClose, onResult, onNavi
         method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
         body: JSON.stringify({ question: trimmed, ...(day ? { day } : {}) }), signal: request.signal,
       });
-      if (!response.ok) throw new Error("The map could not answer from its current signals.");
+      if (response.status === 429) throw new Error("Ask is busy right now. Please try again after the limit resets.");
+      if (!response.ok) throw new Error("Signals are unavailable right now. Try again shortly.");
       const answer: AskResult = await response.json();
       setResult(answer);
       onResult(answer);
-    } catch {
-      if (!request.signal.aborted) setError("Signals are unavailable right now. Try again shortly.");
+    } catch (cause) {
+      if (!request.signal.aborted) setError(cause instanceof Error ? cause.message : "Signals are unavailable right now. Try again shortly.");
     } finally {
       if (!request.signal.aborted) setBusy(false);
     }

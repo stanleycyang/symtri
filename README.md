@@ -17,6 +17,8 @@ Open <http://127.0.0.1:3000>. Drag to orbit, scroll to zoom, click a region to f
 
 The social preview source is [design/social-card.svg](design/social-card.svg). After editing it, regenerate the served Open Graph PNG with `node -e 'const sharp=require("sharp");sharp("design/social-card.svg").png().toFile("app/opengraph-image.png")'` and check the 1200 × 630 image before deployment.
 
+Each live region and thread has a SHARE control that copies a stable `?point=<id>` link. Merged point IDs redirect to their current point when the link opens.
+
 ## Checks
 
 ```bash
@@ -28,7 +30,11 @@ npm run build
 
 After the hourly cron, run `npm run check:production` for a read-only check of the latest completed run, source coverage, vector backlog, full-window relationship counts, and available snapshot dates. Set `SYMTRI_REQUIRED_SOURCE=openalex SYMTRI_MIN_SIGNALS=1151` to require a newly added source to report healthy, appear in the overview, and grow the unique archive beyond a known baseline. It checks the newest two snapshots for historical samples, full-window activity, and relationship counts so the first real date comparison is covered automatically. It reports a pending classification refresh after a classifier deployment; public reads use the current rules while the next cron updates stored rows. The check makes no Gateway model calls. Set `SYMTRI_SITE_URL` to check another deployment.
 
+The independent `/api/verify` cron runs at minute 12 of each UTC hour, persists a health result, and checks the latest ingest, prepared feed, vector and catalog backlog, graph refresh, and daily snapshots. `/api/status` reports the latest monitor result. Once the minute-12 check has run, use `SYMTRI_REQUIRE_MONITOR=1 npm run check:production` to require a healthy result for the latest ingestion. Vercel runs unit tests, lint, and the production build before each deployment. The local Postgres storage check remains a separate release gate.
+
 For a synthetic growth check, run `npm run test:scale:local` (20,000 signals) or `SYMTRI_SCALE_ROWS=50000 npm run test:scale:local`. It creates and removes an isolated loopback Postgres database, applies all migrations, and times the bounded feed, activity, child counts, topic page, and daily graph rollup paths. These local timings are a regression baseline, not a production latency guarantee.
+
+Ask permits 60 requests per visitor IP per UTC hour and 3,000 requests across the site per UTC day, returning 429 with `Retry-After` after a limit. Request bodies are capped at 1 KiB before parsing. Only HMAC hashes of IP addresses are stored; the hourly workflow removes expired quota rows. Active RSS sources are capped at 60 and sampled in six-hour turns. A source paused after three failed polls is retried after 24 hours when capacity exists; manually paused or capacity-replaced sources stay paused. Use `npm run growth:manage -- --help` for operator actions. See [production operations](docs/production-operations.md) for release, recovery, and backup checks.
 
 To prove a particular hourly run has finished, set `SYMTRI_MIN_COMPLETED_AT` to that hour's UTC timestamp, for example `SYMTRI_MIN_COMPLETED_AT=2026-09-24T16:00:00Z npm run check:production`. An older healthy run cannot satisfy this check.
 For the first live time-travel comparison, run `SYMTRI_MIN_SNAPSHOT_DAYS=2 npm run check:production` after the next UTC day's ingestion. The check then requires two saved daily snapshots and validates both samples, relationships, activity, and cumulative archive counts.

@@ -6,7 +6,8 @@ import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun,
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { catalogMatches, getUniverseCatalog, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
-import { discoverFeedCandidates, fetchActiveFeeds, pollTrialFeeds } from "@/lib/data/feed-registry";
+import { discoverFeedCandidates, fetchActiveFeeds, pollTrialFeeds, recoverPausedFeeds } from "@/lib/data/feed-registry";
+import { pruneAskRateLimits } from "@/lib/data/ask-limit";
 
 async function begin(slot: string): Promise<boolean> {
   "use step";
@@ -27,7 +28,10 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
   const registered = await fetchActiveFeeds(new Date(feed.observedAt));
   feed.events.push(...registered.events);
   Object.assign(feed.sources, registered.sources);
-  feed.partial ||= Object.values(registered.sources).some((status) => status !== "ok");
+  const recovered = await recoverPausedFeeds(new Date(feed.observedAt));
+  feed.events.push(...recovered.events);
+  Object.assign(feed.sources, recovered.sources);
+  feed.partial ||= [...Object.values(registered.sources), ...Object.values(recovered.sources)].some((status) => status !== "ok");
   if (Object.values(feed.sources).every((status) => status === "unavailable")) {
     throw new Error("All sources unavailable");
   }
@@ -37,6 +41,7 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
 async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]>; archiveCount: number; childCounts: Record<string, number> }> {
   "use step";
   await seedUniverseCatalog();
+  await pruneAskRateLimits(new Date(feed.observedAt));
   await persistSignals(feed);
   await refreshStoredClassifications();
   await discoverFeedCandidates(new Date(feed.observedAt));

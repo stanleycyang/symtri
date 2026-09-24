@@ -51,6 +51,8 @@ export default function Experience() {
   const [topicArchive, setTopicArchive] = useState<{ key: string; events: SignalEvent[] } | null>(null);
   const [browse, setBrowse] = useState<{ key: string; events: SignalEvent[]; cursor: string | null; previousCursors: (string | null)[]; nextCursor: string | null; loading: boolean; error: boolean } | null>(null);
   const [childPage, setChildPage] = useState(0);
+  const [copiedPoint, setCopiedPoint] = useState<string | null>(null);
+  const deepLinkApplied = useRef(false);
   const [historyDays, setHistoryDays] = useState<SnapshotDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [pendingDay, setPendingDay] = useState<string | null>(null);
@@ -112,6 +114,7 @@ export default function Experience() {
     .sort((a, b) => b.count - a.count).slice(0, 3) : [];
   const child = focus?.children.find((item) => item.id === childId);
   const topicKey = focus ? `${focus.id}:${childId ?? ""}` : null;
+  const sharePointId = child?.id ?? focus?.id ?? null;
   const activeBrowse = browse?.key === topicKey ? browse : null;
   const loadBrowse = (cursor: string | null = null, previousCursors: (string | null)[] = []) => {
     if (!topicKey || !focus || selectedDay) return;
@@ -159,6 +162,22 @@ export default function Experience() {
   const goBack = () => { if (signalId) setSignalId(null); else if (childId) setChildId(null); else chooseTopic(null); };
   const returnToNow = () => { setPendingDay(null); setSelectedDay(null); setSignalId(null); setHistoryError(false); setAskOpen(false); setAskSteps([]); setMobileGuideOpen(false); };
 
+  const copyPointLink = async () => {
+    if (!sharePointId) return;
+    const url = new URL("/", window.location.origin);
+    url.searchParams.set("point", sharePointId);
+    try { await navigator.clipboard.writeText(url.toString()); setCopiedPoint(sharePointId); }
+    catch { setCopiedPoint("error"); }
+  };
+
+  useEffect(() => {
+    if (!entered || !deepLinkApplied.current || selectedDay) return;
+    const url = new URL(window.location.href);
+    if (sharePointId) url.searchParams.set("point", sharePointId);
+    else url.searchParams.delete("point");
+    window.history.replaceState(null, "", url);
+  }, [entered, sharePointId, selectedDay]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date().toISOString()), 60_000);
     return () => window.clearInterval(timer);
@@ -179,7 +198,7 @@ export default function Experience() {
     return () => { window.removeEventListener("keydown", onKey); };
   }, [askOpen, mobileGuideOpen]);
   useEffect(() => {
-    if (!entered) return;
+    if (!entered && !new URLSearchParams(window.location.search).has("point")) return;
     const controller = new AbortController();
     const load = () => {
       if (document.visibilityState === "hidden") return;
@@ -187,7 +206,24 @@ export default function Experience() {
         if (!response.ok) throw new Error("Signal feed unavailable");
         const feed: SignalFeed = await response.json();
         if (!Array.isArray(feed.events)) throw new Error("Invalid signal feed");
-        if (!controller.signal.aborted) { setLiveFeed(feed); setFeedError(false); }
+        if (!controller.signal.aborted) {
+          if (!deepLinkApplied.current) {
+            deepLinkApplied.current = true;
+            const requested = new URL(window.location.href).searchParams.get("point");
+            if (requested && /^[a-z0-9][a-z0-9-]{1,80}$/.test(requested)) {
+              const linkedCatalog = feed.catalog ?? seedCatalog;
+              let resolved = requested;
+              for (let step = 0; step < 8 && linkedCatalog.redirects?.[resolved]; step++) resolved = linkedCatalog.redirects[resolved];
+              const matched = linkedCatalog.topics.find((topic) => topic.id === resolved || topic.children.some((item) => item.id === resolved));
+              if (matched) {
+                setEntered(true);
+                setFocusedId(matched.id);
+                setChildId(matched.children.find((item) => item.id === resolved)?.id ?? null);
+              }
+            }
+          }
+          setLiveFeed(feed); setFeedError(false);
+        }
       }).catch(() => { if (!controller.signal.aborted) setFeedError(true); });
     };
     load();
@@ -279,7 +315,7 @@ export default function Experience() {
 
       {hover && !focus && <div className="hover-card" aria-live="polite"><span className="hover-card-label">REGION IN FOCUS · {hoverActivity ? sampleProvenance : "AWAITING OBSERVATIONS"}</span><strong>{hover.name}</strong><span><b>{hoverActivity ? hoverActivity.momentum.toUpperCase() : "PENDING"}</b> activity <i /> {hoverActivity ? hoverActivity.count : 0} signals</span></div>}
       {focus && <aside key={signalId ?? childId ?? focusedId} className="detail-panel">
-        <div className="panel-top"><span className="eyebrow">{signal ? "SIGNAL / SOURCE" : child ? liveForChild.length ? selectedDay ? "TOPIC / HISTORICAL SIGNALS" : "TOPIC / LIVE SIGNALS" : selectedDay ? "TOPIC / NO HISTORICAL SIGNALS" : "TOPIC / NO OBSERVED SIGNALS" : "REGION / ACTIVE TOPICS"}</span><button className="icon-button" onClick={goBack} aria-label="Go back">↗</button></div>
+        <div className="panel-top"><span className="eyebrow">{signal ? "SIGNAL / SOURCE" : child ? liveForChild.length ? selectedDay ? "TOPIC / HISTORICAL SIGNALS" : "TOPIC / LIVE SIGNALS" : selectedDay ? "TOPIC / NO HISTORICAL SIGNALS" : "TOPIC / NO OBSERVED SIGNALS" : "REGION / ACTIVE TOPICS"}</span><div className="panel-actions">{!selectedDay && <button type="button" className="share-point" onClick={() => void copyPointLink()} aria-label={`Copy link to ${child?.name ?? focus.name}`}>{copiedPoint === sharePointId ? "COPIED" : copiedPoint === "error" ? "COPY FAILED" : "SHARE"}</button>}<button className="icon-button" onClick={goBack} aria-label="Go back">↗</button></div></div>
         <h3>{signal ? signal.title : child ? child.name : focus.name}</h3>
         {signal?.live && signal.url && <a className="mobile-read-source" href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span aria-hidden="true">↗</span></a>}
         {!signal && !selectedDay && liveFeed && (liveFeed.scope === "rolling" || liveFeed.scope === "archive") && <div className="archive-browser">

@@ -14,7 +14,8 @@ else if (action === "point-merge") {
   await mergeConcepts(id, target);
 } else {
   const status = action === "feed-pause" ? "paused" : action === "feed-trial" ? "trial" : "active";
-  const changed = await database()`update source_catalog set status = ${status}, consecutive_failures = 0,
+  const changed = await database()`update source_catalog set status = ${status},
+    pause_reason = ${status === "paused" ? "manual" : null}, consecutive_failures = 0,
     last_checked_at = null where id = ${id} and kind = 'rss' returning id`;
   if (!changed.length) throw new Error("Unknown feed");
   await recordCatalogRevision();

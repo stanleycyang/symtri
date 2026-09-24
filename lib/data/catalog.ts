@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { database } from "./storage";
 import { seedCatalog, type Topic, type UniverseCatalog, type Vec3 } from "../universe";
 import type { SignalEvent, TopicMatch } from "./model";
+import { MAX_ACTIVE_RSS_FEEDS } from "./source-policy";
 
 type ConceptRow = { id: string; name: string; short: string; parent_id: string | null; position: Vec3; color: string; status: string; merged_into: string | null };
 
@@ -132,7 +133,17 @@ export async function getGrowthStatus() {
   const stale = await sql`select count(*)::int as count from signal_events where catalog_revision < ${Number(revision[0]?.id ?? 0)}`;
   const graph = await sql`select count(*)::int as count from knowledge_graph_dirty_days`;
   const sources = await sql`select status, count(*)::int as count from source_catalog group by status`;
+  const rss = await sql`select
+    count(*) filter (where status = 'active')::int as active,
+    count(*) filter (where status = 'trial')::int as trial,
+    count(*) filter (where status = 'paused' and pause_reason = 'failures')::int as recoverable,
+    count(*) filter (where status = 'paused' and pause_reason = 'manual')::int as manual,
+    count(*) filter (where status = 'paused' and pause_reason = 'capacity')::int as capacity_paused
+    from source_catalog where kind = 'rss'`;
   return { ...concepts[0], candidates: Number(candidates[0].count),
     catalogBacklog: Number(stale[0].count), graphDirtyDays: Number(graph[0].count),
-    sources: Object.fromEntries(sources.map((row) => [row.status, Number(row.count)])) };
+    sources: Object.fromEntries(sources.map((row) => [row.status, Number(row.count)])),
+    rss: { active: Number(rss[0].active), capacity: MAX_ACTIVE_RSS_FEEDS, trial: Number(rss[0].trial),
+      recoverable: Number(rss[0].recoverable), manual: Number(rss[0].manual),
+      capacityPaused: Number(rss[0].capacity_paused) } };
 }

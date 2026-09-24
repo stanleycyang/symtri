@@ -15,6 +15,8 @@ import { getUniverseCatalog, recordCatalogRevision, seedUniverseCatalog } from "
 import { discoverConcepts, syncArchiveConcepts } from "../lib/data/discovery";
 import { questionTopics } from "../lib/ai/ask";
 import { fetchActiveFeeds, pollTrialFeeds } from "../lib/data/feed-registry";
+import { recoverPausedFeeds } from "../lib/data/feed-registry";
+import { checkAskRateLimit, pruneAskRateLimits } from "../lib/data/ask-limit";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -98,6 +100,8 @@ async function main() {
   await sql.unsafe(seedCatalogMigration);
   const growthScalingMigration = await readFile(new URL("../supabase/migrations/20260924018000_growth_scaling.sql", import.meta.url), "utf8");
   await sql.unsafe(growthScalingMigration);
+  const launchControlsMigration = await readFile(new URL("../supabase/migrations/20260924019000_launch_controls.sql", import.meta.url), "utf8");
+  await sql.unsafe(launchControlsMigration);
   assert.equal((await sql`select count(*)::int as count from concept_catalog`)[0].count, 76);
   await seedUniverseCatalog();
   assert.equal((await getUniverseCatalog()).topics.length, 10);
@@ -114,10 +118,25 @@ async function main() {
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
       'concept_catalog', 'concept_candidates', 'concept_candidate_evidence', 'signal_concepts', 'catalog_revisions', 'source_catalog', 'source_trial_items', 'source_probes',
-      'current_feed', 'knowledge_graph_days', 'knowledge_graph_dirty_days')
+      'current_feed', 'knowledge_graph_days', 'knowledge_graph_dirty_days', 'ask_request_buckets', 'production_health_checks')
   `;
-  assert.equal(protectedTables.length, 18);
+  assert.equal(protectedTables.length, 20);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
+  const quotaTime = new Date("2025-01-01T10:30:00Z");
+  const visitorRequest = new Request("https://symtri.com/api/ask", { headers: { "x-vercel-forwarded-for": "203.0.113.10" } });
+  for (let attempt = 0; attempt < 60; attempt++) assert.equal(await checkAskRateLimit(visitorRequest, quotaTime), null);
+  assert.ok((await checkAskRateLimit(visitorRequest, quotaTime))! > 0);
+  const secondVisitor = new Request("https://symtri.com/api/ask", { headers: { "x-vercel-forwarded-for": "203.0.113.11" } });
+  assert.equal(await checkAskRateLimit(secondVisitor, quotaTime), null);
+  await sql`update ask_request_buckets set requests = 3000 where scope = 'site-day'`;
+  assert.ok((await checkAskRateLimit(new Request("https://symtri.com/api/ask", {
+    headers: { "x-vercel-forwarded-for": "203.0.113.12" },
+  }), quotaTime))! > 0);
+  assert.equal(await checkAskRateLimit(visitorRequest, new Date("2025-01-02T11:00:00Z")), null);
+  await pruneAskRateLimits(new Date("2025-01-05T00:00:00Z"));
+  assert.equal((await sql`select count(*)::int as count from ask_request_buckets`)[0].count, 0);
+  assert.equal((await askSymtri(new Request("https://symtri.com/api/ask", { method: "POST",
+    body: JSON.stringify({ question: "x".repeat(2_000) }) }))).status, 413);
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
     url: `https://github.com/symtri/${externalId}`, summary: "Storage roundtrip",
@@ -162,6 +181,17 @@ async function main() {
     assert.equal((await sql`select status from source_catalog where id = ${trialSourceId}`)[0].status, "active");
     assert.equal((await fetchActiveFeeds(new Date())).sources[trialSourceId], "ok");
     assert.ok((await getStoredFeed())?.events.some((item) => item.source === trialSourceId));
+    const failedAt = new Date();
+    await sql`update source_catalog set consecutive_failures = 2,
+      last_checked_at = ${new Date(failedAt.getTime() - 7 * 3_600_000)} where id = ${trialSourceId}`;
+    assert.equal((await fetchActiveFeeds(failedAt, async () => { throw new Error("Temporary outage"); })).sources[trialSourceId], "unavailable");
+    assert.equal((await sql`select status, pause_reason from source_catalog where id = ${trialSourceId}`)[0].pause_reason, "failures");
+    const recovered = await recoverPausedFeeds(new Date(failedAt.getTime() + 25 * 3_600_000), trialLoad);
+    assert.equal(recovered.sources[trialSourceId], "ok");
+    assert.equal((await sql`select status from source_catalog where id = ${trialSourceId}`)[0].status, "active");
+    await sql`update source_catalog set status = 'paused', pause_reason = 'manual',
+      last_checked_at = ${failedAt} where id = ${trialSourceId}`;
+    assert.deepEqual((await recoverPausedFeeds(new Date(failedAt.getTime() + 50 * 3_600_000), trialLoad)).sources, {});
     await sql`delete from signal_events where source = ${trialSourceId}`;
     await sql`delete from source_catalog where id = ${trialSourceId}`;
     await recordCatalogRevision();

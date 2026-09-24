@@ -4,11 +4,11 @@ import { fetchPublicText, feedLinkFromHtml, publicHttpsUrl } from "./public-fetc
 import { normalizeSyndicationFeed } from "./normalize";
 import type { SignalEvent, SourceStatus } from "./model";
 import { recordCatalogRevision } from "./catalog";
+import { MAX_ACTIVE_RSS_FEEDS } from "./source-policy";
 
-type FeedRow = { id: string; name: string; feed_url: string; status: "trial" | "active"; consecutive_failures: number; successful_days: number; last_success_day: Date | null; last_checked_at: Date | null };
+type FeedRow = { id: string; name: string; feed_url: string; status: "trial" | "active" | "paused"; consecutive_failures: number; successful_days: number; last_success_day: Date | null; last_checked_at: Date | null };
 const techTerms = /\b(?:technology|software|hardware|science|research|computer|computing|security|energy|engineering|robotics|artificial intelligence|machine learning|quantum|biotech|semiconductor|startup|cryptograph|blockchain)\b/i;
 // Ten feeds per hourly slot gives each active feed a six-hour turn at this cap.
-const MAX_ACTIVE_RSS_FEEDS = 60;
 
 export async function discoverFeedCandidates(now = new Date()): Promise<number> {
   const sql = database();
@@ -71,6 +71,7 @@ export async function fetchActiveFeeds(now = new Date(), load: (row: FeedRow) =>
     from source_catalog where kind = 'rss' and status = 'active'
     order by last_checked_at nulls first limit ${MAX_ACTIVE_RSS_FEEDS}`;
   const events: SignalEvent[] = [];
+  let paused = false;
   const due = (row: FeedRow) => !row.last_checked_at || row.last_checked_at.getTime() <= now.getTime() - 6 * 60 * 60 * 1000;
   const sources: SourceStatus = Object.fromEntries(rows.map((row) => [row.id,
     due(row) || row.consecutive_failures ? "partial" : "ok"]));
@@ -81,10 +82,46 @@ export async function fetchActiveFeeds(now = new Date(), load: (row: FeedRow) =>
       await sql`update source_catalog set last_checked_at = ${now}, consecutive_failures = 0 where id = ${row.id}`;
     } catch {
       sources[row.id] = "unavailable";
+      paused ||= row.consecutive_failures >= 2;
       await sql`update source_catalog set last_checked_at = ${now}, consecutive_failures = consecutive_failures + 1,
-        status = case when consecutive_failures >= 2 then 'paused' else status end where id = ${row.id}`;
+        status = case when consecutive_failures >= 2 then 'paused' else status end,
+        pause_reason = case when consecutive_failures >= 2 then 'failures' else pause_reason end where id = ${row.id}`;
     }
   }
+  if (paused) await recordCatalogRevision();
+  return { events, sources };
+}
+
+export async function recoverPausedFeeds(now = new Date(), load: (row: FeedRow) => Promise<SignalEvent[]> = fetchFeed): Promise<{ events: SignalEvent[]; sources: SourceStatus }> {
+  const sql = database();
+  const active = Number((await sql`select count(*)::int as count from source_catalog where kind = 'rss' and status = 'active'`)[0].count);
+  const slots = Math.min(2, MAX_ACTIVE_RSS_FEEDS - active);
+  if (slots <= 0) return { events: [], sources: {} };
+  const rows = await sql<FeedRow[]>`select id, name, feed_url, status, consecutive_failures, successful_days, last_success_day, last_checked_at
+    from source_catalog where kind = 'rss' and status = 'paused' and pause_reason = 'failures'
+      and last_checked_at <= ${now}::timestamptz - interval '24 hours'
+    order by last_checked_at, id limit ${slots}`;
+  const events: SignalEvent[] = [];
+  const sources: SourceStatus = {};
+  let recovered = 0;
+  for (const row of rows) {
+    try {
+      const observed = await load(row);
+      if (!observed.length) throw new Error("Feed returned no usable items");
+      const changed = await sql`update source_catalog set status = 'active', pause_reason = null,
+        consecutive_failures = 0, last_checked_at = ${now}
+        where id = ${row.id} and status = 'paused' and pause_reason = 'failures' returning id`;
+      if (!changed.length) continue;
+      events.push(...observed);
+      sources[row.id] = "ok";
+      recovered++;
+    } catch {
+      sources[row.id] = "unavailable";
+      await sql`update source_catalog set last_checked_at = ${now} where id = ${row.id}
+        and status = 'paused' and pause_reason = 'failures'`;
+    }
+  }
+  if (recovered) await recordCatalogRevision();
   return { events, sources };
 }
 
@@ -133,14 +170,15 @@ export async function pollTrialFeeds(now = new Date(), load: (row: FeedRow) => P
       const trial = await sql<{ event: SignalEvent }[]>`select event from source_trial_items where source_id = ${row.id}`;
       await persistSignals({ observedAt: now.toISOString(), events: trial.map((item) => item.event), sources: { [row.id]: "ok" }, partial: false, scope: "sample" });
       await sql.begin(async (tx) => {
-        if (replacement[0]) await tx`update source_catalog set status = 'paused' where id = ${replacement[0].id} and status = 'active'`;
-        await tx`update source_catalog set status = 'active', promoted_at = ${now} where id = ${row.id} and status = 'trial'`;
+        if (replacement[0]) await tx`update source_catalog set status = 'paused', pause_reason = 'capacity' where id = ${replacement[0].id} and status = 'active'`;
+        await tx`update source_catalog set status = 'active', pause_reason = null, promoted_at = ${now} where id = ${row.id} and status = 'trial'`;
       });
       await sql`delete from source_trial_items where source_id = ${row.id}`;
       promoted++;
     } catch {
       await sql`update source_catalog set last_checked_at = ${now}, consecutive_failures = consecutive_failures + 1,
-        status = case when consecutive_failures >= 2 then 'paused' else 'trial' end where id = ${row.id}`;
+        status = case when consecutive_failures >= 2 then 'paused' else 'trial' end,
+        pause_reason = case when consecutive_failures >= 2 then 'trial-failures' else pause_reason end where id = ${row.id}`;
     }
   }
   if (promoted) await recordCatalogRevision();

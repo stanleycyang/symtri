@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import postgres from "postgres";
-import { getArchiveActivity, getArchiveChildCounts, getArchiveRelationships, getPersistedCurrentFeed, getStoredFeed, getTopicPage, persistCurrentFeed, rebuildKnowledgeGraph, getKnowledgeGraph } from "../lib/data/storage";
-import { getUniverseCatalog } from "../lib/data/catalog";
+import { getArchiveActivity, getArchiveChildCounts, getArchiveRelationships, getPersistedCurrentFeed, getStoredFeed, getTopicPage, persistCurrentFeed, rebuildKnowledgeGraph, getKnowledgeGraph, getIngestionStatus } from "../lib/data/storage";
+import { getUniverseCatalog, getGrowthStatus } from "../lib/data/catalog";
 
 const url = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!url || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname)) {
@@ -11,7 +11,7 @@ if (!url || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname)
 process.env.DATABASE_URL = url;
 const sql = postgres(url, { max: 1, prepare: false, ssl: false });
 const rows = Number(process.env.SYMTRI_SCALE_ROWS ?? 20_000);
-if (!Number.isInteger(rows) || rows < 1_000 || rows > 100_000) throw new Error("SYMTRI_SCALE_ROWS must be 1,000-100,000");
+if (!Number.isInteger(rows) || rows < 1_000 || rows > 250_000) throw new Error("SYMTRI_SCALE_ROWS must be 1,000-250,000");
 const timings: Record<string, number> = {};
 async function measure<T>(name: string, work: () => Promise<T>): Promise<T> {
   const started = performance.now();
@@ -46,6 +46,8 @@ try {
   const childCounts = await measure("childCountsMs", () => getArchiveChildCounts());
   const relationships = await measure("relationshipsMs", () => getArchiveRelationships(new Date(), catalog));
   const page = await measure("topicPageMs", () => getTopicPage("ai", "ai-agents", null));
+  await measure("statusMs", () => getIngestionStatus());
+  await measure("growthStatusMs", () => getGrowthStatus());
   await measure("graphRollupMs", () => rebuildKnowledgeGraph(relationships));
   await persistCurrentFeed({ ...stored!, archiveCount: rows, activity, childCounts, relationships, catalog });
   assert.equal(activity.ai.count, rows);

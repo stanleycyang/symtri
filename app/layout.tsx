@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://symtri.com"),
   title: "SYMTRI — The Internet Is Thinking",
   description: "Enter a living map of technology and the ideas connecting it.",
+  alternates: { canonical: "/" },
   openGraph: {
     title: "SYMTRI — The Internet Is Thinking",
     description: "Enter a living map of technology and the ideas connecting it.",

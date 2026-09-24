@@ -66,6 +66,10 @@ try {
   if (history.days.length < minimumSnapshotDays) {
     throw new Error(`Only ${history.days.length} snapshot day(s) are available; expected ${minimumSnapshotDays}`);
   }
+  if (process.env.SYMTRI_REQUIRE_MONITOR === "1" &&
+    (!status.monitor || status.monitor.status !== "healthy" || status.monitor.runStartedAt !== run.startedAt)) {
+    throw new Error("The hourly production monitor has not passed for the latest ingest");
+  }
   if (status.growth?.graphDirtyDays > 0) {
     throw new Error(`Knowledge graph is refreshing ${status.growth.graphDirtyDays} dirty UTC day(s)`);
   }
@@ -128,6 +132,8 @@ try {
     classificationBacklog: status.classificationBacklog,
     catalogBacklog: status.growth?.catalogBacklog,
     graphDirtyDays: status.growth?.graphDirtyDays,
+    rss: status.growth?.rss,
+    monitor: status.monitor?.status ?? "pending",
     childCounts: Object.keys(signals.childCounts).length,
     topicPagesVerified,
     snapshotDays: history.days.map((day) => day.day),

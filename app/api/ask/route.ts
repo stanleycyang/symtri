@@ -7,9 +7,29 @@ import { canonicalSignalUrl, signalContentKey } from "@/lib/data/normalize";
 import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { getUniverseCatalog } from "@/lib/data/catalog";
+import { checkAskRateLimit } from "@/lib/data/ask-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+async function readQuestionBody(request: Request): Promise<{ value?: unknown; status?: number }> {
+  if (!request.body) return { status: 400 };
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let length = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > 1_024) { await reader.cancel(); return { status: 413 }; }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return { value: JSON.parse(text) };
+  } catch { return { status: 400 }; }
+}
 
 async function withSourceSummary(answer: AskResult, feed: SignalFeed): Promise<AskResult> {
   if (!gatewayConfigured() || !canSummarize(answer, feed)) return answer;
@@ -26,14 +46,18 @@ async function withSourceSummary(answer: AskResult, feed: SignalFeed): Promise<A
 }
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try { body = await request.json(); } catch { return new Response("Invalid request", { status: 400 }); }
+  const parsed = await readQuestionBody(request);
+  if (parsed.status) return new Response(parsed.status === 413 ? "Question too large" : "Invalid request", { status: parsed.status });
+  const body = parsed.value;
   if (!body || typeof body !== "object") return new Response("Invalid request", { status: 400 });
   const { question, day } = body as Record<string, unknown>;
   if (typeof question !== "string" || question.trim().length < 3 || question.length > 240 || (day !== undefined && typeof day !== "string")) {
     return new Response("Invalid question", { status: 400 });
   }
   try {
+    const retryAfter = await checkAskRateLimit(request);
+    if (retryAfter !== null) return new Response("Ask limit reached", { status: 429,
+      headers: { "Cache-Control": "no-store", "Retry-After": String(retryAfter) } });
     const trimmed = question.trim();
     const catalog = await getUniverseCatalog();
     if (!day && process.env.DATABASE_URL && shouldSearchKnowledge(trimmed, catalog)) {
