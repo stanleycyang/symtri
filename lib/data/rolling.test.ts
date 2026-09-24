@@ -37,6 +37,14 @@ test("rolling view keeps one page when another source discovers its URL", () => 
   assert.equal(result.events[0].title, "Fresh discussion");
 });
 
+test("rolling view hides an archived copy of the same content at another URL", () => {
+  const stored = event("stored", "2026-09-22T12:00:00.000Z");
+  const rediscovered = { ...stored, id: "hacker-news:78", source: "hacker-news" as const,
+    externalId: "78", url: "https://mirror.example/stored", publishedAt: "2026-09-23T11:00:00.000Z" };
+  const result = rollingFeed(feed([rediscovered], "sample"), feed([stored], "archive"), 1);
+  assert.deepEqual(result.events.map((item) => item.id), [rediscovered.id]);
+});
+
 test("rolling view retains archive during a source outage and caps map payload", () => {
   const archive = feed(Array.from({ length: 350 }, (_, index) => event(`id-${index}`, `2026-09-22T${String(index % 24).padStart(2, "0")}:00:00.000Z`)), "archive");
   const empty = feed([], "sample");

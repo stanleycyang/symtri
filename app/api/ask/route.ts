@@ -3,7 +3,7 @@ import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
 import { getSignalFeed } from "@/lib/data/feed";
-import { canonicalSignalUrl } from "@/lib/data/normalize";
+import { canonicalSignalUrl, signalContentKey } from "@/lib/data/normalize";
 import { rollingFeed } from "@/lib/data/rolling";
 import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
 import type { SignalFeed } from "@/lib/data/model";
@@ -63,10 +63,12 @@ export async function POST(request: Request) {
           const recent = await getRecentTopicEvents(references);
           const seen = new Set(feed.events.map((event) => event.id));
           const seenUrls = new Set(feed.events.map((event) => canonicalSignalUrl(event.url)));
+          const seenContent = new Set(feed.events.map(signalContentKey));
           const extra = recent.filter((event) => {
             const url = canonicalSignalUrl(event.url);
-            if (seen.has(event.id) || seenUrls.has(url)) return false;
-            seen.add(event.id); seenUrls.add(url);
+            const content = signalContentKey(event);
+            if (seen.has(event.id) || seenUrls.has(url) || seenContent.has(content)) return false;
+            seen.add(event.id); seenUrls.add(url); seenContent.add(content);
             return true;
           });
           feed = { ...feed, events: [...feed.events, ...extra] };
