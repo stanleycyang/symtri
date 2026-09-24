@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
-import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
+import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
@@ -21,6 +21,8 @@ const externalId = `storage-check-${randomUUID()}`;
 const id = `github:${externalId}`;
 const unclassifiedId = `github:${externalId}-unclassified`;
 const relatedId = `github:${externalId}-related`;
+const weakParentId = `github:${externalId}-weak-parent`;
+const sharedThreadId = `github:${externalId}-shared-thread`;
 const foreignId = `github:${externalId}-foreign`;
 const quantumId = `arxiv:${externalId}-quantum`;
 const cosmicId = `arxiv:${externalId}-cosmic`;
@@ -169,6 +171,22 @@ async function main() {
     assert.ok(!(await getRelatedSignals(id)).some((item) => item.id === id));
     assert.deepEqual(await getRelatedSignals(unclassifiedId), []);
     await sql`delete from signal_events where id = ${relatedId}`;
+    const moderateVector = `[${[.6, .8, ...Array(EMBEDDING_DIMENSIONS - 2).fill(0)].join(",")}]`;
+    await sql`
+      insert into signal_events
+        (id, source, external_id, title, url, summary, published_at, importance, topics, embedding, embedding_model)
+      values
+        (${weakParentId}, 'github', ${`${externalId}-weak-parent`}, 'Broad AI policy', ${`${event.url}/weak-parent`},
+          'A separate story', now(), 20, ${sql.json([{ topicId: "ai", subtopicId: null, relevance: 1 }])}::jsonb,
+          ${moderateVector}::vector(256), ${embeddingModelId()}),
+        (${sharedThreadId}, 'github', ${`${externalId}-shared-thread`}, 'Agents coordinate browser workflows', ${`${event.url}/shared-thread`},
+          'Related agent research', now(), 20, ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }])}::jsonb,
+          ${moderateVector}::vector(256), ${embeddingModelId()})
+    `;
+    const threadLinks = await getRelatedSignals(id);
+    assert.ok(threadLinks.some((item) => item.id === sharedThreadId));
+    assert.ok(!threadLinks.some((item) => item.id === weakParentId));
+    await sql`delete from signal_events where id in (${weakParentId}, ${sharedThreadId})`;
     const crowd = Array.from({ length: 300 }, (_, index) => ({
       id: `${crowdPrefix}${index}`, source: "github", external_id: `${externalId}-crowd-${index}`,
       title: `Software sample ${index}`, url: `https://github.com/symtri/${externalId}-crowd-${index}`,
@@ -354,7 +372,7 @@ async function main() {
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
-    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${weakParentId}, ${sharedThreadId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
