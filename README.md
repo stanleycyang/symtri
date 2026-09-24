@@ -24,7 +24,7 @@ npm test
 npm run build
 ```
 
-After the hourly cron, run `npm run check:production` for a read-only check of the latest completed run, source coverage, vector backlog, full-window relationship counts, and available snapshot dates. It also confirms the newest snapshot contains its own relationship counts. It reports a pending classification refresh after a classifier deployment; public reads use the current rules while the next cron updates stored rows. The check makes no Gateway model calls. Set `SYMTRI_SITE_URL` to check another deployment.
+After the hourly cron, run `npm run check:production` for a read-only check of the latest completed run, source coverage, vector backlog, full-window relationship counts, and available snapshot dates. It checks the newest two snapshots for historical samples, full-window activity, and relationship counts so the first real date comparison is covered automatically. It reports a pending classification refresh after a classifier deployment; public reads use the current rules while the next cron updates stored rows. The check makes no Gateway model calls. Set `SYMTRI_SITE_URL` to check another deployment.
 
 To verify the Postgres path with PostgreSQL and pgvector installed locally, run `npm run test:storage:local`. It starts a temporary loopback database, applies all migrations, checks API table protection, signal upserts, embedding cache and retrieval, relationships, and snapshots, then removes the database. For an existing isolated local database, set `SYMTRI_TEST_DATABASE_URL` to its loopback connection string and run `npm run test:storage`; that command rejects non-local hosts.
 

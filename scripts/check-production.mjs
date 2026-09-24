@@ -42,10 +42,19 @@ try {
   for (const [key, count] of Object.entries(sampledRelationships)) {
     if ((signals.relationships[key] ?? 0) < count) throw new Error(`Live relationship ${key} is below its map sample`);
   }
-  const latestDay = history.days[0].day;
-  const snapshot = await read(`/api/history?day=${encodeURIComponent(latestDay)}`);
-  if (!snapshot.relationships || typeof snapshot.relationships !== "object") {
-    throw new Error(`Snapshot ${latestDay} has no full-window relationships`);
+  const verifiedDays = history.days.slice(0, 2).map((item) => item.day);
+  const snapshots = await Promise.all(verifiedDays.map((day) => read(`/api/history?day=${encodeURIComponent(day)}`)));
+  for (const [index, snapshot] of snapshots.entries()) {
+    const day = verifiedDays[index];
+    if (!Array.isArray(snapshot.events) || !snapshot.events.length || snapshot.observedAt?.slice(0, 10) !== day) {
+      throw new Error(`Snapshot ${day} has no valid historical sample`);
+    }
+    if (!snapshot.activity || typeof snapshot.activity !== "object") {
+      throw new Error(`Snapshot ${day} has no full-window activity`);
+    }
+    if (!snapshot.relationships || typeof snapshot.relationships !== "object") {
+      throw new Error(`Snapshot ${day} has no full-window relationships`);
+    }
   }
   console.log(JSON.stringify({
     completedAt: run.completedAt, status: run.status, sources: run.sources,
@@ -53,7 +62,8 @@ try {
     classificationBacklog: status.classificationBacklog,
     snapshotDays: history.days.map((day) => day.day),
     liveRelationships: Object.keys(signals.relationships).length,
-    snapshotRelationships: Object.keys(snapshot.relationships).length,
+    snapshotRelationships: Object.keys(snapshots[0].relationships).length,
+    verifiedSnapshotDays: verifiedDays,
   }));
 } catch (error) {
   console.error(`SYMTRI production check failed: ${error instanceof Error ? error.message : String(error)}`);
