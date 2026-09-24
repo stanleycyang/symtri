@@ -23,9 +23,18 @@ try {
   if (!Number.isFinite(ageMinutes) || ageMinutes < 0 || ageMinutes > 120) {
     throw new Error(`Latest ingestion run is ${Math.round(ageMinutes)} minutes old`);
   }
+  const minimumCompletedAt = process.env.SYMTRI_MIN_COMPLETED_AT;
+  if (minimumCompletedAt) {
+    const minimum = Date.parse(minimumCompletedAt);
+    if (!Number.isFinite(minimum)) throw new Error("SYMTRI_MIN_COMPLETED_AT must be a valid timestamp");
+    if (Date.parse(run.completedAt) < minimum) {
+      throw new Error(`Latest ingestion run completed before ${minimumCompletedAt}`);
+    }
+  }
   if (status.signals < 1 || status.vectors < 1 || status.embeddingBacklog !== 0) {
     throw new Error("Signal or vector coverage is incomplete");
   }
+  if (run.embeddingStatus !== "ok") throw new Error(`Latest embedding step is ${run.embeddingStatus ?? "missing"}`);
   if (signals.lastIngestedAt !== run.completedAt) {
     throw new Error("Public feed does not expose the latest completed ingest time");
   }
@@ -65,6 +74,7 @@ try {
   console.log(JSON.stringify({
     completedAt: run.completedAt, status: run.status, sources: run.sources,
     fetched: run.fetched, added: run.added, signals: status.signals, vectors: status.vectors,
+    embeddingBacklog: status.embeddingBacklog, embeddingStatus: run.embeddingStatus,
     classificationBacklog: status.classificationBacklog,
     snapshotDays: history.days.map((day) => day.day),
     liveRelationships: Object.keys(signals.relationships).length,
