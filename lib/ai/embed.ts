@@ -1,10 +1,21 @@
 import { createHash } from "node:crypto";
+import { embedMany, gateway, type EmbeddingModel } from "ai";
 import type { SignalEvent } from "../data/model";
 import type { Topic } from "../universe";
 
-export const EMBEDDING_MODEL = "text-embedding-3-small";
+export const DEFAULT_EMBEDDING_MODEL = "google/gemini-embedding-001";
 export const EMBEDDING_DIMENSIONS = 256;
 const BATCH_SIZE = 64;
+
+export function embeddingModelId(): string {
+  return process.env.SYMTRI_EMBEDDING_MODEL?.trim() || DEFAULT_EMBEDDING_MODEL;
+}
+
+function embeddingOptions(modelId: string): Record<string, Record<string, number>> {
+  if (modelId.startsWith("google/")) return { google: { outputDimensionality: EMBEDDING_DIMENSIONS } };
+  if (modelId.startsWith("openai/")) return { openai: { dimensions: EMBEDDING_DIMENSIONS } };
+  throw new Error(`Embedding model ${modelId} has no configured 256-dimensional output`);
+}
 
 export function signalEmbeddingText(event: SignalEvent): string {
   return `${event.title.slice(0, 240)}\n${event.summary.slice(0, 800)}`.trim();
@@ -15,36 +26,29 @@ export function topicEmbeddingText(topic: Topic): string {
 }
 
 export function embeddingInputHash(input: string): string {
-  return createHash("sha256").update(`${EMBEDDING_MODEL}:${EMBEDDING_DIMENSIONS}:${input}`).digest("hex");
+  return createHash("sha256").update(`${embeddingModelId()}:${EMBEDDING_DIMENSIONS}:${input}`).digest("hex");
 }
 
-export async function embedTexts(inputs: string[], apiKey: string, fetcher: typeof fetch = fetch): Promise<number[][]> {
+export async function embedTexts(inputs: string[], model: EmbeddingModel = gateway.embeddingModel(embeddingModelId())): Promise<number[][]> {
   if (!inputs.length) return [];
   const vectors: number[][] = [];
+  const modelId = embeddingModelId();
   for (let offset = 0; offset < inputs.length; offset += BATCH_SIZE) {
     const batch = inputs.slice(offset, offset + BATCH_SIZE);
-    const response = await fetcher("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: EMBEDDING_MODEL, dimensions: EMBEDDING_DIMENSIONS, encoding_format: "float", input: batch }),
-      signal: AbortSignal.timeout(20_000),
+    const { embeddings } = await embedMany({
+      model,
+      values: batch,
+      providerOptions: embeddingOptions(modelId),
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(20_000),
     });
-    if (!response.ok) throw new Error(`Embedding request failed: HTTP ${response.status}`);
-    const payload: unknown = await response.json();
-    const rows = payload && typeof payload === "object" && "data" in payload ? payload.data : null;
-    if (!Array.isArray(rows) || rows.length !== batch.length) throw new Error("Embedding response has an unexpected item count");
-    const ordered: number[][] = new Array(batch.length);
-    for (const row of rows) {
-      if (!row || typeof row !== "object" || !Number.isInteger(row.index) || row.index < 0 || row.index >= batch.length || ordered[row.index]) {
-        throw new Error("Embedding response has an invalid index");
-      }
-      const vector = row.embedding;
+    if (embeddings.length !== batch.length) throw new Error("Embedding response has an unexpected item count");
+    for (const vector of embeddings) {
       if (!Array.isArray(vector) || vector.length !== EMBEDDING_DIMENSIONS || !vector.every((value) => typeof value === "number" && Number.isFinite(value))) {
         throw new Error("Embedding response has an invalid vector");
       }
-      ordered[row.index] = vector;
+      vectors.push(vector);
     }
-    vectors.push(...ordered);
   }
   return vectors;
 }

@@ -1,5 +1,6 @@
 import { getSignalFeed } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
+import { gatewayConfigured } from "@/lib/ai/gateway";
 import { persistEmbeddings, persistSignals, persistSnapshot } from "@/lib/data/storage";
 
 export const runtime = "nodejs";
@@ -20,10 +21,9 @@ export async function GET(request: Request) {
     await persistSnapshot(feed);
     let embedded = 0;
     let embeddingStatus = "not-configured";
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (apiKey) {
+    if (gatewayConfigured()) {
       try {
-        embedded = await persistEmbeddings(feed, (inputs) => embedTexts(inputs, apiKey));
+        embedded = await persistEmbeddings(feed, embedTexts);
         embeddingStatus = "ok";
       } catch (error) {
         embeddingStatus = "unavailable";

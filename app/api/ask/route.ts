@@ -1,5 +1,6 @@
 import { answerQuestion } from "@/lib/ai/ask";
 import { embedTexts } from "@/lib/ai/embed";
+import { gatewayConfigured } from "@/lib/ai/gateway";
 import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
 import { getSignalFeed } from "@/lib/data/feed";
 import { findSemanticSignals, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings } from "@/lib/data/storage";
@@ -25,10 +26,10 @@ export async function POST(request: Request) {
     if (!feed.events.length) return new Response("Signals unavailable", { status: 503 });
     const trimmed = question.trim();
     let semanticMatches: { id: string; similarity: number }[] = [];
-    if (process.env.DATABASE_URL && process.env.OPENAI_API_KEY) {
+    if (process.env.DATABASE_URL && gatewayConfigured()) {
       try {
         if (await hasCurrentSignalEmbeddings(feed.events)) {
-          const [vector] = await embedTexts([trimmed], process.env.OPENAI_API_KEY);
+          const [vector] = await embedTexts([trimmed]);
           semanticMatches = await findSemanticSignals(vector, feed.events);
         }
       } catch (error) {
@@ -36,9 +37,9 @@ export async function POST(request: Request) {
       }
     }
     let answer = answerQuestion(trimmed, feed, semanticMatches);
-    if (process.env.OPENAI_API_KEY && canSummarize(answer, feed)) {
+    if (gatewayConfigured() && canSummarize(answer, feed)) {
       try {
-        const note = await summarizeAnswer(answer, feed, process.env.OPENAI_API_KEY);
+        const note = await summarizeAnswer(answer, feed);
         const citedOrder = new Map(note.citedEventIds.map((id, index) => [id, index]));
         answer = { ...answer, summary: note.summary, summaryKind: "model", citedEventIds: note.citedEventIds,
           events: [...answer.events].sort((a, b) => (citedOrder.get(a.id) ?? 99) - (citedOrder.get(b.id) ?? 99)) };
