@@ -42,15 +42,15 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity };
 }
 
-async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: string }> {
+async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: string; hasMore: boolean }> {
   "use step";
-  if (!gatewayConfigured()) return { embedded: 0, embeddingStatus: "not-configured" };
+  if (!gatewayConfigured()) return { embedded: 0, embeddingStatus: "not-configured", hasMore: false };
   const pending = await getPendingEmbeddingEvents();
   const embedded = await persistEmbeddings({
     observedAt: new Date().toISOString(), events: pending, scope: "archive", partial: false,
     sources: { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" },
   }, embedTexts);
-  return { embedded, embeddingStatus: "ok" };
+  return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
 }
 
 async function finish(slot: string, result: IngestionResult): Promise<void> {
@@ -66,9 +66,20 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
   try {
     const feed = await fetchSources();
     const stored = await storeFeed(slot, feed);
-    let embedding = { embedded: 0, embeddingStatus: "unavailable" };
-    try { embedding = await embedBacklog(); }
-    catch (error) { console.warn("SYMTRI embeddings unavailable", error instanceof Error ? error.message : "unknown error"); }
+    const embedding = { embedded: 0, embeddingStatus: "unavailable" };
+    try {
+      for (let batch = 0; batch < 3; batch++) {
+        const next = await embedBacklog();
+        embedding.embedded += next.embedded;
+        embedding.embeddingStatus = next.embeddingStatus;
+        if (next.embeddingStatus !== "ok" || !next.hasMore) break;
+        if (batch === 2) embedding.embeddingStatus = "backlog";
+      }
+    }
+    catch (error) {
+      embedding.embeddingStatus = "unavailable";
+      console.warn("SYMTRI embeddings unavailable", error instanceof Error ? error.message : "unknown error");
+    }
     result = {
       status: feed.partial || embedding.embeddingStatus !== "ok" ? "partial" : "complete",
       sources: feed.sources, fetched: feed.events.length, mapped: stored.mapped,
