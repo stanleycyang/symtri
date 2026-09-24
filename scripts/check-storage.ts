@@ -22,6 +22,7 @@ const foreignId = `github:${externalId}-foreign`;
 const quantumId = `arxiv:${externalId}-quantum`;
 const archiveId = `github:${externalId}-archive`;
 const crowdPrefix = `github:${externalId}-crowd-`;
+const knowledgePrefix = `github:${externalId}-knowledge-`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
 
@@ -64,11 +65,14 @@ async function main() {
   `;
   const uniqueContentMigration = await readFile(new URL("../supabase/migrations/20260924008000_unique_content.sql", import.meta.url), "utf8");
   await sql.unsafe(uniqueContentMigration);
+  const knowledgeSearchMigration = await readFile(new URL("../supabase/migrations/20260924009000_knowledge_search_index.sql", import.meta.url), "utf8");
+  await sql.unsafe(knowledgeSearchMigration);
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${legacyFirst}`)[0].count, 2);
   await sql`delete from signal_events where id = ${legacyFirst}`;
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_topics_gin_idx'`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_content_key_key'`)[0].count, 1);
+  assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_search_idx'`)[0].count, 1);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations')
@@ -259,10 +263,39 @@ async function main() {
     assert.equal(snapshot?.events.length, 2);
     assert.equal(snapshot?.partial, false);
     assert.equal(snapshot?.scope, "history");
+    const oldKnowledge = Array.from({ length: 35 }, (_, index) => ({
+      id: `${knowledgePrefix}${index}`, external_id: `${externalId}-knowledge-${index}`,
+      title: `Quantum meadow quantum meadow specimen ${index}`, summary: `Quantum meadow observations ${index}`,
+      url: `https://github.com/symtri/${externalId}-knowledge-${index}`,
+    }));
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      select id, 'github', external_id, title, url, summary, now() - interval '20 days', 30, '[]'::jsonb
+      from jsonb_to_recordset(${sql.json(oldKnowledge)}::jsonb) as incoming
+        (id text, external_id text, title text, url text, summary text)
+    `;
+    const freshKnowledgeId = `${knowledgePrefix}fresh`;
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      values (${freshKnowledgeId}, 'github', ${`${externalId}-knowledge-fresh`},
+        'Quantum meadow update', ${`https://github.com/symtri/${externalId}-knowledge-fresh`},
+        'New observations', now(), 30, '[]'::jsonb)
+    `;
+    const oldRank = await sql`
+      select count(*)::int as count from signal_events
+      where id like ${`${knowledgePrefix}%`} and id <> ${freshKnowledgeId}
+        and ts_rank_cd(to_tsvector('english', title || ' ' || summary), websearch_to_tsquery('english', 'Quantum meadow')) >
+          (select ts_rank_cd(to_tsvector('english', title || ' ' || summary), websearch_to_tsquery('english', 'Quantum meadow'))
+           from signal_events where id = ${freshKnowledgeId})
+    `;
+    assert.equal(oldRank[0].count, 35);
+    assert.equal((await searchKnowledge("Quantum meadow", null))[0]?.event.id, freshKnowledgeId);
+    await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     console.log("Postgres migrations, API table protection, signal upsert, topic lookup beyond the map cap, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
+    await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02', '2099-01-03')`;

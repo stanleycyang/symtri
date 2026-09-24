@@ -377,11 +377,22 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
   const sql = database();
   const literal = vector ? `[${vector.join(",")}]` : null;
   const lexical = await sql`
-      select id, source, external_id, title, url, summary, published_at, importance, topics,
-        ts_rank_cd(to_tsvector('english', title || ' ' || summary), websearch_to_tsquery('english', ${query})) as rank
-      from signal_events
-      where to_tsvector('english', title || ' ' || summary) @@ websearch_to_tsquery('english', ${query})
-      order by rank desc, published_at desc limit 30
+      with request as (select websearch_to_tsquery('english', ${query}) as terms),
+      ranked as (
+        select id, source, external_id, title, url, summary, published_at, importance, topics,
+          ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
+        from signal_events cross join request
+        where to_tsvector('english', title || ' ' || summary) @@ request.terms
+        order by rank desc, published_at desc limit 30
+      ), recent as (
+        select id, source, external_id, title, url, summary, published_at, importance, topics,
+          ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
+        from signal_events cross join request
+        where to_tsvector('english', title || ' ' || summary) @@ request.terms
+        order by published_at desc limit 30
+      )
+      select distinct on (id) * from (select * from ranked union all select * from recent) as candidates
+      order by id, rank desc
     `;
   const semantic = literal ? await sql`
       select id, source, external_id, title, url, summary, published_at, importance, topics,
@@ -398,7 +409,11 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
     const previous = scores.get(row.id);
     scores.set(row.id, { row, score: (previous?.score ?? 0) + similarity, similarity });
   }
-  return [...scores.values()].sort((a, b) => b.score - a.score || b.row.published_at.getTime() - a.row.published_at.getTime())
+  const now = Date.now();
+  const freshness = (publishedAt: Date) => .35 * 2 ** (-Math.max(0, now - publishedAt.getTime()) / (72 * 3_600_000));
+  return [...scores.values()].sort((a, b) =>
+    b.score + freshness(b.row.published_at) - a.score - freshness(a.row.published_at)
+    || b.row.published_at.getTime() - a.row.published_at.getTime())
     .slice(0, 6).map(({ row, similarity }) => ({
       similarity,
       event: { id: row.id, source: row.source, externalId: row.external_id, title: row.title,
