@@ -58,6 +58,9 @@ try {
     if (!snapshot.relationships || typeof snapshot.relationships !== "object") {
       throw new Error(`Snapshot ${day} has no full-window relationships`);
     }
+    if (!Number.isInteger(snapshot.archiveCount) || snapshot.archiveCount < snapshot.events.length || snapshot.archiveCount > status.signals) {
+      throw new Error(`Snapshot ${day} has no valid point-in-time archive count`);
+    }
   }
   console.log(JSON.stringify({
     completedAt: run.completedAt, status: run.status, sources: run.sources,
@@ -66,6 +69,7 @@ try {
     snapshotDays: history.days.map((day) => day.day),
     liveRelationships: Object.keys(signals.relationships).length,
     snapshotRelationships: Object.keys(snapshots[0].relationships).length,
+    verifiedSnapshotCounts: snapshots.map((snapshot) => snapshot.archiveCount),
     verifiedSnapshotDays: verifiedDays,
   }));
 } catch (error) {

@@ -40,4 +40,4 @@ export type SignalFeed = {
   semanticRelationships?: Record<string, number>;
 };
 
-export type SnapshotDay = { day: string; capturedAt: string; eventCount: number };
+export type SnapshotDay = { day: string; capturedAt: string; eventCount: number; archiveCount?: number };

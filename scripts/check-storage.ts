@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, backfillSnapshotActivity, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveRelationships, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveRelationships, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -491,12 +491,17 @@ async function main() {
     await persistSnapshot({ ...feed, observedAt: `${historicDay}T12:00:00.000Z`, events: [{ ...event, id: historicId }] });
     assert.equal((await getSnapshotFeed(historicDay))?.activity, undefined);
     assert.equal((await getSnapshotFeed(historicDay))?.relationships, undefined);
+    const archiveAtCapture = Number((await sql`select count(*)::int as count from signal_events
+      where first_seen_at <= '2099-01-04T12:05:00Z'::timestamptz`)[0].count);
+    assert.equal((await getSnapshotFeed(historicDay))?.archiveCount, archiveAtCapture);
     await sql.unsafe(snapshotRelationshipsMigration);
     assert.equal((await getSnapshotFeed(historicDay))?.relationships?.["ai:markets"], 1);
-    assert.ok(await backfillSnapshotActivity() >= 1);
+    assert.ok(await backfillSnapshotMetadata() >= 1);
     assert.equal((await getSnapshotFeed(historicDay))?.activity?.ai.count, 1);
     assert.equal((await getSnapshotFeed(historicDay))?.relationships?.["ai:markets"], 1);
-    assert.equal(await backfillSnapshotActivity(), 0);
+    assert.equal((await getSnapshotFeed(historicDay))?.archiveCount, archiveAtCapture);
+    assert.equal((await getSnapshotDays()).find((item) => item.day === historicDay)?.archiveCount, archiveAtCapture);
+    assert.equal(await backfillSnapshotMetadata(), 0);
     await sql`delete from signal_events where id in (${historicId}, ${laterId})`;
     await sql`delete from signal_snapshots where day = ${historicDay}::date`;
     const oldKnowledge = Array.from({ length: 35 }, (_, index) => ({

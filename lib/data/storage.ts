@@ -275,6 +275,13 @@ export async function getArchiveCount(): Promise<number> {
   return Number(rows[0].count);
 }
 
+async function getArchiveCountAt(capturedAt: Date): Promise<number> {
+  // A snapshot is captured before its source rows finish persisting.
+  const rows = await database()`select count(*)::int as count from signal_events
+    where first_seen_at <= ${capturedAt.toISOString()}::timestamptz + interval '5 minutes'`;
+  return Number(rows[0].count);
+}
+
 // Calculate trends from every classified signal in the 14-day window. The
 // public map deliberately renders only 300 signals, which can cover far less
 // than two days once ingestion has accumulated enough unique content. The
@@ -596,14 +603,16 @@ export async function persistSnapshot(feed: SignalFeed): Promise<void> {
   `;
 }
 
-export async function backfillSnapshotActivity(limit = 14): Promise<number> {
+export async function backfillSnapshotMetadata(limit = 14): Promise<number> {
   const sql = database();
-  const rows = await sql<{ day: string; captured_at: Date; missing_activity: boolean; missing_relationships: boolean }[]>`
+  const rows = await sql<{ day: string; captured_at: Date; missing_activity: boolean; missing_relationships: boolean; missing_archive_count: boolean }[]>`
     select day::text as day, captured_at,
       feed->'activity' is null as missing_activity,
-      feed->'relationships' is null as missing_relationships
+      feed->'relationships' is null as missing_relationships,
+      coalesce(feed->>'archiveCount', '0') = '0' as missing_archive_count
     from signal_snapshots
     where feed->'activity' is null or feed->'relationships' is null
+      or coalesce(feed->>'archiveCount', '0') = '0'
     order by day desc limit ${limit}
   `;
   for (const row of rows) {
@@ -611,6 +620,7 @@ export async function backfillSnapshotActivity(limit = 14): Promise<number> {
     const patch = {
       ...(row.missing_activity ? { activity: await getArchiveActivity(at) } : {}),
       ...(row.missing_relationships ? { relationships: await getArchiveRelationships(at) } : {}),
+      ...(row.missing_archive_count ? { archiveCount: await getArchiveCountAt(at) } : {}),
     };
     await sql`
       update signal_snapshots set feed = feed || ${sql.json(patch)}::jsonb
@@ -623,10 +633,12 @@ export async function backfillSnapshotActivity(limit = 14): Promise<number> {
 export async function getSnapshotDays(): Promise<SnapshotDay[]> {
   const rows = await database()`
     select day::text as day, captured_at,
-      jsonb_array_length(feed->'events')::int as event_count
+      jsonb_array_length(feed->'events')::int as event_count,
+      nullif(feed->>'archiveCount', '0')::int as archive_count
     from signal_snapshots order by day desc limit 14
   `;
-  return rows.map((row) => ({ day: row.day, capturedAt: new Date(row.captured_at).toISOString(), eventCount: row.event_count }));
+  return rows.map((row) => ({ day: row.day, capturedAt: new Date(row.captured_at).toISOString(), eventCount: row.event_count,
+    ...(row.archive_count ? { archiveCount: row.archive_count } : {}) }));
 }
 
 export async function getSnapshotFeed(day: string): Promise<SignalFeed | null> {
@@ -634,5 +646,7 @@ export async function getSnapshotFeed(day: string): Promise<SignalFeed | null> {
   const rows = await database()`select captured_at, feed from signal_snapshots where day = ${day}::date limit 1`;
   if (!rows.length) return null;
   const feed = rows[0].feed as SignalFeed;
-  return { ...feed, observedAt: new Date(rows[0].captured_at).toISOString(), scope: "history" };
+  const capturedAt = new Date(rows[0].captured_at);
+  return { ...feed, archiveCount: feed.archiveCount || await getArchiveCountAt(capturedAt),
+    observedAt: capturedAt.toISOString(), scope: "history" };
 }

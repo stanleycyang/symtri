@@ -2,7 +2,7 @@ import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
-import { acquireIngestionLease, backfillSnapshotActivity, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveCount, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import type { SignalFeed } from "@/lib/data/model";
 
 async function begin(slot: string): Promise<boolean> {
@@ -33,10 +33,11 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   await refreshStoredClassifications();
   const activity = await getArchiveActivity(new Date(feed.observedAt));
   const relationships = await getArchiveRelationships(new Date(feed.observedAt));
+  const archiveCount = await getArchiveCount();
   const mapped = selectFeedEvents(feed.events, 300);
-  const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), 0);
+  const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), archiveCount);
   await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships });
-  await backfillSnapshotActivity();
+  await backfillSnapshotMetadata();
   await rebuildKnowledgeGraph(relationships);
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity };
 }
