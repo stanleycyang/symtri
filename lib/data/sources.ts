@@ -136,12 +136,16 @@ export async function fetchArxivForIngestion(pause: (milliseconds: number) => Pr
   for (const [index, group] of arxivIngestionQueries.entries()) {
     // arXiv requests a three-second pause between API calls.
     if (index) await pause(3000);
-    try {
-      const papers = await queryArxiv(group.query, group.limit, true);
-      results.push(...papers.filter((paper) => !("titlePattern" in group) || group.titlePattern.test(paper.title)));
-    } catch (error) {
-      failedGroups++;
-      console.warn(`SYMTRI arXiv group ${index + 1} unavailable`, error instanceof Error ? error.message : "unknown error");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const papers = await queryArxiv(group.query, group.limit, true);
+        results.push(...papers.filter((paper) => !("titlePattern" in group) || group.titlePattern.test(paper.title)));
+        break;
+      } catch (error) {
+        if (attempt === 0) { await pause(6000); continue; }
+        failedGroups++;
+        console.warn(`SYMTRI arXiv group ${index + 1} unavailable`, error instanceof Error ? error.message : "unknown error");
+      }
     }
   }
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;

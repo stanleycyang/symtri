@@ -43,6 +43,7 @@ Keep a bounded replay window for Hacker News new stories so a missed or stale ho
 An ingestion run should report Hacker News unavailable when its newest-story list fails or its newest usable story is stale. A healthy top-story response alone does not prove the hourly feed is fresh.
 Retry a bounded number of rejected Hacker News item requests once. Keep the stories that succeeded, and mark Hacker News partial if any item requests remain unresolved; do not silently claim full coverage.
 Keep successful arXiv query groups when another group fails. Report the source as partial rather than claiming full coverage or discarding fetched papers; an all-group failure remains unavailable.
+Space arXiv API requests at least three seconds apart. Retry a failed query group once after a longer pause; do not retry indefinitely or mark the source ok if the second attempt fails. Cover transient recovery and permanent partial coverage in `lib/data/sources.test.ts`.
 Blended arXiv category queries can crowd out a named subject even when its category appears in the query. When a promised subject has no live Ask evidence, check a focused category sample before adding a bounded ingestion group. Verify the first hourly run puts a recent paper into Ask, and update the request count, pause count, and per-run paper budget in source tests and docs.
 Likewise, keep popular GitHub repositories if the recent-update search fails, but mark GitHub partial so the run does not claim complete coverage.
 

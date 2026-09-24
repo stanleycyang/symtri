@@ -84,9 +84,31 @@ test("arXiv retains successful groups and reports reduced source coverage", asyn
     const result = await fetchArxivForIngestion(async () => {});
     assert.equal(result.status, "partial");
     assert.equal(result.events.length, 7);
-    assert.equal(requested.length, 8);
+    assert.equal(requested.length, 9);
     failAll = true;
     await assert.rejects(fetchArxivForIngestion(async () => {}), /no usable papers/);
+    assert.equal(requested.length, 25);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("arXiv retries a transient group failure before marking coverage partial", async () => {
+  const originalFetch = globalThis.fetch;
+  const attempts = new Map<string, number>();
+  const pauses: number[] = [];
+  globalThis.fetch = async (input) => {
+    const query = new URL(String(input)).searchParams.get("search_query") ?? "";
+    attempts.set(query, (attempts.get(query) ?? 0) + 1);
+    if (query.includes("cs.CR") && attempts.get(query) === 1) return new Response("Unavailable", { status: 503 });
+    return new Response(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>https://arxiv.org/abs/2609.1234${attempts.size}v1</id><title>Fusion research ${attempts.size}</title><summary>A recent study.</summary><published>${new Date().toISOString()}</published><category term="physics.plasm-ph" /></entry></feed>`);
+  };
+  try {
+    const result = await fetchArxivForIngestion(async (milliseconds) => { pauses.push(milliseconds); });
+    assert.equal(result.status, "ok");
+    assert.equal(attempts.get("cat:cs.CR OR cat:cs.SE OR cat:cs.NI"), 2);
+    assert.equal(pauses.filter((pause) => pause === 6000).length, 1);
+    assert.equal(pauses.filter((pause) => pause === 3000).length, 7);
   } finally {
     globalThis.fetch = originalFetch;
   }
