@@ -15,6 +15,8 @@ npm run dev
 
 Open <http://127.0.0.1:3000>. Drag to orbit, scroll to zoom, click a region to focus, and select a subtopic to reveal signal markers. Escape or the back button returns outward.
 
+The social preview source is [design/social-card.svg](design/social-card.svg). After editing it, regenerate the served Open Graph PNG with `node -e 'const sharp=require("sharp");sharp("design/social-card.svg").png().toFile("app/opengraph-image.png")'` and check the 1200 × 630 image before deployment.
+
 ## Checks
 
 ```bash
