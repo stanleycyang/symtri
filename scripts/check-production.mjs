@@ -19,6 +19,13 @@ try {
   if (!run?.completedAt || !["complete", "partial"].includes(run.status)) {
     throw new Error(`Latest ingestion run is ${run?.status ?? "missing"}`);
   }
+  if (process.env.SYMTRI_REQUIRE_SOURCES_AVAILABLE === "1") {
+    for (const source of ["hacker-news", "github", "arxiv"]) {
+      if (!["ok", "partial"].includes(run.sources?.[source])) {
+        throw new Error(`Latest ingestion run has no usable ${source} coverage`);
+      }
+    }
+  }
   const ageMinutes = (Date.now() - Date.parse(run.completedAt)) / 60_000;
   if (!Number.isFinite(ageMinutes) || ageMinutes < 0 || ageMinutes > 120) {
     throw new Error(`Latest ingestion run is ${Math.round(ageMinutes)} minutes old`);
