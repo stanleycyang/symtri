@@ -4,7 +4,7 @@ import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, OrbitControls } from "@react-three/drei";
 import { Component, MutableRefObject, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { getTopic, Topic, topics, Vec3 } from "@/lib/universe";
+import { getTopic, Topic, topicEdges, topics, Vec3 } from "@/lib/universe";
 import { attentionEdges, flowingAttentionEdges, relationshipKey, type RegionActivity, type RegionRelationships } from "@/lib/data/activity";
 import type { AskResult } from "@/lib/ai/ask";
 
@@ -30,6 +30,7 @@ export type UniverseProps = {
 };
 
 const topicPoints = new Map(topics.map((topic) => [topic.id, new THREE.Vector3(...topic.position)]));
+const establishedEdgeKeys = new Set(topicEdges.map(([first, second]) => relationshipKey(first, second)));
 
 type CameraMove = {
   fromPosition: THREE.Vector3;
@@ -400,7 +401,23 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
     <Dust count={compact ? 650 : 1500} reducedMotion={reducedMotion} />
     <IncomingSignals compact={compact} reducedMotion={reducedMotion} activeTopics={activeTopics} />
     <FlowSignals reducedMotion={reducedMotion} edges={flowingEdges} />
-    {activeEdges.map(([a, b]) => { const first = getTopic(a)!; const second = getTopic(b)!; const highlighted = hoveredId === a || hoveredId === b; const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === relationshipKey(a, b)); const key = relationshipKey(a, b); const count = regionRelationships?.[key] ?? 0; const archived = archiveRelationships?.[key] ?? 0; const similarity = semanticRelationships?.[key]; const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3)); const recentStrength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost; const strength = Math.max(recentStrength, archived ? Math.min(.24, .06 + Math.log1p(archived) * .045) : 0); return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId)?.color : undefined} opacity={inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04) : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength} bend={2.6} />; })}
+    {activeEdges.map(([a, b]) => {
+      const first = getTopic(a)!;
+      const second = getTopic(b)!;
+      const key = relationshipKey(a, b);
+      const highlighted = hoveredId === a || hoveredId === b;
+      const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === key);
+      const count = regionRelationships?.[key] ?? 0;
+      const archived = archiveRelationships?.[key] ?? 0;
+      const similarity = semanticRelationships?.[key];
+      const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3));
+      const recentStrength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost;
+      const strength = Math.max(recentStrength, archived ? Math.min(.24, .06 + Math.log1p(archived) * .045) : 0);
+      const color = inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId)?.color : establishedEdgeKeys.has(key) ? undefined : "#bfa178";
+      const opacity = inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04)
+        : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength;
+      return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={color} opacity={opacity} bend={2.6} />;
+    })}
     {askSteps.map((step, index) => index > 0 && step.subtopicId && askSteps[index - 1].subtopicId ? <Filament key={`ask-${index}`} from={pathPosition(askSteps[index - 1])} to={pathPosition(step)} color="#e6b988" opacity={.82} bend={.8} /> : null)}
     {activeTopics.map((topic) => <group key={topic.id}>
       <SignalCloud topic={topic} reducedMotion={reducedMotion} />
