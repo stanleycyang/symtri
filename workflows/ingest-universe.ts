@@ -24,7 +24,7 @@ async function fetchSources(): Promise<SignalFeed> {
 async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number }> {
   "use step";
   await persistSignals(feed);
-  const mapped = selectFeedEvents(feed.events);
+  const mapped = selectFeedEvents(feed.events, 300);
   await persistSnapshot({ ...feed, events: mapped });
   await rebuildKnowledgeGraph();
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length };

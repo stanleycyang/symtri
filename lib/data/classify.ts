@@ -2,14 +2,14 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 const topicTerms: Record<string, string[]> = {
-  ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai"],
-  software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "sdk"],
-  science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical"],
-  space: ["space", "satellite", "rocket", "astronomy", "cosmology", "orbital", "spacecraft", "nasa"],
+  ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
+  software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "browsers", "sdk", "vscode", "vs code", "kafka", "nixos", "http", "debugger", "terminal", "tailscale"],
+  science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical", "crispr", "enzyme", "vaccine", "mrna", "dna"],
+  space: ["space", "satellite", "satellites", "rocket", "astronomy", "cosmology", "orbital", "spacecraft", "nasa"],
   energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
-  security: ["security", "cyber", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity"],
-  hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "device", "sensor", "manufacturing"],
+  security: ["security", "cyber", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity", "hacked", "hacking", "supply-chain attack"],
+  hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "device", "sensor", "manufacturing", "uefi", "vga", "vr glasses"],
   startups: ["startup", "founder", "funding", "seed round", "product launch", "launch hn", "venture", "growth"],
   crypto: ["crypto", "bitcoin", "ethereum", "blockchain", "stablecoin", "web3", "onchain"],
 };
@@ -53,6 +53,8 @@ const childTerms: Record<string, string[]> = {
 
 const categoryTerms: Record<string, string[]> = {
   ai: ["cs.AI", "cs.LG", "cs.CL", "cs.CV", "cs.RO"],
+  software: ["cs.SE", "cs.NI"],
+  markets: ["q-fin."],
   security: ["cs.CR"],
   space: ["astro-ph"],
   science: ["physics", "q-bio", "quant-ph"],

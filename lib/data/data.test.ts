@@ -29,6 +29,25 @@ test("specific story titles map to regions without inferring unrelated ones", ()
   assert.deepEqual(classifySignal("Umbrella insurance via your personal agent", "Hacker News discussion"), []);
 });
 
+test("clear source headlines reach their regions while ordinary stories stay unmapped", () => {
+  const cases: [string, string[]][] = [
+    ["Claude discovers a novel enzyme system with CRISPR-like repeats", ["ai", "science"]],
+    ["VSCode's SSH Agent Is Bananas", ["software"]],
+    ["UK military jamming other nations' satellites", ["space"]],
+    ["An analyst infiltrated a supply-chain hacking gang", ["security"]],
+    ["Meta VR Glasses", ["hardware"]],
+  ];
+  for (const [title, regions] of cases) {
+    const matches = classifySignal(title, "Hacker News discussion.").map((match) => match.topicId);
+    for (const region of regions) assert.ok(matches.includes(region), `${title} should map to ${region}`);
+  }
+  assert.deepEqual(classifySignal("Fixing the Portobello Police Station Clock", "Hacker News discussion."), []);
+  assert.deepEqual(classifySignal("Umbrella insurance via your personal agent", "Hacker News discussion."), []);
+  assert.equal(classifySignal("Testing distributed systems", "A study", ["cs.SE"])[0]?.topicId, "software");
+  assert.equal(classifySignal("Liquidity in limit order books", "A study", ["q-fin.TR"])[0]?.topicId, "markets");
+  assert.equal(classifySignal("Molecular interaction networks", "A study", ["q-bio.MN"])[0]?.topicId, "science");
+});
+
 test("Hacker News normalization rejects dead stories and unsafe URLs", () => {
   const event = normalizeHackerNews({ id: 123, type: "story", title: "AI agents &amp; tools", time: 1780000000, score: 25, descendants: 6, url: "javascript:alert(1)" });
   assert.equal(event?.url, "https://news.ycombinator.com/item?id=123");

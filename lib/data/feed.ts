@@ -12,7 +12,7 @@ export async function getSignalFeed(options: { includeUnclassified?: boolean; fo
   const sources: [SourceId, () => Promise<SignalEvent[]>][] = [
     ["hacker-news", () => fetchHackerNews(options.forIngestion)],
     ["github", () => fetchGitHub(options.forIngestion)],
-    ["arxiv", fetchArxiv],
+    ["arxiv", () => fetchArxiv(options.forIngestion)],
   ];
   const results = await Promise.allSettled(sources.map(([, fetchSource]) => fetchSource()));
   const status: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };

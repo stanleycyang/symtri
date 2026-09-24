@@ -61,11 +61,11 @@ export async function fetchGitHub(forIngestion = false): Promise<SignalEvent[]> 
   }
 }
 
-export async function fetchArxiv(): Promise<SignalEvent[]> {
+export async function fetchArxiv(forIngestion = false): Promise<SignalEvent[]> {
   const url = new URL("https://export.arxiv.org/api/query");
-  url.searchParams.set("search_query", "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO OR cat:cs.CR OR cat:astro-ph.CO OR cat:quant-ph");
+  url.searchParams.set("search_query", "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO OR cat:cs.CR OR cat:cs.SE OR cat:cs.NI OR cat:astro-ph.CO OR cat:q-bio.MN OR cat:q-fin.TR OR cat:quant-ph");
   url.searchParams.set("start", "0");
-  url.searchParams.set("max_results", "55");
+  url.searchParams.set("max_results", forIngestion ? "120" : "55");
   url.searchParams.set("sortBy", "submittedDate");
   url.searchParams.set("sortOrder", "descending");
   const xml = await (await request(url.toString(), { "User-Agent": "SYMTRI/0.1 (https://symtri.com)" })).text();
