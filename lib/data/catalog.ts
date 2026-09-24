@@ -7,15 +7,20 @@ type ConceptRow = { id: string; name: string; short: string; parent_id: string |
 
 export async function seedUniverseCatalog(): Promise<void> {
   const sql = database();
-  for (const topic of seedCatalog.topics) {
-    await sql`insert into concept_catalog (id, name, short, position, color, status, seeded)
-      values (${topic.id}, ${topic.name}, ${topic.short}, ${sql.json(topic.position)}::jsonb, ${topic.color}, 'public', true)
-      on conflict (id) do nothing`;
-    for (const child of topic.children) await sql`
-      insert into concept_catalog (id, name, short, parent_id, position, color, status, seeded)
-      values (${child.id}, ${child.name}, ${child.name}, ${topic.id}, ${sql.json(child.position)}::jsonb, ${topic.color}, 'public', true)
-      on conflict (id) do nothing`;
-  }
+  const roots = seedCatalog.topics.map((topic) => ({ id: topic.id, name: topic.name, short: topic.short,
+    position: topic.position, color: topic.color }));
+  await sql`insert into concept_catalog (id, name, short, position, color, status, seeded)
+    select id, name, short, position, color, 'public', true
+    from jsonb_to_recordset(${sql.json(roots)}::jsonb)
+      as incoming(id text, name text, short text, position jsonb, color text)
+    on conflict (id) do nothing`;
+  const children = seedCatalog.topics.flatMap((topic) => topic.children.map((child) => ({ id: child.id, name: child.name,
+    parent_id: topic.id, position: child.position, color: topic.color })));
+  await sql`insert into concept_catalog (id, name, short, parent_id, position, color, status, seeded)
+    select id, name, name, parent_id, position, color, 'public', true
+    from jsonb_to_recordset(${sql.json(children)}::jsonb)
+      as incoming(id text, name text, parent_id text, position jsonb, color text)
+    on conflict (id) do nothing`;
   const rows = await sql`select id from catalog_revisions limit 1`;
   if (!rows.length) await recordCatalogRevision();
 }
