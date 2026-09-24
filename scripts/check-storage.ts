@@ -101,6 +101,17 @@ async function main() {
     partial: true, scope: "sample",
   };
   try {
+    const repository: SignalEvent = { ...event, id: `github:${externalId}-shared-page`, externalId: `${externalId}-shared-page`,
+      url: `https://github.com/symtri/${externalId}/shared-page`, title: "Agent toolkit repository", summary: "A repository for agent tools", importance: 80 };
+    const discussion: SignalEvent = { ...repository, id: `hacker-news:${externalId}-shared-page`, source: "hacker-news",
+      externalId: `${externalId}-shared-page`, url: `${repository.url}?utm_source=hn`, title: "Agent toolkit discussion",
+      summary: "A discussion about agent tools", importance: 30 };
+    const sharedFeed = { ...feed, events: [discussion, repository, { ...discussion, importance: 1 }] };
+    assert.equal(await persistSignals(sharedFeed), 1);
+    assert.equal((await sql`select id from signal_events where canonical_url = ${`github.com/symtri/${externalId}/shared-page`}`)[0].id, repository.id);
+    assert.deepEqual((await sql`select signal_id from signal_observations where external_id = ${repository.externalId} order by source`).map((row) => row.signal_id), [repository.id, repository.id]);
+    assert.equal(await persistSignals(sharedFeed), 0);
+    await sql`delete from signal_events where id = ${repository.id}`;
     const selfPostOne: SignalEvent = { ...event, id: `hacker-news:${externalId}-self-1`, source: "hacker-news",
       externalId: `${externalId}-self-1`, title: "First distinct question", summary: "AI agent question one",
       url: `https://news.ycombinator.com/item?id=${externalId}-1` };

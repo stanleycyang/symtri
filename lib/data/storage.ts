@@ -5,6 +5,7 @@ import { topicEdges, topics } from "../universe";
 import { relationshipKey } from "./activity";
 import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import { selectDistinctHeadlines } from "./select";
+import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
 
 let connection: ReturnType<typeof postgres> | undefined;
@@ -46,12 +47,15 @@ function database() {
 export async function persistSignals(feed: SignalFeed): Promise<number> {
   if (!feed.events.length) return 0;
   const sql = database();
-  const rows = feed.events.map((event) => ({
+  const observations = uniqueSourceObservations(feed.events);
+  const canonicalIds = new Set(deduplicateSignals(observations).map((event) => event.id));
+  const rows = observations.map((event) => ({
     id: event.id, source: event.source, external_id: event.externalId,
     title: event.title, url: event.url, summary: event.summary,
     published_at: event.publishedAt, importance: event.importance, topics: event.topics,
     classification_input: event.classificationInput ?? { title: event.title, summary: event.summary, categories: [] },
   }));
+  const canonicalRows = rows.filter((row) => canonicalIds.has(row.id));
   await sql`
     update signal_events as target set
       title = incoming.title, summary = incoming.summary,
@@ -74,7 +78,7 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
     insert into signal_events
       (id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version)
     select id, source, external_id, title, url, summary, published_at::timestamptz, importance, topics, classification_input, ${CLASSIFIER_VERSION}
-    from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
+    from jsonb_to_recordset(${sql.json(canonicalRows)}::jsonb) as incoming
       (id text, source text, external_id text, title text, url text, summary text,
        published_at text, importance double precision, topics jsonb, classification_input jsonb)
     on conflict do nothing returning id

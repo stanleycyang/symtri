@@ -3,7 +3,7 @@ import test from "node:test";
 import { classifySignal } from "./classify";
 import { selectFeedEvents } from "./feed";
 import { selectDistinctHeadlines, selectFocusedSignals, selectRegionHighlights } from "./select";
-import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
+import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews, uniqueSourceObservations } from "./normalize";
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
   assert.deepEqual(classifySignal("AI coding agents use tools", "A benchmark of tool use")[0]?.subtopicId, "ai-coding-agents");
@@ -152,6 +152,16 @@ test("deduplication keeps one copy of identical content across URLs", () => {
   const mirror = { ...first, id: "hacker-news:48", externalId: "48", url: "https://mirror.example/agent",
     title: "  AI agent toolkit  ", importance: 5 };
   assert.deepEqual(deduplicateSignals([mirror, first]).map((item) => item.id), [first.id]);
+});
+
+test("ingestion retains each source observation for one canonical page", () => {
+  const repository = normalizeGitHub({ id: 73, full_name: "example/agent-kit", created_at: "2026-09-23T12:00:00Z",
+    html_url: "https://github.com/example/agent-kit", description: "An agent toolkit", stargazers_count: 25, fork: false })!;
+  const discussion = normalizeHackerNews({ id: 74, type: "story", title: "Agent toolkit discussion", time: 1780000000,
+    score: 12, url: "https://github.com/example/agent-kit?utm_source=hn" })!;
+  const observations = uniqueSourceObservations([discussion, repository, { ...discussion, importance: 1 }]);
+  assert.deepEqual(new Set(observations.map((item) => item.id)), new Set([discussion.id, repository.id]));
+  assert.equal(deduplicateSignals(observations).length, 1);
 });
 
 test("feed selection keeps mapped signals before applying the cap or deduplicating", () => {

@@ -1,4 +1,4 @@
-import { deduplicateSignals } from "./normalize";
+import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
 import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion } from "./sources";
 import type { SignalEvent, SignalFeed, SourceId, SourceStatus } from "./model";
 
@@ -31,7 +31,7 @@ export async function getSignalFeed(options: { includeUnclassified?: boolean; fo
   return {
     observedAt: new Date().toISOString(),
     events: options.includeUnclassified
-      ? deduplicateSignals(events).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+      ? uniqueSourceObservations(events)
       : selectFeedEvents(events),
     sources: status,
     partial: Object.values(status).some((value) => value !== "ok"),

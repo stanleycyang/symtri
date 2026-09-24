@@ -79,6 +79,15 @@ export function deduplicateSignals(events: SignalEvent[]): SignalEvent[] {
   });
 }
 
+export function uniqueSourceObservations(events: SignalEvent[]): SignalEvent[] {
+  const byId = new Map<string, SignalEvent>();
+  for (const event of events) {
+    const previous = byId.get(event.id);
+    if (!previous || event.importance > previous.importance) byId.set(event.id, event);
+  }
+  return [...byId.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+}
+
 export function signalContentKey(event: Pick<SignalEvent, "title" | "summary">): string {
   return `${event.title}\n${event.summary}`.trim().replace(/\s+/g, " ").toLowerCase();
 }
