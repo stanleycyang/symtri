@@ -1,9 +1,16 @@
 const base = new URL(process.env.SYMTRI_SITE_URL ?? "https://symtri.com");
 
 async function read(path) {
-  const response = await fetch(new URL(path, base), { signal: AbortSignal.timeout(15_000), cache: "no-store" });
-  if (!response.ok) throw new Error(`${path} returned HTTP ${response.status}`);
-  return response.json();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(new URL(path, base), { signal: AbortSignal.timeout(15_000), cache: "no-store" });
+      if (!response.ok) throw Object.assign(new Error(`${path} returned HTTP ${response.status}`), { status: response.status });
+      return await response.json();
+    } catch (error) {
+      if ((error.status && error.status < 500) || attempt === 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+    }
+  }
 }
 
 try {
