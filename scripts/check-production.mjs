@@ -34,6 +34,25 @@ try {
   if (status.signals < 1 || status.vectors < 1 || status.embeddingBacklog !== 0) {
     throw new Error("Signal or vector coverage is incomplete");
   }
+  const minimumSignals = Number(process.env.SYMTRI_MIN_SIGNALS ?? 1);
+  if (!Number.isInteger(minimumSignals) || minimumSignals < 1) {
+    throw new Error("SYMTRI_MIN_SIGNALS must be a positive integer");
+  }
+  if (status.signals < minimumSignals) {
+    throw new Error(`Only ${status.signals} unique signals are available; expected ${minimumSignals}`);
+  }
+  const requiredSource = process.env.SYMTRI_REQUIRED_SOURCE;
+  if (requiredSource) {
+    if (!Object.hasOwn(run.sources ?? {}, requiredSource)) {
+      throw new Error(`Latest ingestion run has no ${requiredSource} source status`);
+    }
+    if (run.sources[requiredSource] !== "ok") {
+      throw new Error(`${requiredSource} source is ${run.sources[requiredSource]}`);
+    }
+    if (!signals.events?.some((event) => event.source === requiredSource)) {
+      throw new Error(`${requiredSource} has no visible overview signal`);
+    }
+  }
   if (run.embeddingStatus !== "ok") throw new Error(`Latest embedding step is ${run.embeddingStatus ?? "missing"}`);
   if (signals.lastIngestedAt !== run.completedAt) {
     throw new Error("Public feed does not expose the latest completed ingest time");
