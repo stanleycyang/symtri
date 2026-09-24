@@ -8,6 +8,7 @@ import { selectDistinctHeadlines } from "./select";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
 
 let connection: ReturnType<typeof postgres> | undefined;
+let lastDatabaseUse = 0;
 
 function embeddingCandidates(events: SignalEvent[]) {
   return events.map((event) => ({ id: event.id, hash: embeddingInputHash(signalEmbeddingText(event)) }));
@@ -25,6 +26,14 @@ function currentTopics(row: { topics?: unknown; classifier_version?: unknown; cl
 function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is required for persistent signals");
+  const now = Date.now();
+  // Frozen serverless instances can resume after their pooled TCP socket has died.
+  if (connection && now - lastDatabaseUse > 15_000) {
+    const stale = connection;
+    connection = undefined;
+    void stale.end({ timeout: 0 }).catch(() => {});
+  }
+  lastDatabaseUse = now;
   const hostname = new URL(url).hostname;
   const local = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
   connection ??= postgres(url, {
