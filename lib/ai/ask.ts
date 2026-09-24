@@ -97,10 +97,16 @@ export function shouldSearchKnowledge(question: string): boolean {
 
 export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[]): AskResult {
   const selected = results.slice(0, 4);
+  const location = selected[0]?.event.topics.find((match) => match.relevance >= .67 && topics.some((topic) => topic.id === match.topicId));
+  const region = location ? topics.find((topic) => topic.id === location.topicId)! : null;
+  const child = region?.children.find((item) => item.id === location?.subtopicId);
   return {
     question,
     summary: selected.length ? `The knowledge archive has ${results.length} source${results.length === 1 ? "" : "s"} related to this question. The closest sources are linked below; this sample does not establish a broad trend.` : "No indexed source matches this question yet. The universe is still growing from its connected sources.",
-    regionIds: [], pathIds: [], pathSteps: [], subtopicId: null,
+    regionIds: region ? [region.id] : [], pathIds: region ? [region.id] : [],
+    pathSteps: region ? [{ regionId: region.id, subtopicId: null, label: region.short },
+      ...(child ? [{ regionId: region.id, subtopicId: child.id, label: child.name }] : [])] : [],
+    subtopicId: child?.id ?? null,
     evidenceCount: results.length, observedAt: new Date().toISOString(), scope: "knowledge",
     retrieval: selected.some((item) => item.similarity !== null) ? "semantic-assisted" : "terms",
     summaryKind: "sample", citedEventIds: [],

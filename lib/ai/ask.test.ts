@@ -151,6 +151,17 @@ test("unmapped subjects use the knowledge archive without inventing a map locati
   assert.deepEqual(result.events.map((item) => item.id), [garden.id]);
 });
 
+test("classified archive evidence guides the map without broadening the source answer", () => {
+  const paper = event("exoplanet", "Exoplanet atmospheres observed with JWST", "space", "space-astronomy");
+  const result = answerKnowledgeQuestion("What is new in exoplanet research?", [{ event: paper, similarity: null }]);
+  assert.deepEqual(result.regionIds, ["space"]);
+  assert.deepEqual(result.pathSteps.map((step) => step.label), ["SPACE", "Astronomy"]);
+  assert.equal(result.subtopicId, "space-astronomy");
+  assert.deepEqual(result.events.map((item) => item.id), [paper.id]);
+  const weak = { ...paper, topics: [{ ...paper.topics[0], relevance: .5 }] };
+  assert.deepEqual(answerKnowledgeQuestion("Exoplanets", [{ event: weak, similarity: null }]).regionIds, []);
+});
+
 test("quantum computing questions navigate to the physics thread", () => {
   assert.deepEqual(questionTopics("What is happening with quantum computing?"), [{ id: "science", childId: "science-physics" }]);
   assert.equal(shouldSearchKnowledge("What is happening with quantum computing?"), false);
