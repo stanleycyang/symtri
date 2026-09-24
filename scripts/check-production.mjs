@@ -39,6 +39,13 @@ try {
     throw new Error("Public feed does not expose the latest completed ingest time");
   }
   if (!Array.isArray(history.days) || history.days.length < 1) throw new Error("No daily snapshot is available");
+  const minimumSnapshotDays = Number(process.env.SYMTRI_MIN_SNAPSHOT_DAYS ?? 1);
+  if (!Number.isInteger(minimumSnapshotDays) || minimumSnapshotDays < 1) {
+    throw new Error("SYMTRI_MIN_SNAPSHOT_DAYS must be a positive integer");
+  }
+  if (history.days.length < minimumSnapshotDays) {
+    throw new Error(`Only ${history.days.length} snapshot day(s) are available; expected ${minimumSnapshotDays}`);
+  }
   if (!signals.relationships || typeof signals.relationships !== "object") {
     throw new Error("Full-window live relationships are unavailable");
   }
