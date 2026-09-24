@@ -136,7 +136,7 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
   const rows = await sql`
     select id, source, external_id, title, url, summary, published_at, importance, topics
     from signal_events where published_at >= now() - interval '14 days'
-    order by published_at desc limit 150
+    order by published_at desc limit 300
   `;
   if (!rows.length) return null;
   const events: SignalEvent[] = rows.map((row) => ({
@@ -147,6 +147,11 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
   }));
   const sources: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };
   return { observedAt: new Date().toISOString(), events, sources, partial: true, scope: "archive" };
+}
+
+export async function getArchiveCount(): Promise<number> {
+  const rows = await database()`select count(*)::int as count from signal_events`;
+  return Number(rows[0].count);
 }
 
 export async function persistSnapshot(feed: SignalFeed): Promise<void> {

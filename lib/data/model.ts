@@ -25,7 +25,8 @@ export type SignalFeed = {
   events: SignalEvent[];
   sources: SourceStatus;
   partial: boolean;
-  scope: "sample" | "archive" | "history";
+  scope: "sample" | "rolling" | "archive" | "history";
+  archiveCount?: number;
   semanticRelationships?: Record<string, number>;
 };
 

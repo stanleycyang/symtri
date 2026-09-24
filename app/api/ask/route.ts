@@ -3,6 +3,7 @@ import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
 import { getSignalFeed } from "@/lib/data/feed";
+import { rollingFeed } from "@/lib/data/rolling";
 import { findSemanticSignals, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings } from "@/lib/data/storage";
 
 export const runtime = "nodejs";
@@ -21,7 +22,10 @@ export async function POST(request: Request) {
     if (day && !feed) return new Response("Snapshot not found", { status: 404 });
     if (!feed) {
       feed = await getSignalFeed();
-      if (!feed.events.length && process.env.DATABASE_URL) feed = await getStoredFeed() ?? feed;
+      if (process.env.DATABASE_URL) {
+        try { feed = rollingFeed(feed, await getStoredFeed(), 0); }
+        catch (error) { console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error"); }
+      }
     }
     if (!feed.events.length) return new Response("Signals unavailable", { status: 503 });
     const trimmed = question.trim();
