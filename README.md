@@ -4,7 +4,7 @@
 
 ## Current state
 
-The universe has 10 stable regions, 66 subtopics, ambient and incoming signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, a cinematic entrance, and a region → subtopic → signal exploration path. The scene is atmospheric while the live feed loads, then uses observed counts from Hacker News, GitHub, and arXiv. Region panels expose recent signals that do not fit a named subtopic; topic panels show matching real signals with source links. Topics with no matching observations show an empty state; no example stories or fabricated counts appear.
+The universe has 10 stable regions, 66 subtopics, ambient and incoming signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, a cinematic entrance, and a region → subtopic → signal exploration path. The scene is atmospheric while the live feed loads, then uses observed counts from Hacker News, GitHub, and arXiv. If a device cannot create a WebGL context, a lightweight region view still lets visitors explore topics, real sources, and Ask. Region panels expose recent signals that do not fit a named subtopic; topic panels show matching real signals with source links. Topics with no matching observations show an empty state; no example stories or fabricated counts appear.
 
 ## Run locally
 

@@ -2,7 +2,7 @@
 
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, OrbitControls } from "@react-three/drei";
-import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { Component, MutableRefObject, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { getTopic, Topic, topics, Vec3 } from "@/lib/universe";
 import { attentionEdges, flowingAttentionEdges, relationshipKey, type RegionActivity, type RegionRelationships } from "@/lib/data/activity";
@@ -419,10 +419,40 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
   </>;
 }
 
+class SceneErrorBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError(error: Error) {
+    if (!/webgl|context lost/i.test(error.message)) throw error;
+    return { failed: true };
+  }
+  componentDidCatch(error: Error) { console.warn("SYMTRI 3D view unavailable", error.message); }
+  render() { return this.state.failed ? this.props.fallback : this.props.children; }
+}
+
+function UniverseFallback({ entered, focusedId, onFocus }: Pick<UniverseProps, "entered" | "focusedId" | "onFocus">) {
+  const focused = getTopic(focusedId);
+  return <div className="universe-fallback">
+    {entered && focused && <div className="universe-fallback-focus" aria-hidden="true">
+      <span style={{ borderColor: focused.color }} /><strong>{focused.short}</strong><small>REGION IN FOCUS</small>
+    </div>}
+    {entered && !focusedId && <div className="universe-fallback-content">
+      <p className="eyebrow">EXPLORE THE LIVE SIGNALS</p>
+      <h2>Follow an idea.</h2>
+      <p>The 3D view is unavailable here. Choose a region to explore its topics and sources.</p>
+      <div className="universe-fallback-regions">{topics.map((topic) =>
+        <button key={topic.id} type="button" onClick={() => onFocus(topic.id)}>
+          <span style={{ background: topic.color }} aria-hidden="true" />{topic.short}<b aria-hidden="true">↗</b>
+        </button>)}</div>
+    </div>}
+  </div>;
+}
+
 export default function Universe(props: UniverseProps) {
   const [compact, setCompact] = useState(false);
   useEffect(() => { const query = window.matchMedia("(max-width: 700px)"); const update = () => setCompact(query.matches); update(); query.addEventListener("change", update); return () => query.removeEventListener("change", update); }, []);
-  return <Canvas className="universe-canvas" camera={{ position: [0, 0, 70], fov: 48, near: .1, far: 250 }} dpr={[1, compact ? 1.4 : 1.8]} gl={{ antialias: !compact, alpha: false, powerPreference: "high-performance" }} onCreated={({ gl }) => gl.setClearColor("#07090d")}>
-    <World {...props} compact={compact} />
-  </Canvas>;
+  return <SceneErrorBoundary fallback={<UniverseFallback entered={props.entered} focusedId={props.focusedId} onFocus={props.onFocus} />}>
+    <Canvas className="universe-canvas" camera={{ position: [0, 0, 70], fov: 48, near: .1, far: 250 }} dpr={[1, compact ? 1.4 : 1.8]} gl={{ antialias: !compact, alpha: false, powerPreference: "high-performance" }} onCreated={({ gl }) => gl.setClearColor("#07090d")}>
+      <World {...props} compact={compact} />
+    </Canvas>
+  </SceneErrorBoundary>;
 }
