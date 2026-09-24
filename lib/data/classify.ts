@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 3;
+export const CLASSIFIER_VERSION = 4;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -36,7 +36,7 @@ const childTerms: Record<string, string[]> = {
   "science-climate-science": ["climate", "carbon", "warming"],
   "space-launch-systems": ["rocket", "launch vehicle"],
   "space-satellites": ["satellite"],
-  "space-astronomy": ["astronomy", "telescope", "galaxy"],
+  "space-astronomy": ["astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "telescope", "galaxy"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
   "energy-solar": ["solar energy", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic"],
   "energy-battery-storage": ["battery", "storage"],
@@ -95,7 +95,8 @@ export function classifySignal(title: string, summary: string, categories: strin
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));
     const categoryWeight = topic.id === "space" && parentInCategory ? 8 : 6;
     let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? categoryWeight : 0);
-    let bestChild: { id: string; score: number } | null = null;
+    let bestChild: { id: string; score: number } | null = topic.id === "space" && parentInCategory
+      ? { id: "space-astronomy", score: 4 } : null;
     for (const child of topic.children) {
       const childAliases = childTerms[child.id] ?? [child.name.toLowerCase()];
       const childTitle = child.id === "ai-agents" ? title.replace(/\bforeign agents?\b/gi, "") : title;

@@ -43,6 +43,9 @@ test("computational space is not astronomy and astro-ph outweighs incidental GPU
     .some((match) => match.topicId === "space"));
   const astrophysics = classifySignal("Differentiable astrophysics on the GPU", "Astronomers use graphics processing units", ["astro-ph.IM", "physics.comp-ph"]);
   assert.equal(astrophysics[0]?.topicId, "space");
+  assert.equal(astrophysics[0]?.subtopicId, "space-astronomy");
+  assert.equal(classifySignal("Astronomical multiband time series", "", ["astro-ph.IM"])[0]?.subtopicId, "space-astronomy");
+  assert.equal(classifySignal("Sterile Neutrino Dark Matter", "", ["astro-ph.CO"])[0]?.subtopicId, "space-astronomy");
   assert.ok(classifySignal("New space telescope photographs a galaxy", "", []).some((match) => match.topicId === "space"));
 });
 
