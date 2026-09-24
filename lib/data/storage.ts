@@ -356,11 +356,14 @@ export async function getIngestionStatus() {
   const runs = await sql`select started_at, completed_at, status, source_status, fetched_count, mapped_count,
     new_count, embedded_count, embedding_status from ingestion_runs order by started_at desc limit 1`;
   const counts = await sql`select count(*)::int as signals,
-    count(*) filter (where embedding is not null and embedding_model = ${embeddingModelId()})::int as vectors
+    count(*) filter (where embedding is not null and embedding_model = ${embeddingModelId()})::int as vectors,
+    count(*) filter (where embedding is null or embedding_model is distinct from ${embeddingModelId()})::int as embedding_backlog,
+    count(*) filter (where classifier_version < ${CLASSIFIER_VERSION} and classification_input is not null)::int as classification_backlog
     from signal_events`;
   const last = runs[0];
   return {
     signals: Number(counts[0].signals), vectors: Number(counts[0].vectors),
+    embeddingBacklog: Number(counts[0].embedding_backlog), classificationBacklog: Number(counts[0].classification_backlog),
     lastRun: last ? {
       startedAt: new Date(last.started_at).toISOString(),
       completedAt: last.completed_at ? new Date(last.completed_at).toISOString() : null,

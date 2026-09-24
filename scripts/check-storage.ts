@@ -209,6 +209,8 @@ async function main() {
     const status = await getIngestionStatus();
     assert.equal(status.lastRun?.status, "complete");
     assert.equal(status.lastRun?.fetched, 1);
+    assert.equal(status.classificationBacklog, 0);
+    assert.equal(status.embeddingBacklog, 1);
     await releaseIngestionLease(runId);
     assert.equal(await acquireIngestionLease(competingRunId), true);
     await releaseIngestionLease(competingRunId);
