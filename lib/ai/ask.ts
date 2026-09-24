@@ -36,6 +36,7 @@ const subtopicAliases: Record<string, string[]> = {
   "ai-language-models": ["llm", "llms", "language model", "language models"],
   "ai-coding-agents": ["coding agent", "coding agents"],
   "ai-ai-infrastructure": ["ai infrastructure", "inference"],
+  "ai-research": ["ai research", "artificial intelligence research", "machine learning research"],
   "science-physics": ["quantum computing", "quantum computers", "quantum physics", "qubits"],
   "energy-power-demand": ["power demand", "data center power"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
