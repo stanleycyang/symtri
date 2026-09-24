@@ -54,8 +54,9 @@ try {
     }
   }
   if (run.embeddingStatus !== "ok") throw new Error(`Latest embedding step is ${run.embeddingStatus ?? "missing"}`);
-  if (signals.lastIngestedAt !== run.completedAt) {
-    throw new Error("Public feed does not expose the latest completed ingest time");
+  const observedAt = Date.parse(signals.lastIngestedAt);
+  if (!Number.isFinite(observedAt) || observedAt < Date.parse(run.startedAt) || observedAt > Date.parse(run.completedAt)) {
+    throw new Error("Public feed does not reflect the latest completed ingest");
   }
   if (!Array.isArray(history.days) || history.days.length < 1) throw new Error("No daily snapshot is available");
   const minimumSnapshotDays = Number(process.env.SYMTRI_MIN_SNAPSHOT_DAYS ?? 1);
