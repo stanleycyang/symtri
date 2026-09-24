@@ -14,7 +14,7 @@ async function read(path) {
 }
 
 try {
-  const [status, history] = await Promise.all([read("/api/status"), read("/api/history")]);
+  const [status, history, signals] = await Promise.all([read("/api/status"), read("/api/history"), read("/api/signals")]);
   const run = status.lastRun;
   if (!run?.completedAt || !["complete", "partial"].includes(run.status)) {
     throw new Error(`Latest ingestion run is ${run?.status ?? "missing"}`);
@@ -27,11 +27,33 @@ try {
     throw new Error("Signal or vector coverage is incomplete");
   }
   if (!Array.isArray(history.days) || history.days.length < 1) throw new Error("No daily snapshot is available");
+  if (!signals.relationships || typeof signals.relationships !== "object") {
+    throw new Error("Full-window live relationships are unavailable");
+  }
+  const known = new Set(Object.keys(signals.activity ?? {}));
+  const sampledRelationships = {};
+  for (const event of signals.events ?? []) {
+    const ids = [...new Set(event.topics.map((match) => match.topicId).filter((id) => known.has(id)))].sort();
+    for (let first = 0; first < ids.length; first++) for (let second = first + 1; second < ids.length; second++) {
+      const key = `${ids[first]}:${ids[second]}`;
+      sampledRelationships[key] = (sampledRelationships[key] ?? 0) + 1;
+    }
+  }
+  for (const [key, count] of Object.entries(sampledRelationships)) {
+    if ((signals.relationships[key] ?? 0) < count) throw new Error(`Live relationship ${key} is below its map sample`);
+  }
+  const latestDay = history.days[0].day;
+  const snapshot = await read(`/api/history?day=${encodeURIComponent(latestDay)}`);
+  if (!snapshot.relationships || typeof snapshot.relationships !== "object") {
+    throw new Error(`Snapshot ${latestDay} has no full-window relationships`);
+  }
   console.log(JSON.stringify({
     completedAt: run.completedAt, status: run.status, sources: run.sources,
     fetched: run.fetched, added: run.added, signals: status.signals, vectors: status.vectors,
     classificationBacklog: status.classificationBacklog,
     snapshotDays: history.days.map((day) => day.day),
+    liveRelationships: Object.keys(signals.relationships).length,
+    snapshotRelationships: Object.keys(snapshot.relationships).length,
   }));
 } catch (error) {
   console.error(`SYMTRI production check failed: ${error instanceof Error ? error.message : String(error)}`);

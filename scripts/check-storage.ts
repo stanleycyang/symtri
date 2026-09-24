@@ -81,6 +81,8 @@ async function main() {
   await sql.unsafe(archiveActivityMigration);
   const recentRelationshipsMigration = await readFile(new URL("../supabase/migrations/20260924012000_recent_relationships.sql", import.meta.url), "utf8");
   await sql.unsafe(recentRelationshipsMigration);
+  const snapshotRelationshipsMigration = await readFile(new URL("../supabase/migrations/20260924013000_snapshot_relationships_backfill.sql", import.meta.url), "utf8");
+  await sql.unsafe(snapshotRelationshipsMigration);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
   assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
@@ -479,6 +481,9 @@ async function main() {
     `;
     await persistSnapshot({ ...feed, observedAt: `${historicDay}T12:00:00.000Z`, events: [{ ...event, id: historicId }] });
     assert.equal((await getSnapshotFeed(historicDay))?.activity, undefined);
+    assert.equal((await getSnapshotFeed(historicDay))?.relationships, undefined);
+    await sql.unsafe(snapshotRelationshipsMigration);
+    assert.equal((await getSnapshotFeed(historicDay))?.relationships?.["ai:markets"], 1);
     assert.ok(await backfillSnapshotActivity() >= 1);
     assert.equal((await getSnapshotFeed(historicDay))?.activity?.ai.count, 1);
     assert.equal((await getSnapshotFeed(historicDay))?.relationships?.["ai:markets"], 1);
