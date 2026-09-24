@@ -7,6 +7,7 @@ import type { AskResult } from "@/lib/ai/ask";
 import { getTopic, topics } from "@/lib/universe";
 import type { SignalEvent, SignalFeed, SnapshotDay } from "@/lib/data/model";
 import { regionActivity, regionRelationships, relationshipKey } from "@/lib/data/activity";
+import { selectRegionHighlights } from "@/lib/data/select";
 
 const Universe = dynamic(() => import("@/components/universe/Universe"), { ssr: false, loading: () => <div className="universe-loading">AWAKENING THE MAP</div> });
 
@@ -18,18 +19,6 @@ function ageOf(publishedAt: string, observedAt: string) {
 }
 function showLive(event: SignalEvent, observedAt: string): DisplaySignal {
   return { id: event.id, title: event.title, source: sourceLabels[event.source], age: ageOf(event.publishedAt, observedAt), summary: event.summary, url: event.url, live: true };
-}
-function regionHighlights(events: SignalEvent[], regionId: string): SignalEvent[] {
-  const matches = events.filter((event) => event.topics.some((match) => match.topicId === regionId && !match.subtopicId))
-    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  const chosen: SignalEvent[] = [];
-  const sources = new Set<string>();
-  for (const event of matches) if (!sources.has(event.source)) { chosen.push(event); sources.add(event.source); }
-  for (const event of matches) {
-    if (chosen.length >= 3) break;
-    if (!chosen.includes(event)) chosen.push(event);
-  }
-  return chosen.slice(0, 3).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }
 function shortDay(day: string) { return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase(); }
 
@@ -65,7 +54,7 @@ export default function Experience() {
     .sort((a, b) => b.count - a.count).slice(0, 3) : [];
   const child = focus?.children.find((item) => item.id === childId);
   const liveForChild = child && displayFeed && (!selectedDay || historicalFeed?.day === selectedDay) ? displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === child.id)).slice(0, 3) : [];
-  const regionSignals = focus && displayFeed ? regionHighlights(displayFeed.events, focus.id).map((event) => showLive(event, displayFeed.observedAt)) : [];
+  const regionSignals = focus && displayFeed ? selectRegionHighlights(displayFeed.events, focus.id).map((event) => showLive(event, displayFeed.observedAt)) : [];
   const visibleSignals: DisplaySignal[] = child
     ? liveForChild.length ? liveForChild.map((event) => showLive(event, displayFeed!.observedAt)) : []
     : regionSignals;

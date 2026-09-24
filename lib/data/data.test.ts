@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { classifySignal } from "./classify";
 import { selectFeedEvents } from "./feed";
+import { selectRegionHighlights } from "./select";
 import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
@@ -83,4 +84,13 @@ test("feed selection keeps mapped signals before applying the cap or deduplicati
   const input = [unmapped, mapped, second];
   assert.deepEqual(selectFeedEvents(input, 2).map((event) => event.id), [mapped.id, second.id]);
   assert.equal(input.length, 3);
+});
+
+test("region highlights surface the newest thread stories without losing region scope", () => {
+  const oldBare = normalizeHackerNews({ id: 81, type: "story", title: "AI announcement", time: Date.parse("2026-09-22T08:00:00Z") / 1000, url: "https://example.com/old" })!;
+  const newerThread = normalizeHackerNews({ id: 82, type: "story", title: "AI coding agents", time: Date.parse("2026-09-23T08:00:00Z") / 1000, url: "https://example.com/new" })!;
+  const unrelated = normalizeHackerNews({ id: 83, type: "story", title: "New nuclear reactor", time: Date.parse("2026-09-24T08:00:00Z") / 1000, url: "https://example.com/energy" })!;
+  assert.equal(newerThread.topics[0]?.subtopicId, "ai-coding-agents");
+  assert.equal(oldBare.topics[0]?.subtopicId, null);
+  assert.deepEqual(selectRegionHighlights([oldBare, unrelated, newerThread], "ai", 2).map((event) => event.id), [newerThread.id, oldBare.id]);
 });
