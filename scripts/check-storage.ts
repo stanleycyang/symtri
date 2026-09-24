@@ -254,7 +254,7 @@ async function main() {
         (id text, source text, external_id text, title text, url text, summary text,
          published_at text, importance double precision, topics jsonb)
     `;
-    const journalPreviewId = `${crowdPrefix}openalex-journal`;
+    const journalPreviewId = `openalex:${externalId}-crowd-journal`;
     await sql`
       insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
       values (${journalPreviewId}, 'openalex', ${`${externalId}-preview-journal`},
@@ -342,6 +342,7 @@ async function main() {
       assert.equal(archiveActivity[topicId].momentum, expectedActivity[topicId].momentum);
     }
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
+    await sql`delete from signal_events where id = ${journalPreviewId}`;
     const semanticRelationships = await getSemanticRelationships();
     assert.ok(Number.isFinite(semanticRelationships["ai:energy"]));
     const aiHash = (await sql`select embedding_input_hash from topic_embeddings where topic_id = 'ai'`)[0].embedding_input_hash;
