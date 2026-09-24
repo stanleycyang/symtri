@@ -100,6 +100,12 @@ test("Hacker News normalization rejects dead stories and unsafe URLs", () => {
   assert.equal(normalizeHackerNews({ id: 123, type: "story", deleted: true, title: "AI", time: 1780000000 }), null);
 });
 
+test("Hacker News text decodes numeric and named HTML entities", () => {
+  const event = normalizeHackerNews({ id: 124, type: "story", title: "AI&#x27;s research &amp; tools", text: "<p>It isn&#x27;t hidden&#x2F;lost &mdash; it&#39;s here.</p>", time: 1780000000 });
+  assert.equal(event?.title, "AI's research & tools");
+  assert.equal(event?.summary, "It isn't hidden/lost — it's here.");
+});
+
 test("GitHub and arXiv normalize to the same event shape", () => {
   const github = normalizeGitHub({ id: 42, full_name: "example/agent-kit", created_at: "2026-09-22T12:00:00Z", html_url: "https://github.com/example/agent-kit", description: "AI coding agent tools", stargazers_count: 80, topics: ["ai-agents"], fork: false });
   assert.equal(github?.id, "github:42");

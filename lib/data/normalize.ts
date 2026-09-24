@@ -5,7 +5,14 @@ import type { SignalEvent } from "./model";
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function text(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
 function number(value: unknown): number { return typeof value === "number" && Number.isFinite(value) ? value : 0; }
-function clean(value: unknown): string { return text(value).replace(/<[^>]*>/g, " ").replace(/&(?:amp|#38);/g, "&").replace(/&(?:lt|#60);/g, "<").replace(/&(?:gt|#62);/g, ">").replace(/&(?:quot|#34);/g, '"').replace(/\s+/g, " ").trim(); }
+const namedEntities: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", ndash: "–", mdash: "—", hellip: "…" };
+function decodeEntity(match: string, entity: string): string {
+  if (!entity.startsWith("#")) return namedEntities[entity.toLowerCase()] ?? match;
+  const hex = entity[1]?.toLowerCase() === "x";
+  const point = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
+  return point > 0 && point <= 0x10ffff && !(point >= 0xd800 && point <= 0xdfff) ? String.fromCodePoint(point) : match;
+}
+function clean(value: unknown): string { return text(value).replace(/<[^>]*>/g, " ").replace(/&(#(?:x[\da-f]+|\d+)|[a-z]+);/gi, decodeEntity).replace(/\s+/g, " ").trim(); }
 function safeUrl(value: unknown, fallback: string): string {
   try { const url = new URL(text(value)); return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : fallback; } catch { return fallback; }
 }
