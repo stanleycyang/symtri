@@ -1,10 +1,11 @@
-import { answerKnowledgeQuestion, answerQuestion, shouldSearchKnowledge, type AskResult } from "@/lib/ai/ask";
+import { answerKnowledgeQuestion, answerQuestion, questionTopics, shouldSearchKnowledge, type AskResult } from "@/lib/ai/ask";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
 import { getSignalFeed } from "@/lib/data/feed";
+import { canonicalSignalUrl } from "@/lib/data/normalize";
 import { rollingFeed } from "@/lib/data/rolling";
-import { findSemanticSignals, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
+import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
 import type { SignalFeed } from "@/lib/data/model";
 
 export const runtime = "nodejs";
@@ -53,6 +54,23 @@ export async function POST(request: Request) {
       if (process.env.DATABASE_URL) {
         try { feed = rollingFeed(feed, await getStoredFeed(), 0); }
         catch (error) { console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error"); }
+      }
+    }
+    if (!day && process.env.DATABASE_URL) {
+      const references = questionTopics(trimmed);
+      if (references.length) {
+        try {
+          const recent = await getRecentTopicEvents(references);
+          const seen = new Set(feed.events.map((event) => event.id));
+          const seenUrls = new Set(feed.events.map((event) => canonicalSignalUrl(event.url)));
+          const extra = recent.filter((event) => {
+            const url = canonicalSignalUrl(event.url);
+            if (seen.has(event.id) || seenUrls.has(url)) return false;
+            seen.add(event.id); seenUrls.add(url);
+            return true;
+          });
+          feed = { ...feed, events: [...feed.events, ...extra] };
+        } catch (error) { console.warn("SYMTRI topic archive unavailable", error instanceof Error ? error.message : "unknown error"); }
       }
     }
     if (!feed.events.length) return new Response("Signals unavailable", { status: 503 });

@@ -74,10 +74,18 @@ function words(input: string): string[] {
   return input.toLowerCase().match(/[a-z0-9]+/g)?.filter((word) => word.length > 2 && !stop.has(word)) ?? [];
 }
 
+export function questionTopics(question: string): { id: string; childId: string | null }[] {
+  return topics.map((topic) => {
+    const regionPosition = firstMatch(question, regionAliases[topic.id] ?? [topic.name.toLowerCase()]);
+    const children = topic.children.map((child) => ({ id: child.id, position: firstMatch(question, subtopicAliases[child.id] ?? [child.name.toLowerCase()]) }));
+    const child = children.filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position)[0];
+    return { id: topic.id, position: Math.min(regionPosition, child?.position ?? Infinity), childId: child?.id ?? null };
+  }).filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position).slice(0, 2)
+    .map(({ id, childId }) => ({ id, childId }));
+}
+
 export function shouldSearchKnowledge(question: string): boolean {
-  if (!words(question).length) return false;
-  return !topics.some((topic) => Number.isFinite(firstMatch(question, regionAliases[topic.id] ?? [topic.name.toLowerCase()]))
-    || topic.children.some((child) => Number.isFinite(firstMatch(question, subtopicAliases[child.id] ?? [child.name.toLowerCase()]))));
+  return words(question).length > 0 && questionTopics(question).length === 0;
 }
 
 export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[]): AskResult {
@@ -94,13 +102,7 @@ export function answerKnowledgeQuestion(question: string, results: { event: Sign
 }
 
 export function answerQuestion(question: string, feed: SignalFeed, semanticMatches: { id: string; similarity: number }[] = []): AskResult {
-  const normalized = question.toLowerCase();
-  const detected = topics.map((topic) => {
-    const regionPosition = firstMatch(normalized, regionAliases[topic.id] ?? [topic.name.toLowerCase()]);
-    const children = topic.children.map((child) => ({ id: child.id, position: firstMatch(normalized, subtopicAliases[child.id] ?? [child.name.toLowerCase()]) }));
-    const child = children.filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position)[0];
-    return { id: topic.id, position: Math.min(regionPosition, child?.position ?? Infinity), childId: child?.id ?? null };
-  }).filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position).slice(0, 2);
+  const detected = questionTopics(question);
   const fallback = Object.entries(regionActivity(feed.events, Date.parse(feed.observedAt))).sort((a, b) => b[1].score - a[1].score)[0]?.[0] ?? "ai";
   const regionIds = detected.length ? detected.map((item) => item.id) : [fallback];
   const subtopicId = regionIds.length === 1 ? detected[0]?.childId ?? null : null;

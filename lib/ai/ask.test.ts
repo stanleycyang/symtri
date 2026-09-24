@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { answerKnowledgeQuestion, answerQuestion, shouldSearchKnowledge } from "./ask";
+import { answerKnowledgeQuestion, answerQuestion, questionTopics, shouldSearchKnowledge } from "./ask";
 import type { SignalEvent, SignalFeed } from "../data/model";
 
 const observedAt = "2026-09-22T12:00:00.000Z";
@@ -99,6 +99,8 @@ test("semantic similarity reorders sources only within the identified region", (
 });
 
 test("unmapped subjects use the knowledge archive without inventing a map location", () => {
+  assert.deepEqual(questionTopics("What's happening with AI agents?"), [{ id: "ai", childId: "ai-agents" }]);
+  assert.deepEqual(questionTopics("What is drawing attention?"), []);
   assert.equal(shouldSearchKnowledge("What is happening with AI agents?"), false);
   assert.equal(shouldSearchKnowledge("What is drawing attention?"), false);
   assert.equal(shouldSearchKnowledge("What is new with urban gardening?"), true);
