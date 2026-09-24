@@ -23,7 +23,7 @@ const regionAliases: Record<string, string[]> = {
   software: ["software", "developer", "programming", "open source", "database"],
   science: ["science", "biology", "physics", "medicine", "quantum computing", "quantum computers", "qubits"],
   space: ["space", "satellite", "rocket", "astronomy"],
-  energy: ["energy", "power demand", "electricity", "nuclear", "solar", "battery", "fusion"],
+  energy: ["energy", "power demand", "electricity", "nuclear", "solar", "battery", "fusion", "tokamak", "tokamaks", "stellarator", "stellarators"],
   markets: ["markets", "economy", "finance", "investment", "venture capital"],
   security: ["security", "privacy", "cyber", "malware", "encryption"],
   hardware: ["hardware", "chip", "semiconductor", "gpu", "compute"],
@@ -39,6 +39,7 @@ const subtopicAliases: Record<string, string[]> = {
   "science-physics": ["quantum computing", "quantum computers", "quantum physics", "qubits"],
   "energy-power-demand": ["power demand", "data center power"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
+  "energy-fusion": ["fusion", "tokamak", "tokamaks", "stellarator", "stellarators"],
 };
 
 function firstMatch(question: string, phrases: string[]): number {

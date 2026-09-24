@@ -137,3 +137,14 @@ test("quantum computing questions navigate to the physics thread", () => {
   assert.deepEqual(result.pathSteps.map((step) => step.label), ["SCIENCE", "Physics"]);
   assert.deepEqual(result.events.map((item) => item.id), [paper.id]);
 });
+
+test("tokamak and stellarator questions navigate to fusion research", () => {
+  const paper = event("tokamak", "Tokamak fusion confinement", "energy", "energy-fusion");
+  for (const question of ["What's new with tokamaks?", "What is happening in stellarators?"]) {
+    assert.deepEqual(questionTopics(question), [{ id: "energy", childId: "energy-fusion" }]);
+    assert.equal(shouldSearchKnowledge(question), false);
+    const result = answerQuestion(question, { ...feed, events: [paper] });
+    assert.deepEqual(result.pathSteps.map((step) => step.label), ["ENERGY", "Fusion"]);
+    assert.deepEqual(result.events.map((item) => item.id), [paper.id]);
+  }
+});
