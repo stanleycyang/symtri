@@ -85,6 +85,8 @@ async function main() {
   await sql.unsafe(snapshotRelationshipsMigration);
   const openAlexMigration = await readFile(new URL("../supabase/migrations/20260924014000_openalex_source.sql", import.meta.url), "utf8");
   await sql.unsafe(openAlexMigration);
+  const sourcePreviewMigration = await readFile(new URL("../supabase/migrations/20260924015000_source_preview_index.sql", import.meta.url), "utf8");
+  await sql.unsafe(sourcePreviewMigration);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
   assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
@@ -93,6 +95,7 @@ async function main() {
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_topics_gin_idx'`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_content_key_key'`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_search_idx'`)[0].count, 1);
+  assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_source_preview_idx'`)[0].count, 1);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations')
@@ -251,6 +254,17 @@ async function main() {
         (id text, source text, external_id text, title text, url text, summary text,
          published_at text, importance double precision, topics jsonb)
     `;
+    const journalPreviewId = `${crowdPrefix}openalex-journal`;
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      values (${journalPreviewId}, 'openalex', ${`${externalId}-preview-journal`},
+        'Stellarator plasma research', ${`https://doi.org/10.1234/${externalId}-preview`},
+        'A recently discovered journal paper about fusion energy', now() - interval '12 hours', 25,
+        ${sql.json([{ topicId: "energy", subtopicId: "energy-fusion", relevance: 1 }])}::jsonb)
+    `;
+    const balancedPreview = await getStoredFeed();
+    assert.equal(balancedPreview?.events.length, 300);
+    assert.ok(balancedPreview.events.some((item) => item.id === journalPreviewId));
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === id));
     assert.ok((await getRecentTopicEvents([{ id: "ai", childId: "ai-agents" }])).some((item) => item.id === id));
     const batteryRows = Array.from({ length: 41 }, (_, index) => ({

@@ -223,12 +223,37 @@ export async function hasCurrentSignalEmbeddings(events: SignalEvent[]): Promise
 
 export async function getStoredFeed(): Promise<SignalFeed | null> {
   const sql = database();
-  const rows = await sql`
-    select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
+  const recent = await sql`
+    select id, source, external_id, title, url, summary, published_at, first_seen_at, importance, topics, classification_input, classifier_version
     from signal_events where published_at >= now() - interval '14 days' and jsonb_array_length(topics) > 0
-    order by published_at desc limit 300
+    order by published_at desc, first_seen_at desc limit 300
   `;
-  if (!rows.length) return null;
+  if (!recent.length) return null;
+  const sourceMinimum = 12;
+  const candidates = [...recent];
+  if (recent.length === 300) {
+    const seen = new Set(candidates.map((row) => row.id));
+    for (const source of Object.keys(unavailableSources())) {
+      if (recent.filter((row) => row.source === source).length >= sourceMinimum) continue;
+      const sourceRows = await sql`
+        select id, source, external_id, title, url, summary, published_at, first_seen_at, importance, topics, classification_input, classifier_version
+        from signal_events
+        where source = ${source} and published_at >= now() - interval '14 days' and jsonb_array_length(topics) > 0
+        order by published_at desc, first_seen_at desc limit ${sourceMinimum}
+      `;
+      for (const row of sourceRows) if (!seen.has(row.id)) {
+        candidates.push(row);
+        seen.add(row.id);
+      }
+    }
+  }
+  const newestFirst = (a: (typeof candidates)[number], b: (typeof candidates)[number]) =>
+    new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+      || new Date(b.first_seen_at).getTime() - new Date(a.first_seen_at).getTime();
+  const reserved = new Set(Object.keys(unavailableSources()).flatMap((source) =>
+    candidates.filter((row) => row.source === source).sort(newestFirst).slice(0, sourceMinimum).map((row) => row.id)));
+  const rows = [...candidates.filter((row) => reserved.has(row.id)), ...recent.filter((row) => !reserved.has(row.id))]
+    .slice(0, 300).sort(newestFirst);
   const events: SignalEvent[] = rows.map((row) => ({
     id: row.id, source: row.source, externalId: row.external_id,
     title: row.title, url: row.url, summary: row.summary,
