@@ -1,6 +1,8 @@
 import { normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 import type { SignalEvent } from "./model";
 
+const hackerNewsReplayLimit = 180;
+
 async function request(url: string, headers?: HeadersInit, fresh = false): Promise<Response> {
   const response = await fetch(url, { headers, ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: 900 } }), signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error(`Source returned HTTP ${response.status}`);
@@ -16,7 +18,7 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
     try {
       const newest: unknown = await (await request("https://hacker-news.firebaseio.com/v0/newstories.json", undefined, true)).json();
       if (!Array.isArray(newest)) throw new Error("Invalid Hacker News new story list");
-      storyIds = [...new Set([...topIds, ...newest.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, 60)])];
+      storyIds = [...new Set([...topIds, ...newest.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, hackerNewsReplayLimit)])];
     } catch (error) {
       console.warn("SYMTRI Hacker News new stories unavailable", error instanceof Error ? error.message : "unknown error");
     }

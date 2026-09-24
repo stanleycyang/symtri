@@ -56,3 +56,29 @@ test("hourly source sampling finds new items without widening the public sample"
     globalThis.fetch = originalFetch;
   }
 });
+
+test("hourly Hacker News replay covers stories missed by a previous run", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedItems: number[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/topstories.json")) return Response.json([1]);
+    if (url.endsWith("/newstories.json")) return Response.json(Array.from({ length: 200 }, (_, index) => index + 2));
+    const item = url.match(/\/item\/(\d+)\.json$/);
+    if (item) {
+      const id = Number(item[1]);
+      requestedItems.push(id);
+      return Response.json({ id, type: "story", title: `AI agent story ${id}`, time: 1780000000, score: 10, url: `https://example.com/${id}` });
+    }
+    throw new Error(`Unexpected source request: ${url}`);
+  };
+  try {
+    const events = await fetchHackerNews(true);
+    assert.equal(events.length, 181);
+    assert.ok(requestedItems.includes(181));
+    assert.equal(requestedItems.includes(182), false);
+    assert.equal(requestedItems.includes(201), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
