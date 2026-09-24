@@ -94,6 +94,9 @@ async function main() {
   await sql.unsafe(sourcePreviewMigration);
   const organicMigration = await readFile(new URL("../supabase/migrations/20260924016000_organic_graph.sql", import.meta.url), "utf8");
   await sql.unsafe(organicMigration);
+  const seedCatalogMigration = await readFile(new URL("../supabase/migrations/20260924017000_seed_catalog.sql", import.meta.url), "utf8");
+  await sql.unsafe(seedCatalogMigration);
+  assert.equal((await sql`select count(*)::int as count from concept_catalog`)[0].count, 76);
   await seedUniverseCatalog();
   assert.equal((await getUniverseCatalog()).topics.length, 10);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
