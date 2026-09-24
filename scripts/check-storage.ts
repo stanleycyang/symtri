@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 
@@ -16,6 +16,7 @@ const sql = postgres(testUrl, { max: 1, prepare: false, ssl: false });
 const externalId = `storage-check-${randomUUID()}`;
 const id = `github:${externalId}`;
 const unclassifiedId = `github:${externalId}-unclassified`;
+const relatedId = `github:${externalId}-related`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
 
@@ -77,6 +78,13 @@ async function main() {
     assert.ok(await persistEmbeddings(feed, fakeEmbedder) >= 1);
     assert.ok(!(await getPendingEmbeddingEvents()).some((item) => item.id === id));
     assert.equal(await persistEmbeddings(feed, fakeEmbedder), 0);
+    const related: SignalEvent = { ...event, id: relatedId, externalId: `${externalId}-related`, title: "AI powered materials research", summary: "Research agents explore new materials", url: `${event.url}/related`, topics: [{ topicId: "science", subtopicId: "science-materials", relevance: 1 }] };
+    await persistSignals({ ...feed, events: [related] });
+    await persistEmbeddings({ ...feed, events: [related] }, fakeEmbedder);
+    assert.equal((await getRelatedSignals(id))[0]?.id, relatedId);
+    assert.ok(!(await getRelatedSignals(id)).some((item) => item.id === id));
+    assert.deepEqual(await getRelatedSignals(unclassifiedId), []);
+    await sql`delete from signal_events where id = ${relatedId}`;
     const semanticRelationships = await getSemanticRelationships();
     assert.ok(Number.isFinite(semanticRelationships["ai:energy"]));
     const aiHash = (await sql`select embedding_input_hash from topic_embeddings where topic_id = 'ai'`)[0].embedding_input_hash;
@@ -163,7 +171,7 @@ async function main() {
     assert.equal(snapshot?.scope, "history");
     console.log("Postgres migrations, API table protection, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
   } finally {
-    await sql`delete from signal_events where id in (${id}, ${unclassifiedId})`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId})`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;

@@ -3,7 +3,7 @@ import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_
 import { embeddingModelId } from "../ai/embed";
 import { topicEdges, topics } from "../universe";
 import { relationshipKey } from "./activity";
-import type { SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
+import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
 
 let connection: ReturnType<typeof postgres> | undefined;
 
@@ -341,6 +341,35 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
         url: row.url, summary: row.summary, publishedAt: new Date(row.published_at).toISOString(),
         importance: row.importance, topics: row.topics },
     }));
+}
+
+export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
+  const sql = database();
+  const origin = await sql`
+    select embedding::text as vector, topics
+    from signal_events
+    where id = ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
+    limit 1
+  `;
+  if (!origin.length) return [];
+  const candidates = await sql`
+    select id, source, title, url, summary, published_at, topics,
+      1 - (embedding <=> ${origin[0].vector}::vector(256)) as similarity
+    from signal_events
+    where id <> ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
+      and jsonb_array_length(topics) > 0
+    order by embedding <=> ${origin[0].vector}::vector(256)
+    limit 24
+  `;
+  const originRegions = new Set((origin[0].topics as SignalEvent["topics"]).map((match) => match.topicId));
+  return candidates.filter((row) => {
+    const similarity = Number(row.similarity);
+    const sharedRegion = (row.topics as SignalEvent["topics"]).some((match) => originRegions.has(match.topicId));
+    return Number.isFinite(similarity) && similarity >= (sharedRegion ? .55 : .68);
+  }).slice(0, 3).map((row) => ({
+    id: row.id, source: row.source, title: row.title, url: row.url, summary: row.summary,
+    publishedAt: new Date(row.published_at).toISOString(), topics: row.topics,
+  }));
 }
 
 export async function persistSnapshot(feed: SignalFeed): Promise<void> {

@@ -18,6 +18,8 @@ export type SignalEvent = {
   topics: TopicMatch[];
 };
 
+export type RelatedSignal = Pick<SignalEvent, "id" | "source" | "title" | "url" | "summary" | "publishedAt" | "topics">;
+
 export type SourceStatus = Record<SourceId, "ok" | "unavailable">;
 
 export type SignalFeed = {
