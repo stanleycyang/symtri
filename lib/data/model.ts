@@ -1,3 +1,5 @@
+import type { RegionActivity } from "./activity";
+
 export type SourceId = "hacker-news" | "github" | "arxiv";
 
 export type TopicMatch = {
@@ -30,6 +32,7 @@ export type SignalFeed = {
   partial: boolean;
   scope: "sample" | "rolling" | "archive" | "history" | "knowledge";
   archiveCount?: number;
+  activity?: Record<string, RegionActivity>;
   knowledgeGraph?: { updatedAt: string; regionCounts: Record<string, number>; relationships: Record<string, number> };
   semanticRelationships?: Record<string, number>;
 };

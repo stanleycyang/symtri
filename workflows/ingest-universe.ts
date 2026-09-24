@@ -2,7 +2,7 @@ import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
-import { acquireIngestionLease, countNewSignalsForRun, finishIngestionRun, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { acquireIngestionLease, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import type { SignalFeed } from "@/lib/data/model";
 
 async function begin(slot: string): Promise<boolean> {
@@ -27,15 +27,16 @@ async function fetchSources(): Promise<SignalFeed> {
   return feed;
 }
 
-async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number }> {
+async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]> }> {
   "use step";
   await persistSignals(feed);
   await refreshStoredClassifications();
+  const activity = await getArchiveActivity(new Date(feed.observedAt));
   const mapped = selectFeedEvents(feed.events, 300);
   const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), 0);
-  await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial });
+  await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity });
   await rebuildKnowledgeGraph();
-  return { added: await countNewSignalsForRun(slot), mapped: mapped.length };
+  return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity };
 }
 
 async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: string }> {
@@ -68,7 +69,7 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
     result = {
       status: feed.partial || embedding.embeddingStatus !== "ok" ? "partial" : "complete",
       sources: feed.sources, fetched: feed.events.length, mapped: stored.mapped,
-      added: stored.added, ...embedding,
+      added: stored.added, activity: stored.activity, ...embedding,
     };
   } catch (error) {
     result = { status: "failed", error: error instanceof Error ? error.message.slice(0, 200) : "unknown error" };

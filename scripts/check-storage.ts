@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
+import { regionActivity } from "../lib/data/activity";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
@@ -76,6 +77,8 @@ async function main() {
   await sql.unsafe(knowledgeSearchMigration);
   const queryIdentityMigration = await readFile(new URL("../supabase/migrations/20260924010000_query_identity.sql", import.meta.url), "utf8");
   await sql.unsafe(queryIdentityMigration);
+  const archiveActivityMigration = await readFile(new URL("../supabase/migrations/20260924011000_archive_activity.sql", import.meta.url), "utf8");
+  await sql.unsafe(archiveActivityMigration);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
   assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
@@ -229,6 +232,28 @@ async function main() {
     `;
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === id));
     assert.ok((await getRecentTopicEvents([{ id: "ai", childId: "ai-agents" }])).some((item) => item.id === id));
+    const olderAiId = `${crowdPrefix}older-ai`;
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      values (${olderAiId}, 'github', ${`${externalId}-older-ai`}, 'Older AI agent research',
+        ${`https://github.com/symtri/${externalId}-older-ai`}, 'A previous-day agent observation',
+        now() - interval '30 hours', 50, ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }])}::jsonb)
+    `;
+    const activityAt = new Date();
+    const archiveActivity = await getArchiveActivity(activityAt);
+    assert.ok(archiveActivity.ai.count >= 2);
+    assert.ok(archiveActivity.ai.previous > 0);
+    assert.ok(archiveActivity.ai.count > (await getStoredFeed())!.events.filter((item) => item.topics.some((match) => match.topicId === "ai")).length);
+    const activityRows = await sql`select id, published_at, importance, topics from signal_events`;
+    const expectedActivity = regionActivity(activityRows.map((row) => ({
+      id: row.id, publishedAt: new Date(row.published_at).toISOString(), importance: row.importance,
+      topics: row.topics,
+    })) as SignalEvent[], activityAt.getTime());
+    for (const topicId of ["ai", "software"]) {
+      assert.equal(archiveActivity[topicId].count, expectedActivity[topicId].count);
+      assert.ok(Math.abs(archiveActivity[topicId].score - expectedActivity[topicId].score) < 1e-8);
+      assert.equal(archiveActivity[topicId].momentum, expectedActivity[topicId].momentum);
+    }
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     const semanticRelationships = await getSemanticRelationships();
     assert.ok(Number.isFinite(semanticRelationships["ai:energy"]));
@@ -269,7 +294,8 @@ async function main() {
     assert.equal(await startIngestionRun(runId), true);
     assert.equal(await startIngestionRun(runId), true);
     assert.ok(await countNewSignalsForRun(runId) >= 0);
-    await finishIngestionRun(runId, { status: "complete", sources: feed.sources, fetched: 1, mapped: 1, added: 1, embedded: 1, embeddingStatus: "ok" });
+    const activity = await getArchiveActivity();
+    await finishIngestionRun(runId, { status: "complete", sources: feed.sources, fetched: 1, mapped: 1, added: 1, embedded: 1, embeddingStatus: "ok", activity });
     assert.equal(await startIngestionRun(runId), false);
     const status = await getIngestionStatus();
     assert.equal(status.lastRun?.status, "complete");
@@ -277,6 +303,7 @@ async function main() {
     const latestFeed = await getLatestIngestionFeedMetadata();
     assert.equal(latestFeed?.sources.github, "ok");
     assert.equal(latestFeed?.partial, feed.partial);
+    assert.equal(latestFeed?.activity?.ai.count, activity.ai.count);
     assert.ok(Date.parse(latestFeed!.observedAt) <= Date.now());
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => { throw new Error("Public feed contacted a source"); };
@@ -288,6 +315,7 @@ async function main() {
       assert.ok(Date.now() - Date.parse(publicFeed.observedAt) < 10_000);
       assert.ok(publicFeed.events.some((item) => item.id === id));
       assert.equal(publicFeed.sources.github, "ok");
+      assert.equal(publicFeed.activity?.ai.count, activity.ai.count);
       const gatewayKey = process.env.AI_GATEWAY_API_KEY;
       const vercelFlag = process.env.VERCEL;
       process.env.AI_GATEWAY_API_KEY = "";
@@ -319,8 +347,9 @@ async function main() {
     await persistSignals({ ...feed, events: [archiveEvent] });
     const rollingSnapshot = rollingFeed(feed, await getStoredFeed(), 0);
     assert.deepEqual(new Set(rollingSnapshot.events.map((item) => item.id)), new Set([id, archiveId]));
-    await persistSnapshot({ ...rollingSnapshot, observedAt: "2099-01-03T12:00:00.000Z", sources: feed.sources, partial: feed.partial });
+    await persistSnapshot({ ...rollingSnapshot, observedAt: "2099-01-03T12:00:00.000Z", sources: feed.sources, partial: feed.partial, activity });
     assert.deepEqual(new Set((await getSnapshotFeed("2099-01-03"))?.events.map((item) => item.id)), new Set([id, archiveId]));
+    assert.equal((await getSnapshotFeed("2099-01-03"))?.activity?.ai.count, activity.ai.count);
     await sql`delete from signal_events where id = ${archiveId}`;
     const firstDay = "2099-01-01";
     const secondDay = "2099-01-02";

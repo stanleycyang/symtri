@@ -55,6 +55,7 @@ When adding Ask thread aliases, use phrases that identify the map context for ge
 For an Ask question naming a specific map thread, keep that map location but do not cite unrelated parent-region stories when the thread has no matching source. Verify a real empty thread, such as Climate Science, returns no filler sources.
 
 The overview caps its event payload. A focused region or thread fetches recent matching archive events through `/api/topic`; keep those detail results distinct from the capped map activity calculation, and verify a niche source remains reachable beyond the overview cap.
+Calculate current and historical region activity from the full 14-day classified archive at ingestion time. The newest 300 map details can span only a few hours as the archive grows, so deriving momentum from that cap falsely labels regions as rising. Keep the full-window activity in ingestion metadata and each daily snapshot; verify with more than 300 newer records that an older signal still contributes to the previous 24-hour window.
 
 The Workflow CLI `start` command selects the deployment of its newest prior run, even after a newer Git deployment is Ready; setting `VERCEL_DEPLOYMENT_ID` does not override that selection. Inspect the new run's `deploymentId` before using its result to verify new workflow code. Prefer the cron route on the current production alias for an end-to-end check.
 

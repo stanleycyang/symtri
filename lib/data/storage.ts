@@ -2,7 +2,7 @@ import postgres from "postgres";
 import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_DIMENSIONS } from "../ai/embed";
 import { embeddingModelId } from "../ai/embed";
 import { topicEdges, topics } from "../universe";
-import { relationshipKey } from "./activity";
+import { completeRegionActivity, relationshipKey, type RegionActivity } from "./activity";
 import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import { selectDistinctHeadlines } from "./select";
 import { knowledgeSearchQuery } from "./search";
@@ -275,6 +275,39 @@ export async function getArchiveCount(): Promise<number> {
   return Number(rows[0].count);
 }
 
+// Calculate trends from every classified signal in the 14-day window. The
+// public map deliberately renders only 300 signals, which can cover far less
+// than two days once ingestion has accumulated enough unique content.
+export async function getArchiveActivity(at = new Date()): Promise<Record<string, RegionActivity>> {
+  const rows = await database()<{
+    topic_id: string; count: number; score: number; recent: number; previous: number;
+  }[]>`
+    with matches as (
+      select event.id, event.published_at, event.importance,
+        match.value->>'topicId' as topic_id,
+        max(greatest(0, least(1, (match.value->>'relevance')::double precision))) as relevance
+      from signal_events as event
+      cross join lateral jsonb_array_elements(event.topics) as match(value)
+      where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
+        and ${at.toISOString()}::timestamptz + interval '1 hour'
+        and match.value ? 'topicId'
+      group by event.id, event.published_at, event.importance, match.value->>'topicId'
+    ), weighted as (
+      select topic_id, relevance * (.6 + greatest(0, least(100, importance)) / 200) as weight,
+        extract(epoch from (${at.toISOString()}::timestamptz - published_at)) / 3600 as age_hours
+      from matches
+    )
+    select topic_id, count(*)::int as count,
+      coalesce(sum(weight * power(2::double precision, -greatest(0, age_hours) / 24)), 0)::double precision as score,
+      coalesce(sum(weight) filter (where age_hours < 24), 0)::double precision as recent,
+      coalesce(sum(weight) filter (where age_hours >= 24 and age_hours < 48), 0)::double precision as previous
+    from weighted group by topic_id
+  `;
+  return completeRegionActivity(Object.fromEntries(rows.map((row) => [row.topic_id, {
+    count: Number(row.count), score: Number(row.score), recent: Number(row.recent), previous: Number(row.previous),
+  }])));
+}
+
 export async function countNewSignalsForRun(runId: string): Promise<number> {
   const rows = await database()`
     select count(*)::int as count from signal_events as event
@@ -368,16 +401,19 @@ export type IngestionResult = {
   added?: number;
   embedded?: number;
   embeddingStatus?: string;
+  activity?: Record<string, RegionActivity>;
   error?: string;
 };
 
 export async function finishIngestionRun(runId: string, result: IngestionResult): Promise<void> {
-  await database()`
+  const sql = database();
+  await sql`
     update ingestion_runs set completed_at = now(), status = ${result.status},
-      source_status = ${database().json(result.sources ?? {})}::jsonb,
+      source_status = ${sql.json(result.sources ?? {})}::jsonb,
       fetched_count = ${result.fetched ?? 0}, mapped_count = ${result.mapped ?? 0},
       new_count = ${result.added ?? 0}, embedded_count = ${result.embedded ?? 0},
-      embedding_status = ${result.embeddingStatus ?? "unavailable"}, error = ${result.error ?? null}
+      embedding_status = ${result.embeddingStatus ?? "unavailable"},
+      activity = ${sql.json(result.activity ?? {})}::jsonb, error = ${result.error ?? null}
     where id = ${runId}
   `;
 }
@@ -406,12 +442,13 @@ export async function getIngestionStatus() {
   };
 }
 
-export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed, "observedAt" | "sources" | "partial"> | null> {
+export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed, "observedAt" | "sources" | "partial" | "activity"> | null> {
   const rows = await database()<{
     completed_at: Date;
     source_status: SourceStatus;
+    activity: Record<string, RegionActivity>;
   }[]>`
-    select completed_at, source_status
+    select completed_at, source_status, activity
     from ingestion_runs
     where completed_at is not null and status in ('complete', 'partial')
     order by completed_at desc limit 1
@@ -421,6 +458,7 @@ export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed,
   return {
     observedAt: new Date(latest.completed_at).toISOString(),
     sources: latest.source_status,
+    activity: Object.keys(latest.activity).length ? latest.activity : undefined,
     partial: latest.source_status["hacker-news"] !== "ok" || latest.source_status.github !== "ok" || latest.source_status.arxiv !== "ok",
   };
 }
