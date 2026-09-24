@@ -61,15 +61,41 @@ export async function fetchGitHub(forIngestion = false): Promise<SignalEvent[]> 
   }
 }
 
-export async function fetchArxiv(forIngestion = false): Promise<SignalEvent[]> {
+const arxivPublicQuery = "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO OR cat:cs.CR OR cat:cs.SE OR cat:cs.NI OR cat:astro-ph.CO OR cat:q-bio.MN OR cat:q-fin.TR OR cat:quant-ph";
+const arxivIngestionQueries = [
+  { query: "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO", limit: 45 },
+  { query: "cat:cs.CR OR cat:cs.SE OR cat:cs.NI", limit: 25 },
+  { query: "cat:q-bio.BM OR cat:q-bio.MN OR cat:q-bio.GN OR cat:quant-ph", limit: 25 },
+  { query: "cat:astro-ph.CO OR cat:astro-ph.EP OR cat:astro-ph.IM", limit: 15 },
+  { query: "cat:q-fin.TR OR cat:q-fin.ST OR cat:q-fin.EC OR cat:q-fin.CP", limit: 10 },
+] as const;
+
+async function queryArxiv(query: string, limit: number): Promise<SignalEvent[]> {
   const url = new URL("https://export.arxiv.org/api/query");
-  url.searchParams.set("search_query", "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO OR cat:cs.CR OR cat:cs.SE OR cat:cs.NI OR cat:astro-ph.CO OR cat:q-bio.MN OR cat:q-fin.TR OR cat:quant-ph");
+  url.searchParams.set("search_query", query);
   url.searchParams.set("start", "0");
-  url.searchParams.set("max_results", forIngestion ? "120" : "55");
+  url.searchParams.set("max_results", String(limit));
   url.searchParams.set("sortBy", "submittedDate");
   url.searchParams.set("sortOrder", "descending");
   const xml = await (await request(url.toString(), { "User-Agent": "SYMTRI/0.1 (https://symtri.com)" })).text();
-  const events = normalizeArxivFeed(xml);
+  return normalizeArxivFeed(xml);
+}
+
+export async function fetchArxiv(forIngestion = false, pause: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))): Promise<SignalEvent[]> {
+  if (!forIngestion) {
+    const events = await queryArxiv(arxivPublicQuery, 55);
+    if (!events.length) throw new Error("arXiv returned no usable papers");
+    return events;
+  }
+  const results: SignalEvent[] = [];
+  for (const [index, group] of arxivIngestionQueries.entries()) {
+    // arXiv requests a three-second pause between API calls.
+    if (index) await pause(3000);
+    results.push(...await queryArxiv(group.query, group.limit));
+  }
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const events = [...new Map(results.filter((event) => Date.parse(event.publishedAt) >= cutoff)
+    .map((event) => [event.id, event])).values()];
   if (!events.length) throw new Error("arXiv returned no usable papers");
   return events;
 }
