@@ -41,6 +41,7 @@ const subtopicAliases: Record<string, string[]> = {
   "energy-power-demand": ["power demand", "data center power"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
   "energy-fusion": ["fusion", "tokamak", "tokamaks", "stellarator", "stellarators"],
+  "startups-design": ["startup design", "design for startups"],
 };
 
 function firstMatch(question: string, phrases: string[]): number {

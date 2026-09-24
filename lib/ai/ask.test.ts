@@ -125,6 +125,9 @@ test("unmapped subjects use the knowledge archive without inventing a map locati
   assert.deepEqual(questionTopics("Don't we require emotions for doing research?"), []);
   assert.equal(shouldSearchKnowledge("Don't we require emotions for doing research?"), true);
   assert.deepEqual(questionTopics("What is new in AI research?"), [{ id: "ai", childId: "ai-research" }]);
+  assert.deepEqual(questionTopics("Nokia Design Archive"), []);
+  assert.equal(shouldSearchKnowledge("Nokia Design Archive"), true);
+  assert.deepEqual(questionTopics("What is new in startup design?"), [{ id: "startups", childId: "startups-design" }]);
   const garden = { ...event("garden", "Urban gardens", "science", "science-climate-science"), topics: [] };
   const result = answerKnowledgeQuestion("What is new with urban gardening?", [{ event: garden, similarity: .7 }]);
   assert.equal(result.scope, "knowledge");
