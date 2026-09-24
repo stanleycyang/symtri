@@ -8,6 +8,7 @@ import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
+import { GET as getHistory } from "../app/api/history/route";
 import { POST as askSymtri } from "../app/api/ask/route";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
@@ -363,6 +364,16 @@ async function main() {
     await persistSnapshot(completeFeed);
     const days = await getSnapshotDays();
     assert.deepEqual(days.slice(0, 3).map((item) => item.day), ["2099-01-03", secondDay, firstDay]);
+    const historyIndex = await getHistory(new Request("http://localhost/api/history"));
+    assert.equal(historyIndex.status, 200);
+    assert.equal(historyIndex.headers.get("cache-control"), "no-store");
+    assert.deepEqual((await historyIndex.json()).days.slice(0, 3).map((item: { day: string }) => item.day), ["2099-01-03", secondDay, firstDay]);
+    const historyDay = await getHistory(new Request(`http://localhost/api/history?day=${secondDay}`));
+    assert.equal(historyDay.status, 200);
+    const historyFeed = await historyDay.json();
+    assert.equal(historyFeed.scope, "history");
+    assert.equal(historyFeed.events.length, 2);
+    assert.equal((await getHistory(new Request("http://localhost/api/history?day=2099-01-04"))).status, 404);
     const snapshot = await getSnapshotFeed(secondDay);
     assert.equal(snapshot?.events[0].title, "Two-event snapshot");
     assert.equal(snapshot?.events.length, 2);
