@@ -191,6 +191,15 @@ async function main() {
     assert.ok(await persistEmbeddings(feed, fakeEmbedder) >= 1);
     assert.ok(!(await getPendingEmbeddingEvents()).some((item) => item.id === id));
     assert.equal(await persistEmbeddings(feed, fakeEmbedder), 0);
+    const beforeMissingHash = await getIngestionStatus();
+    await sql`update signal_events set embedding_input_hash = null where id = ${id}`;
+    const withMissingHash = await getIngestionStatus();
+    assert.equal(withMissingHash.vectors, beforeMissingHash.vectors - 1);
+    assert.equal(withMissingHash.embeddingBacklog, beforeMissingHash.embeddingBacklog + 1);
+    assert.ok((await getPendingEmbeddingEvents()).some((item) => item.id === id));
+    assert.equal(await hasCurrentSignalEmbeddings(feed.events), false);
+    assert.equal(await persistEmbeddings(feed, fakeEmbedder), 1);
+    assert.equal((await getIngestionStatus()).embeddingBacklog, beforeMissingHash.embeddingBacklog);
     const related: SignalEvent = { ...event, id: relatedId, externalId: `${externalId}-related`, title: "AI powered materials research", summary: "Research agents explore new materials", url: `${event.url}/related`, topics: [{ topicId: "science", subtopicId: "science-materials", relevance: 1 }] };
     await persistSignals({ ...feed, events: [related] });
     await persistEmbeddings({ ...feed, events: [related] }, fakeEmbedder);

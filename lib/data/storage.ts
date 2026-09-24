@@ -381,7 +381,7 @@ export async function getPendingEmbeddingEvents(limit = 200): Promise<SignalEven
   const rows = await database()`
     select id, source, external_id, title, url, summary, published_at, importance, topics
     from signal_events
-    where embedding is null or embedding_model is distinct from ${embeddingModelId()}
+    where embedding is null or embedding_input_hash is null or embedding_model is distinct from ${embeddingModelId()}
     order by first_seen_at, id limit ${limit}
   `;
   return rows.map((row) => ({
@@ -453,8 +453,8 @@ export async function getIngestionStatus() {
   const runs = await sql`select started_at, completed_at, status, source_status, fetched_count, mapped_count,
     new_count, embedded_count, embedding_status from ingestion_runs order by started_at desc limit 1`;
   const counts = await sql`select count(*)::int as signals,
-    count(*) filter (where embedding is not null and embedding_model = ${embeddingModelId()})::int as vectors,
-    count(*) filter (where embedding is null or embedding_model is distinct from ${embeddingModelId()})::int as embedding_backlog,
+    count(*) filter (where embedding is not null and embedding_input_hash is not null and embedding_model = ${embeddingModelId()})::int as vectors,
+    count(*) filter (where embedding is null or embedding_input_hash is null or embedding_model is distinct from ${embeddingModelId()})::int as embedding_backlog,
     count(*) filter (where classifier_version < ${CLASSIFIER_VERSION} and classification_input is not null)::int as classification_backlog
     from signal_events`;
   const last = runs[0];
