@@ -21,6 +21,14 @@ async function main() {
   await sql.unsafe(migration);
   const vectorMigration = await readFile(new URL("../db/002_embeddings.sql", import.meta.url), "utf8");
   await sql.unsafe(vectorMigration);
+  const accessMigration = await readFile(new URL("../db/003_lock_down_api.sql", import.meta.url), "utf8");
+  await sql.unsafe(accessMigration);
+  const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
+    select relname, relrowsecurity from pg_class
+    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings')
+  `;
+  assert.equal(protectedTables.length, 3);
+  assert.ok(protectedTables.every((table) => table.relrowsecurity));
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
     url: `https://github.com/symtri/${externalId}`, summary: "Storage roundtrip",
@@ -109,7 +117,7 @@ async function main() {
     assert.equal(snapshot?.events.length, 2);
     assert.equal(snapshot?.partial, false);
     assert.equal(snapshot?.scope, "history");
-    console.log("Postgres migrations, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
+    console.log("Postgres migrations, API table protection, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
   } finally {
     await sql`delete from signal_events where id = ${id}`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;
