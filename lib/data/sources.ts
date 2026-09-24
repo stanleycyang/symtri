@@ -97,16 +97,26 @@ export async function fetchArxiv(forIngestion = false, pause: (milliseconds: num
     if (!events.length) throw new Error("arXiv returned no usable papers");
     return events;
   }
+  return (await fetchArxivForIngestion(pause)).events;
+}
+
+export async function fetchArxivForIngestion(pause: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {
   const results: SignalEvent[] = [];
+  let failedGroups = 0;
   for (const [index, group] of arxivIngestionQueries.entries()) {
     // arXiv requests a three-second pause between API calls.
     if (index) await pause(3000);
-    const papers = await queryArxiv(group.query, group.limit, true);
-    results.push(...papers.filter((paper) => !("titlePattern" in group) || group.titlePattern.test(paper.title)));
+    try {
+      const papers = await queryArxiv(group.query, group.limit, true);
+      results.push(...papers.filter((paper) => !("titlePattern" in group) || group.titlePattern.test(paper.title)));
+    } catch (error) {
+      failedGroups++;
+      console.warn(`SYMTRI arXiv group ${index + 1} unavailable`, error instanceof Error ? error.message : "unknown error");
+    }
   }
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const events = [...new Map(results.filter((event) => Date.parse(event.publishedAt) >= cutoff)
     .map((event) => [event.id, event])).values()];
   if (!events.length) throw new Error("arXiv returned no usable papers");
-  return events;
+  return { events, status: failedGroups ? "partial" : "ok" };
 }

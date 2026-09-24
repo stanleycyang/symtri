@@ -1,5 +1,5 @@
 import { deduplicateSignals } from "./normalize";
-import { fetchArxiv, fetchGitHub, fetchHackerNews } from "./sources";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchHackerNews } from "./sources";
 import type { SignalEvent, SignalFeed, SourceId, SourceStatus } from "./model";
 
 export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEvent[] {
@@ -15,17 +15,17 @@ export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEven
 }
 
 export async function getSignalFeed(options: { includeUnclassified?: boolean; forIngestion?: boolean } = {}): Promise<SignalFeed> {
-  const sources: [SourceId, () => Promise<SignalEvent[]>][] = [
-    ["hacker-news", () => fetchHackerNews(options.forIngestion)],
-    ["github", () => fetchGitHub(options.forIngestion)],
-    ["arxiv", () => fetchArxiv(options.forIngestion)],
+  const sources: [SourceId, () => Promise<{ events: SignalEvent[]; status: "ok" | "partial" }>][] = [
+    ["hacker-news", async () => ({ events: await fetchHackerNews(options.forIngestion), status: "ok" })],
+    ["github", async () => ({ events: await fetchGitHub(options.forIngestion), status: "ok" })],
+    ["arxiv", () => options.forIngestion ? fetchArxivForIngestion() : fetchArxiv().then((items) => ({ events: items, status: "ok" }))],
   ];
   const results = await Promise.allSettled(sources.map(([, fetchSource]) => fetchSource()));
   const status: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };
   const events: SignalEvent[] = [];
   results.forEach((result, index) => {
     const source = sources[index][0];
-    if (result.status === "fulfilled") { status[source] = "ok"; events.push(...result.value); }
+    if (result.status === "fulfilled") { status[source] = result.value.status; events.push(...result.value.events); }
     else console.warn(`SYMTRI source ${source}: ${result.reason instanceof Error ? result.reason.message : "unavailable"}`);
   });
   return {

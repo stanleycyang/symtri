@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchArxiv, fetchGitHub, fetchHackerNews } from "./sources";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchHackerNews } from "./sources";
 
 test("hourly source sampling finds new items without widening the public sample", async () => {
   const originalFetch = globalThis.fetch;
@@ -59,6 +59,30 @@ test("hourly source sampling finds new items without widening the public sample"
     assert.equal(requests.some((url) => url.includes("sort=updated")), true);
     assert.equal(requests.filter((url) => url.includes("export.arxiv.org/api/query")).length, 6);
     assert.deepEqual(pauses, [3000, 3000, 3000, 3000, 3000]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("arXiv retains successful groups and reports reduced source coverage", async () => {
+  const originalFetch = globalThis.fetch;
+  let failAll = false;
+  const requested: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    requested.push(url);
+    const query = new URL(url).searchParams.get("search_query") ?? "";
+    if (failAll || query.includes("cs.CR")) return new Response("Unavailable", { status: 503 });
+    const id = requested.length;
+    return new Response(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>https://arxiv.org/abs/2609.1234${id}v1</id><title>Fusion research ${id}</title><summary>A recent study.</summary><published>${new Date().toISOString()}</published><category term="physics.plasm-ph" /></entry></feed>`);
+  };
+  try {
+    const result = await fetchArxivForIngestion(async () => {});
+    assert.equal(result.status, "partial");
+    assert.equal(result.events.length, 5);
+    assert.equal(requested.length, 6);
+    failAll = true;
+    await assert.rejects(fetchArxivForIngestion(async () => {}), /no usable papers/);
   } finally {
     globalThis.fetch = originalFetch;
   }
