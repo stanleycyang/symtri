@@ -482,6 +482,7 @@ async function main() {
     await persistSnapshot(completeFeed);
     const days = await getSnapshotDays();
     assert.deepEqual(days.slice(0, 3).map((item) => item.day), ["2099-01-03", secondDay, firstDay]);
+    assert.ok(days.slice(0, 3).every((item) => (item.archiveCount ?? 0) > 0));
     const historyIndex = await getHistory(new Request("http://localhost/api/history"));
     assert.equal(historyIndex.status, 200);
     assert.equal(historyIndex.headers.get("cache-control"), "no-store");
@@ -518,6 +519,7 @@ async function main() {
     const archiveAtCapture = Number((await sql`select count(*)::int as count from signal_events
       where first_seen_at <= '2099-01-04T12:05:00Z'::timestamptz`)[0].count);
     assert.equal((await getSnapshotFeed(historicDay))?.archiveCount, archiveAtCapture);
+    assert.equal((await getSnapshotDays()).find((item) => item.day === historicDay)?.archiveCount, archiveAtCapture);
     await sql.unsafe(snapshotRelationshipsMigration);
     assert.equal((await getSnapshotFeed(historicDay))?.relationships?.["ai:markets"], 1);
     assert.ok(await backfillSnapshotMetadata() >= 1);

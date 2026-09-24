@@ -634,7 +634,9 @@ export async function getSnapshotDays(): Promise<SnapshotDay[]> {
   const rows = await database()`
     select day::text as day, captured_at,
       jsonb_array_length(feed->'events')::int as event_count,
-      nullif(feed->>'archiveCount', '0')::int as archive_count
+      coalesce(nullif(feed->>'archiveCount', '0')::int,
+        (select count(*)::int from signal_events
+          where first_seen_at <= signal_snapshots.captured_at + interval '5 minutes')) as archive_count
     from signal_snapshots order by day desc limit 14
   `;
   return rows.map((row) => ({ day: row.day, capturedAt: new Date(row.captured_at).toISOString(), eventCount: row.event_count,
