@@ -6,6 +6,7 @@ import { getCurrentFeed } from "@/lib/data/current";
 import { canonicalSignalUrl, signalContentKey } from "@/lib/data/normalize";
 import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
+import { getUniverseCatalog } from "@/lib/data/catalog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,8 @@ export async function POST(request: Request) {
   }
   try {
     const trimmed = question.trim();
-    if (!day && process.env.DATABASE_URL && shouldSearchKnowledge(trimmed)) {
+    const catalog = await getUniverseCatalog();
+    if (!day && process.env.DATABASE_URL && shouldSearchKnowledge(trimmed, catalog)) {
       try {
         let vector: number[] | null = null;
         if (gatewayConfigured()) {
@@ -44,14 +46,15 @@ export async function POST(request: Request) {
         const results = await searchKnowledge(trimmed, vector);
         const knowledgeFeed: SignalFeed = { observedAt: new Date().toISOString(), events: results.map((item) => item.event),
           sources: unavailableSources(), partial: true, scope: "knowledge" };
-        return Response.json(await withSourceSummary(answerKnowledgeQuestion(trimmed, results), knowledgeFeed), { headers: { "Cache-Control": "no-store" } });
+        return Response.json(await withSourceSummary(answerKnowledgeQuestion(trimmed, results, catalog), knowledgeFeed), { headers: { "Cache-Control": "no-store" } });
       } catch (error) { console.warn("SYMTRI knowledge search unavailable", error instanceof Error ? error.message : "unknown error"); }
     }
     let feed = day && process.env.DATABASE_URL ? await getSnapshotFeed(day) : null;
     if (day && !feed) return new Response("Snapshot not found", { status: 404 });
     if (!feed) feed = await getCurrentFeed();
+    feed = { ...feed, catalog: day ? await getUniverseCatalog(new Date(feed.observedAt)) : catalog };
     if (!day && process.env.DATABASE_URL) {
-      const references = questionTopics(trimmed);
+      const references = questionTopics(trimmed, feed.catalog);
       if (references.length) {
         try {
           const recent = await getRecentTopicEvents(references);
@@ -82,7 +85,7 @@ export async function POST(request: Request) {
       }
     }
     let answer = answerQuestion(trimmed, feed, semanticMatches);
-    if (!day && process.env.DATABASE_URL && !answer.evidenceCount && questionSpecificWords(trimmed).length) {
+    if (!day && process.env.DATABASE_URL && !answer.evidenceCount && questionSpecificWords(trimmed, feed.catalog).length) {
       try {
         const seen = new Set(feed.events.map((event) => event.id));
         const archived = (await searchKnowledge(trimmed, null)).map(({ event }) => event).filter((event) => !seen.has(event.id));

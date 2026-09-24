@@ -18,6 +18,7 @@ export type Subtopic = {
   activity: number;
   signals: number;
 };
+export type UniverseCatalog = { revision: number; topics: Topic[]; topicEdges: [string, string][]; sourceLabels: Record<string, string>; redirects?: Record<string, string> };
 
 type Seed = [string, string, string, Vec3, string, string[]];
 const seeds: Seed[] = [
@@ -59,4 +60,9 @@ export const topicEdges: [string, string][] = [
   ["markets", "startups"], ["markets", "crypto"], ["hardware", "space"], ["hardware", "crypto"],
 ];
 
-export function getTopic(id: string | null) { return topics.find((topic) => topic.id === id) ?? null; }
+export const seedCatalog: UniverseCatalog = {
+  revision: 0, topics, topicEdges,
+  sourceLabels: { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv", openalex: "OpenAlex" },
+};
+
+export function getTopic(id: string | null, catalog: UniverseCatalog = seedCatalog) { return catalog.topics.find((topic) => topic.id === (id ? catalog.redirects?.[id] ?? id : null)) ?? null; }

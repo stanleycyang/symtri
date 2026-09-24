@@ -2,7 +2,7 @@ import { regionActivity, regionRelationships, relationshipKey } from "../data/ac
 import type { SignalEvent, SignalFeed } from "../data/model";
 import { knowledgeSearchQuery } from "../data/search";
 import { selectDistinctHeadlines } from "../data/select";
-import { topicEdges, topics } from "../universe";
+import { seedCatalog, type UniverseCatalog } from "../universe";
 
 export type AskResult = {
   question: string;
@@ -60,14 +60,14 @@ function firstMatch(question: string, phrases: string[]): number {
   return first;
 }
 
-function findPath(start: string, end: string): string[] {
+function findPath(start: string, end: string, catalog: UniverseCatalog): string[] {
   if (start === end) return [start];
   const queue: string[][] = [[start]];
   const visited = new Set([start]);
   while (queue.length) {
     const path = queue.shift()!;
     const current = path[path.length - 1];
-    for (const [a, b] of topicEdges) {
+    for (const [a, b] of catalog.topicEdges) {
       const next = a === current ? b : b === current ? a : null;
       if (!next || visited.has(next)) continue;
       const candidate = [...path, next];
@@ -84,9 +84,9 @@ function words(input: string): string[] {
   return input.toLowerCase().match(/[a-z0-9]+/g)?.filter((word) => word.length > 2 && !stop.has(word)) ?? [];
 }
 
-export function questionTopics(question: string): { id: string; childId: string | null }[] {
+export function questionTopics(question: string, catalog: UniverseCatalog = seedCatalog): { id: string; childId: string | null }[] {
   const routingQuestion = question.replace(/\bsecurity[ -]council\b/gi, "");
-  return topics.map((topic) => {
+  return catalog.topics.map((topic) => {
     const regionPosition = firstMatch(routingQuestion, regionAliases[topic.id] ?? [topic.name.toLowerCase()]);
     const children = topic.children.map((child) => ({ id: child.id, position: firstMatch(routingQuestion, subtopicAliases[child.id] ?? [child.name.toLowerCase()]) }));
     const child = children.filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position)[0];
@@ -95,14 +95,14 @@ export function questionTopics(question: string): { id: string; childId: string 
     .map(({ id, childId }) => ({ id, childId }));
 }
 
-export function shouldSearchKnowledge(question: string): boolean {
-  return words(question).length > 0 && questionTopics(question).length === 0;
+export function shouldSearchKnowledge(question: string, catalog: UniverseCatalog = seedCatalog): boolean {
+  return words(question).length > 0 && questionTopics(question, catalog).length === 0;
 }
 
-export function questionSpecificWords(question: string): string[] {
-  const [detected, other] = questionTopics(question);
+export function questionSpecificWords(question: string, catalog: UniverseCatalog = seedCatalog): string[] {
+  const [detected, other] = questionTopics(question, catalog);
   if (!detected || other) return [];
-  const region = topics.find((topic) => topic.id === detected.id)!;
+  const region = catalog.topics.find((topic) => topic.id === detected.id)!;
   const child = region.children.find((item) => item.id === detected.childId);
   const aliases = [...(regionAliases[detected.id] ?? []), region.name,
     ...(child ? [...(subtopicAliases[child.id] ?? []), child.name] : [])];
@@ -118,10 +118,10 @@ function matchesSpecificWords(event: SignalEvent, terms: string[]): boolean {
   });
 }
 
-export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[]): AskResult {
+export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[], catalog: UniverseCatalog = seedCatalog): AskResult {
   const selected = selectDistinctHeadlines(results.map((item) => ({ ...item, title: item.event.title })), 4);
-  const location = selected[0]?.event.topics.find((match) => match.relevance >= .67 && topics.some((topic) => topic.id === match.topicId));
-  const region = location ? topics.find((topic) => topic.id === location.topicId)! : null;
+  const location = selected[0]?.event.topics.find((match) => match.relevance >= .67 && catalog.topics.some((topic) => topic.id === match.topicId));
+  const region = location ? catalog.topics.find((topic) => topic.id === location.topicId)! : null;
   const child = region?.children.find((item) => item.id === location?.subtopicId);
   return {
     question,
@@ -138,14 +138,15 @@ export function answerKnowledgeQuestion(question: string, results: { event: Sign
 }
 
 export function answerQuestion(question: string, feed: SignalFeed, semanticMatches: { id: string; similarity: number }[] = []): AskResult {
-  const detected = questionTopics(question);
-  const fallback = Object.entries(regionActivity(feed.events, Date.parse(feed.observedAt))).sort((a, b) => b[1].score - a[1].score)[0]?.[0] ?? "ai";
+  const catalog = feed.catalog ?? seedCatalog;
+  const detected = questionTopics(question, catalog);
+  const fallback = Object.entries(regionActivity(feed.events, Date.parse(feed.observedAt), catalog)).sort((a, b) => b[1].score - a[1].score)[0]?.[0] ?? "ai";
   const regionIds = detected.length ? detected.map((item) => item.id) : [fallback];
   const subtopicId = regionIds.length === 1 ? detected[0]?.childId ?? null : null;
-  const pathIds = regionIds.length === 2 ? findPath(regionIds[0], regionIds[1]) : regionIds;
-  const regionStep = (id: string) => ({ regionId: id, subtopicId: null, label: topics.find((topic) => topic.id === id)!.short });
+  const pathIds = regionIds.length === 2 ? findPath(regionIds[0], regionIds[1], catalog) : regionIds;
+  const regionStep = (id: string) => ({ regionId: id, subtopicId: null, label: catalog.topics.find((topic) => topic.id === id)!.short });
   const childStep = (id: string) => {
-    const region = topics.find((topic) => topic.children.some((child) => child.id === id))!;
+    const region = catalog.topics.find((topic) => topic.children.some((child) => child.id === id))!;
     return { regionId: region.id, subtopicId: id, label: region.children.find((child) => child.id === id)!.name };
   };
   const energyAi = regionIds.length === 2 && regionIds.includes("energy") && regionIds.includes("ai") && detected.some((item) => item.childId === "energy-nuclear");
@@ -154,7 +155,7 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
     ? regionIds[0] === "energy" ? energyAiSteps : [...energyAiSteps].reverse()
     : regionIds.length === 1 && subtopicId ? [regionStep(regionIds[0]), childStep(subtopicId)] : pathIds.map(regionStep);
   const queryWords = words(question);
-  const specificWords = regionIds.length === 1 ? questionSpecificWords(question) : [];
+  const specificWords = regionIds.length === 1 ? questionSpecificWords(question, catalog) : [];
   const matching = feed.events.filter((event) => event.topics.some((match) => regionIds.includes(match.topicId)));
   const scoped = subtopicId ? matching.filter((event) => event.topics.some((match) => match.subtopicId === subtopicId)) : matching;
   const candidates = scoped.filter((event) => matchesSpecificWords(event, specificWords));
@@ -189,19 +190,19 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
     selected.push(...selectDistinctHeadlines(ranked, 4));
   }
 
-  const names = regionIds.map((id) => topics.find((topic) => topic.id === id)!.name);
+  const names = regionIds.map((id) => catalog.topics.find((topic) => topic.id === id)!.name);
   const missingRegions = regionIds.filter((id) => !matching.some((event) => event.topics.some((match) => match.topicId === id)));
-  const childName = subtopicId ? topics.flatMap((topic) => topic.children).find((child) => child.id === subtopicId)?.name : null;
+  const childName = subtopicId ? catalog.topics.flatMap((topic) => topic.children).find((child) => child.id === subtopicId)?.name : null;
   const crossChild = regionIds.length === 2 ? detected.find((item) => item.childId)?.childId : null;
-  const crossChildName = crossChild ? topics.flatMap((topic) => topic.children).find((child) => child.id === crossChild)?.name : null;
+  const crossChildName = crossChild ? catalog.topics.flatMap((topic) => topic.children).find((child) => child.id === crossChild)?.name : null;
   const crossChildShared = crossChild ? sharedEvents.some((event) => event.topics.some((match) => match.subtopicId === crossChild)) : true;
-  const sharedCount = regionIds.length === 2 ? regionRelationships(feed.events, Date.parse(feed.observedAt))[relationshipKey(regionIds[0], regionIds[1])] ?? 0 : 0;
+  const sharedCount = regionIds.length === 2 ? regionRelationships(feed.events, Date.parse(feed.observedAt), catalog)[relationshipKey(regionIds[0], regionIds[1])] ?? 0 : 0;
   let summary: string;
   if (regionIds.length === 2) {
     summary = sharedCount
       ? `${sharedCount} sampled signal${sharedCount === 1 ? "" : "s"} ${sharedCount === 1 ? "links" : "link"} ${names[0]} and ${names[1]}. ${crossChildName && !crossChildShared ? `None of those shared signals is tagged ${crossChildName}; the sources show nearby activity.` : `The first source is classified to both regions.`}`
       : missingRegions.length
-        ? `No sampled signal connects ${names[0]} and ${names[1]}. ${missingRegions.map((id) => topics.find((topic) => topic.id === id)!.name).join(" and ")} ${missingRegions.length === 1 ? "has" : "have"} no source in this sample${candidates.length ? "; the links below are from the other region" : ""}.`
+        ? `No sampled signal connects ${names[0]} and ${names[1]}. ${missingRegions.map((id) => catalog.topics.find((topic) => topic.id === id)!.name).join(" and ")} ${missingRegions.length === 1 ? "has" : "have"} no source in this sample${candidates.length ? "; the links below are from the other region" : ""}.`
       : `The map links ${names[0]} and ${names[1]}, but this sample has no signal classified to both. The sources below show each region separately.`;
   } else if (specificWords.length && !candidates.length && matching.length) {
     summary = `No sampled signal matches ${knowledgeSearchQuery(question)} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this subject.`;

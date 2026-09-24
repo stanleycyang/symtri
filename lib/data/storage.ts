@@ -1,7 +1,7 @@
 import postgres from "postgres";
 import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_DIMENSIONS } from "../ai/embed";
 import { embeddingModelId } from "../ai/embed";
-import { topicEdges, topics } from "../universe";
+import { seedCatalog, topicEdges, topics, type UniverseCatalog } from "../universe";
 import { completeRegionActivity, relationshipKey, type RegionActivity, type RegionRelationships } from "./activity";
 import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import { selectDistinctHeadlines } from "./select";
@@ -25,7 +25,7 @@ function currentTopics(row: { topics?: unknown; classifier_version?: unknown; cl
   return classifySignal(input.title, input.summary, categories);
 }
 
-function database() {
+export function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is required for persistent signals");
   const now = Date.now();
@@ -62,7 +62,7 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
       title = incoming.title, summary = incoming.summary,
       importance = incoming.importance, topics = incoming.topics,
       classification_input = incoming.classification_input,
-      classifier_version = ${CLASSIFIER_VERSION},
+      classifier_version = ${CLASSIFIER_VERSION}, catalog_revision = 0,
       embedding = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding end,
       embedding_input_hash = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding_input_hash end,
       embedding_model = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding_model end
@@ -119,7 +119,7 @@ export async function refreshStoredClassifications(limit = 1000): Promise<number
     return { id: row.id as string, topics: classifySignal(input.title, input.summary, input.categories) };
   });
   await sql`
-    update signal_events as target set topics = incoming.topics, classifier_version = ${CLASSIFIER_VERSION}
+    update signal_events as target set topics = incoming.topics, classifier_version = ${CLASSIFIER_VERSION}, catalog_revision = 0
     from jsonb_to_recordset(${sql.json(updates)}::jsonb) as incoming(id text, topics jsonb)
     where target.id = incoming.id and target.classifier_version < ${CLASSIFIER_VERSION}
   `;
@@ -223,37 +223,22 @@ export async function hasCurrentSignalEmbeddings(events: SignalEvent[]): Promise
 
 export async function getStoredFeed(): Promise<SignalFeed | null> {
   const sql = database();
-  const recent = await sql`
-    select id, source, external_id, title, url, summary, published_at, first_seen_at, importance, topics, classification_input, classifier_version
-    from signal_events where published_at >= now() - interval '14 days' and jsonb_array_length(topics) > 0
-    order by published_at desc, first_seen_at desc limit 300
+  const rows = await sql`
+    with ranked as (
+      select event.id, event.source, event.external_id, event.title, event.url, event.summary,
+        event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version,
+        row_number() over (partition by event.source order by event.published_at desc, event.first_seen_at desc) as source_rank
+      from signal_events as event join source_catalog as source on source.id = event.source and source.status = 'active'
+      where event.published_at >= now() - interval '14 days' and jsonb_array_length(event.topics) > 0
+    ), chosen as (
+      select * from ranked
+      order by case when source_rank <= case when source like 'feed-%' then 6 else 12 end then 0 else 1 end,
+        published_at desc limit 300
+    )
+    select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
+    from chosen order by published_at desc
   `;
-  if (!recent.length) return null;
-  const sourceMinimum = 12;
-  const candidates = [...recent];
-  if (recent.length === 300) {
-    const seen = new Set(candidates.map((row) => row.id));
-    for (const source of Object.keys(unavailableSources())) {
-      if (recent.filter((row) => row.source === source).length >= sourceMinimum) continue;
-      const sourceRows = await sql`
-        select id, source, external_id, title, url, summary, published_at, first_seen_at, importance, topics, classification_input, classifier_version
-        from signal_events
-        where source = ${source} and published_at >= now() - interval '14 days' and jsonb_array_length(topics) > 0
-        order by published_at desc, first_seen_at desc limit ${sourceMinimum}
-      `;
-      for (const row of sourceRows) if (!seen.has(row.id)) {
-        candidates.push(row);
-        seen.add(row.id);
-      }
-    }
-  }
-  const newestFirst = (a: (typeof candidates)[number], b: (typeof candidates)[number]) =>
-    new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
-      || new Date(b.first_seen_at).getTime() - new Date(a.first_seen_at).getTime();
-  const reserved = new Set(Object.keys(unavailableSources()).flatMap((source) =>
-    candidates.filter((row) => row.source === source).sort(newestFirst).slice(0, sourceMinimum).map((row) => row.id)));
-  const rows = [...candidates.filter((row) => reserved.has(row.id)), ...recent.filter((row) => !reserved.has(row.id))]
-    .slice(0, 300).sort(newestFirst);
+  if (!rows.length) return null;
   const events: SignalEvent[] = rows.map((row) => ({
     id: row.id, source: row.source, externalId: row.external_id,
     title: row.title, url: row.url, summary: row.summary,
@@ -277,6 +262,7 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
         select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
         from signal_events
         where published_at >= now() - interval '14 days'
+          and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
           and topics @> ${sql.json([filter])}::jsonb
         order by published_at desc limit 40
       `;
@@ -296,14 +282,16 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
 }
 
 export async function getArchiveCount(): Promise<number> {
-  const rows = await database()`select count(*)::int as count from signal_events`;
+  const rows = await database()`select count(*)::int as count from signal_events
+    where exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')`;
   return Number(rows[0].count);
 }
 
 async function getArchiveCountAt(capturedAt: Date): Promise<number> {
   // A snapshot is captured before its source rows finish persisting.
   const rows = await database()`select count(*)::int as count from signal_events
-    where first_seen_at <= ${capturedAt.toISOString()}::timestamptz + interval '5 minutes'`;
+    where first_seen_at <= ${capturedAt.toISOString()}::timestamptz + interval '5 minutes'
+      and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')`;
   return Number(rows[0].count);
 }
 
@@ -312,7 +300,7 @@ async function getArchiveCountAt(capturedAt: Date): Promise<number> {
 // than two days once ingestion has accumulated enough unique content. The
 // first-seen allowance includes records stored just after a snapshot's fetch
 // timestamp while excluding records discovered on later hourly runs.
-export async function getArchiveActivity(at = new Date()): Promise<Record<string, RegionActivity>> {
+export async function getArchiveActivity(at = new Date(), catalog: UniverseCatalog = seedCatalog): Promise<Record<string, RegionActivity>> {
   const rows = await database()<{
     topic_id: string; count: number; score: number; recent: number; previous: number;
   }[]>`
@@ -320,7 +308,7 @@ export async function getArchiveActivity(at = new Date()): Promise<Record<string
       select event.id, event.published_at, event.importance,
         match.value->>'topicId' as topic_id,
         max(greatest(0, least(1, (match.value->>'relevance')::double precision))) as relevance
-      from signal_events as event
+      from signal_events as event join source_catalog as catalog_source on catalog_source.id = event.source and catalog_source.status = 'active'
       cross join lateral jsonb_array_elements(event.topics) as match(value)
       where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
         and ${at.toISOString()}::timestamptz + interval '1 hour'
@@ -340,21 +328,21 @@ export async function getArchiveActivity(at = new Date()): Promise<Record<string
   `;
   return completeRegionActivity(Object.fromEntries(rows.map((row) => [row.topic_id, {
     count: Number(row.count), score: Number(row.score), recent: Number(row.recent), previous: Number(row.previous),
-  }])));
+  }])), catalog);
 }
 
-export async function getArchiveRelationships(at = new Date()): Promise<RegionRelationships> {
+export async function getArchiveRelationships(at = new Date(), catalog: UniverseCatalog = seedCatalog): Promise<RegionRelationships> {
   const sql = database();
   const rows = await sql<{ first_id: string; second_id: string; signals: number }[]>`
     with matches as (
       select distinct event.id, match.value->>'topicId' as topic_id
-      from signal_events as event
+      from signal_events as event join source_catalog as catalog_source on catalog_source.id = event.source and catalog_source.status = 'active'
       cross join lateral jsonb_array_elements(event.topics) as match(value)
       where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
         and ${at.toISOString()}::timestamptz + interval '1 hour'
         and event.first_seen_at <= ${new Date(at.getTime() + 10 * 60 * 1000).toISOString()}::timestamptz
         and match.value ? 'topicId'
-        and match.value->>'topicId' in ${sql(topics.map((topic) => topic.id))}
+        and match.value->>'topicId' in ${sql(catalog.topics.map((topic) => topic.id))}
     )
     select first.topic_id as first_id, second.topic_id as second_id, count(*)::int as signals
     from matches as first join matches as second
@@ -379,7 +367,7 @@ export async function rebuildKnowledgeGraph(recentRelationships?: RegionRelation
   await sql`
     with matches as (
       select distinct event.id, match.value->>'topicId' as topic_id
-      from signal_events as event
+      from signal_events as event join source_catalog as catalog_source on catalog_source.id = event.source and catalog_source.status = 'active'
       cross join lateral jsonb_array_elements(event.topics) as match(value)
       where match.value ? 'topicId'
     ), region_totals as (
@@ -538,12 +526,14 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
         from signal_events cross join request
         where to_tsvector('english', title || ' ' || summary) @@ request.terms
+          and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
         order by rank desc, published_at desc limit 30
       ), recent as (
         select id, source, external_id, title, url, summary, published_at, importance, topics,
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
         from signal_events cross join request
         where to_tsvector('english', title || ' ' || summary) @@ request.terms
+          and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
         order by published_at desc limit 30
       )
       select distinct on (id) * from (select * from ranked union all select * from recent) as candidates
@@ -554,6 +544,7 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
         1 - (embedding <=> ${literal}::vector(256)) as similarity
       from signal_events
       where embedding is not null and embedding_model = ${embeddingModelId()}
+        and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
       order by embedding <=> ${literal}::vector(256) limit 30
     ` : [];
   const scores = new Map<string, { row: (typeof lexical)[number]; score: number; similarity: number | null }>();
@@ -584,6 +575,7 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
     select embedding::text as vector, topics, title
     from signal_events
     where id = ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
+      and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
     limit 1
   `;
   if (!origin.length) return [];
@@ -594,6 +586,7 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
     from signal_events
     where id <> ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
       and jsonb_array_length(topics) > 0
+      and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
     order by embedding <=> ${origin[0].vector}::vector(256)
     limit 24
   `;

@@ -4,6 +4,9 @@ import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
 import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveCount, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
+import { catalogMatches, getUniverseCatalog, seedUniverseCatalog } from "@/lib/data/catalog";
+import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
+import { discoverFeedCandidates, fetchActiveFeeds, pollTrialFeeds } from "@/lib/data/feed-registry";
 
 async function begin(slot: string): Promise<boolean> {
   "use step";
@@ -21,6 +24,10 @@ async function begin(slot: string): Promise<boolean> {
 async function fetchSources(slot: string): Promise<SignalFeed> {
   "use step";
   const feed = await getSignalFeed({ includeUnclassified: true, forIngestion: true, slot });
+  const registered = await fetchActiveFeeds(new Date(feed.observedAt));
+  feed.events.push(...registered.events);
+  Object.assign(feed.sources, registered.sources);
+  feed.partial ||= Object.values(registered.sources).some((status) => status !== "ok");
   if (Object.values(feed.sources).every((status) => status === "unavailable")) {
     throw new Error("All sources unavailable");
   }
@@ -29,14 +36,22 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
 
 async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]> }> {
   "use step";
+  await seedUniverseCatalog();
   await persistSignals(feed);
   await refreshStoredClassifications();
-  const activity = await getArchiveActivity(new Date(feed.observedAt));
-  const relationships = await getArchiveRelationships(new Date(feed.observedAt));
+  await discoverFeedCandidates(new Date(feed.observedAt));
+  await pollTrialFeeds(new Date(feed.observedAt));
+  await syncArchiveConcepts();
+  await discoverConcepts(new Date(feed.observedAt));
+  await retireInactiveConcepts(new Date(feed.observedAt));
+  await syncArchiveConcepts();
+  const catalog = await getUniverseCatalog();
+  const activity = await getArchiveActivity(new Date(feed.observedAt), catalog);
+  const relationships = await getArchiveRelationships(new Date(feed.observedAt), catalog);
   const archiveCount = await getArchiveCount();
-  const mapped = selectFeedEvents(feed.events, 300);
+  const mapped = selectFeedEvents(feed.events.map((event) => ({ ...event, topics: catalogMatches(event, catalog) })), 300);
   const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), archiveCount);
-  await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships });
+  await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships, catalog });
   await backfillSnapshotMetadata();
   await rebuildKnowledgeGraph(relationships);
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity };

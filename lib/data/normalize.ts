@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { classifySignal } from "./classify";
 import type { SignalEvent } from "./model";
+import { createHash } from "node:crypto";
 
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function text(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
@@ -94,6 +95,29 @@ export function normalizeOpenAlex(input: unknown): SignalEvent | null {
   return { id: `openalex:${externalId}`, source: "openalex", externalId, title, url: doi,
     summary: excerpt, publishedAt, importance: 25,
     topics: classifySignal(title, excerpt), classificationInput };
+}
+
+export function normalizeSyndicationFeed(xml: string, source: string): SignalEvent[] {
+  const parsed = record(parser.parse(xml));
+  const rss = record(record(parsed?.rss)?.channel);
+  const atom = record(parsed?.feed);
+  const raw = rss?.item ?? atom?.entry;
+  const entries = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  return entries.slice(0, 50).flatMap((input): SignalEvent[] => {
+    const item = record(input);
+    if (!item) return [];
+    const linkValue = item.link;
+    const linkEntry = Array.isArray(linkValue) ? linkValue.find((entry) => record(entry)?.["@rel"] === "alternate") ?? linkValue[0] : linkValue;
+    const link = typeof linkEntry === "string" ? linkEntry : text(record(linkEntry)?.["@href"] ?? record(linkEntry)?.["#text"]);
+    const url = safeUrl(link, "");
+    const title = clean(item.title);
+    const summary = short(clean(item.description ?? item.summary ?? item.content), 600);
+    const publishedAt = iso(item.pubDate ?? item.published ?? item.updated);
+    if (!url.startsWith("https://") || !title || summary.length < 30 || !publishedAt) return [];
+    const externalId = createHash("sha256").update(text(item.guid ?? item.id) || url).digest("hex").slice(0, 24);
+    return [{ id: `${source}:${externalId}`, source, externalId, title, url, summary, publishedAt,
+      importance: 25, topics: classifySignal(title, summary), classificationInput: { title, summary, categories: [] } }];
+  });
 }
 
 export function deduplicateSignals(events: SignalEvent[]): SignalEvent[] {

@@ -1,6 +1,7 @@
 import { getSignalFeed } from "./feed";
 import { getArchiveCount, getLatestIngestionFeedMetadata, getStoredFeed } from "./storage";
 import type { SignalFeed } from "./model";
+import { getUniverseCatalog } from "./catalog";
 
 export async function getCurrentFeed(): Promise<SignalFeed> {
   if (!process.env.DATABASE_URL) return getSignalFeed();
@@ -17,5 +18,6 @@ export async function getCurrentFeed(): Promise<SignalFeed> {
     activity: stale ? undefined : latest?.activity,
     partial: stale || latest?.partial || false,
     scope: stale ? "archive" : "rolling",
+    catalog: await getUniverseCatalog(),
   };
 }

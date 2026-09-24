@@ -4,11 +4,12 @@ import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, OrbitControls } from "@react-three/drei";
 import { Component, MutableRefObject, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { getTopic, Topic, topicEdges, topics, Vec3 } from "@/lib/universe";
+import { getTopic, type Topic, type UniverseCatalog, type Vec3 } from "@/lib/universe";
 import { attentionEdges, flowingAttentionEdges, relationshipKey, type RegionActivity, type RegionRelationships } from "@/lib/data/activity";
 import type { AskResult } from "@/lib/ai/ask";
 
 export type UniverseProps = {
+  catalog: UniverseCatalog;
   entered: boolean;
   askOpen: boolean;
   focusedId: string | null;
@@ -29,9 +30,6 @@ export type UniverseProps = {
   reducedMotion: boolean;
 };
 
-const topicPoints = new Map(topics.map((topic) => [topic.id, new THREE.Vector3(...topic.position)]));
-const establishedEdgeKeys = new Set(topicEdges.map(([first, second]) => relationshipKey(first, second)));
-
 type CameraMove = {
   fromPosition: THREE.Vector3;
   toPosition: THREE.Vector3;
@@ -41,13 +39,13 @@ type CameraMove = {
   duration: number;
 };
 
-function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact, askOverlay, controls }: { entered: boolean; focusedId: string | null; selectedChildId: string | null; reducedMotion: boolean; compact: boolean; askOverlay: boolean; controls: MutableRefObject<React.ComponentRef<typeof OrbitControls> | null> }) {
+function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact, askOverlay, controls, catalog }: { entered: boolean; focusedId: string | null; selectedChildId: string | null; reducedMotion: boolean; compact: boolean; askOverlay: boolean; controls: MutableRefObject<React.ComponentRef<typeof OrbitControls> | null>; catalog: UniverseCatalog }) {
   const { camera, size } = useThree();
   const move = useRef<CameraMove | null>(null);
   const panelConstrained = !compact && size.width <= 1000;
 
   useEffect(() => {
-    const topic = getTopic(focusedId);
+    const topic = getTopic(focusedId, catalog);
     const child = topic?.children.find((item) => item.id === selectedChildId);
     const toTarget = new THREE.Vector3();
     const toPosition = new THREE.Vector3();
@@ -74,7 +72,7 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
       elapsed: 0,
       duration: reducedMotion ? 0 : !entered ? 1 : topic ? 1.7 : 2.2,
     };
-  }, [askOverlay, camera, compact, controls, entered, focusedId, panelConstrained, selectedChildId, reducedMotion]);
+  }, [askOverlay, camera, catalog, compact, controls, entered, focusedId, panelConstrained, selectedChildId, reducedMotion]);
 
   useFrame((_, delta) => {
     const current = move.current;
@@ -297,12 +295,12 @@ function IncomingSignals({ compact, reducedMotion, activeTopics }: { compact: bo
   return <points ref={points} geometry={geometry} raycast={() => null}><pointsMaterial size={.115} vertexColors transparent opacity={.72} sizeAttenuation depthWrite={false} /></points>;
 }
 
-function FlowSignals({ reducedMotion, edges }: { reducedMotion: boolean; edges: [string, string][] }) {
+function FlowSignals({ reducedMotion, edges, catalog }: { reducedMotion: boolean; edges: [string, string][]; catalog: UniverseCatalog }) {
   const paths = useMemo(() => edges.map(([a, b]) => {
-    const first = getTopic(a)!;
-    const second = getTopic(b)!;
+    const first = getTopic(a, catalog)!;
+    const second = getTopic(b, catalog)!;
     return filamentCurve(first.position, second.position, 2.6);
-  }), [edges]);
+  }), [edges, catalog]);
   const perPath = 7;
   const geometry = useMemo(() => {
     const buffer = new THREE.BufferGeometry();
@@ -357,19 +355,21 @@ function SignalCloud({ topic, reducedMotion }: { topic: Topic; reducedMotion: bo
   return <points ref={points} position={topic.position} geometry={geometry} raycast={() => null}><pointsMaterial ref={material} color={topic.color} size={.035} transparent opacity={Math.min(.58, .33 + topic.change / 1000)} sizeAttenuation depthWrite={false} /></points>;
 }
 
-function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact }: UniverseProps & { compact: boolean }) {
+function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
   const { camera } = useThree();
-  const activeTopics = useMemo(() => regionActivity ? topics.map((topic) => {
+  const topicPoints = useMemo(() => new Map(catalog.topics.map((topic) => [topic.id, new THREE.Vector3(...topic.position)])), [catalog]);
+  const establishedEdgeKeys = useMemo(() => new Set(catalog.topicEdges.map(([first, second]) => relationshipKey(first, second))), [catalog]);
+  const activeTopics = useMemo(() => regionActivity ? catalog.topics.map((topic) => {
     const measured = regionActivity[topic.id];
-    return { ...topic, activity: measured.visual, change: measured.momentum === "rising" ? 80 : 0, signals: measured.count };
-  }) : topics, [regionActivity]);
-  const activeEdges = useMemo(() => attentionEdges(regionRelationships), [regionRelationships]);
+    return measured ? { ...topic, activity: measured.visual, change: measured.momentum === "rising" ? 80 : 0, signals: measured.count } : topic;
+  }) : catalog.topics, [catalog, regionActivity]);
+  const activeEdges = useMemo(() => attentionEdges(regionRelationships, catalog), [catalog, regionRelationships]);
   const flowingEdges = useMemo(() => flowingAttentionEdges(activeEdges, regionRelationships), [activeEdges, regionRelationships]);
-  const focused = getTopic(focusedId);
+  const focused = getTopic(focusedId, catalog);
   const pathChildren = new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null));
   const pathPosition = (step: AskResult["pathSteps"][number]): Vec3 => {
-    const topic = getTopic(step.regionId)!;
+    const topic = getTopic(step.regionId, catalog)!;
     return topic.children.find((child) => child.id === step.subtopicId)?.position ?? topic.position;
   };
   const selectedChild = focused?.children.find((child) => child.id === selectedChildId);
@@ -381,7 +381,7 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
     let candidate = focused;
     if (!candidate) {
       let closest = Infinity;
-      for (const topic of topics) {
+      for (const topic of catalog.topics) {
         const distance = camera.position.distanceTo(topicPoints.get(topic.id)!);
         if (distance < closest) { closest = distance; candidate = topic; }
       }
@@ -396,14 +396,14 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
   return <>
     <color attach="background" args={["#07090d"]} />
     <fog attach="fog" args={["#07090d", compact ? 75 : 48, compact ? 160 : 130]} />
-    <CameraRig entered={entered} focusedId={focusedId} selectedChildId={selectedChildId} reducedMotion={reducedMotion} compact={compact} askOverlay={compact && askOpen} controls={controls} />
+    <CameraRig entered={entered} focusedId={focusedId} selectedChildId={selectedChildId} reducedMotion={reducedMotion} compact={compact} askOverlay={compact && askOpen} controls={controls} catalog={catalog} />
     <OrbitControls ref={controls} enableDamping dampingFactor={.055} enablePan={false} minDistance={9} maxDistance={compact ? 135 : 84} rotateSpeed={.43} zoomSpeed={.65} />
     <Dust count={compact ? 650 : 1500} reducedMotion={reducedMotion} />
     <IncomingSignals compact={compact} reducedMotion={reducedMotion} activeTopics={activeTopics} />
-    <FlowSignals reducedMotion={reducedMotion} edges={flowingEdges} />
+    <FlowSignals reducedMotion={reducedMotion} edges={flowingEdges} catalog={catalog} />
     {activeEdges.map(([a, b]) => {
-      const first = getTopic(a)!;
-      const second = getTopic(b)!;
+      const first = getTopic(a, catalog)!;
+      const second = getTopic(b, catalog)!;
       const key = relationshipKey(a, b);
       const highlighted = hoveredId === a || hoveredId === b;
       const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === key);
@@ -413,7 +413,7 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
       const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3));
       const recentStrength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost;
       const strength = Math.max(recentStrength, archived ? Math.min(.24, .06 + Math.log1p(archived) * .045) : 0);
-      const color = inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId)?.color : establishedEdgeKeys.has(key) ? undefined : "#bfa178";
+      const color = inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId, catalog)?.color : establishedEdgeKeys.has(key) ? undefined : "#bfa178";
       const opacity = inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04)
         : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength;
       return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={color} opacity={opacity} bend={2.6} />;
@@ -446,8 +446,8 @@ class SceneErrorBoundary extends Component<{ children: ReactNode; fallback: Reac
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-function UniverseFallback({ entered, focusedId, onFocus }: Pick<UniverseProps, "entered" | "focusedId" | "onFocus">) {
-  const focused = getTopic(focusedId);
+function UniverseFallback({ entered, focusedId, onFocus, catalog }: Pick<UniverseProps, "entered" | "focusedId" | "onFocus" | "catalog">) {
+  const focused = getTopic(focusedId, catalog);
   return <div className="universe-fallback">
     {entered && focused && <div className="universe-fallback-focus" aria-hidden="true">
       <span style={{ borderColor: focused.color }} /><strong>{focused.short}</strong><small>REGION IN FOCUS</small>
@@ -456,7 +456,7 @@ function UniverseFallback({ entered, focusedId, onFocus }: Pick<UniverseProps, "
       <p className="eyebrow">EXPLORE THE LIVE SIGNALS</p>
       <h2>Follow an idea.</h2>
       <p>The 3D view is unavailable here. Choose a region to explore its topics and sources.</p>
-      <div className="universe-fallback-regions">{topics.map((topic) =>
+      <div className="universe-fallback-regions">{catalog.topics.map((topic) =>
         <button key={topic.id} type="button" onClick={() => onFocus(topic.id)}>
           <span style={{ background: topic.color }} aria-hidden="true" />{topic.short}<b aria-hidden="true">↗</b>
         </button>)}</div>
@@ -467,7 +467,7 @@ function UniverseFallback({ entered, focusedId, onFocus }: Pick<UniverseProps, "
 export default function Universe(props: UniverseProps) {
   const [compact, setCompact] = useState(false);
   useEffect(() => { const query = window.matchMedia("(max-width: 700px)"); const update = () => setCompact(query.matches); update(); query.addEventListener("change", update); return () => query.removeEventListener("change", update); }, []);
-  return <SceneErrorBoundary fallback={<UniverseFallback entered={props.entered} focusedId={props.focusedId} onFocus={props.onFocus} />}>
+  return <SceneErrorBoundary fallback={<UniverseFallback entered={props.entered} focusedId={props.focusedId} onFocus={props.onFocus} catalog={props.catalog} />}>
     <Canvas className="universe-canvas" camera={{ position: [0, 0, 70], fov: 48, near: .1, far: 250 }} dpr={[1, compact ? 1.4 : 1.8]} gl={{ antialias: !compact, alpha: false, powerPreference: "high-performance" }} onCreated={({ gl }) => gl.setClearColor("#07090d")}>
       <World {...props} compact={compact} />
     </Canvas>

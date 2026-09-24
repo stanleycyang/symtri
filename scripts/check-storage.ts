@@ -11,6 +11,10 @@ import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
 import { POST as askSymtri } from "../app/api/ask/route";
+import { getUniverseCatalog, recordCatalogRevision, seedUniverseCatalog } from "../lib/data/catalog";
+import { discoverConcepts, syncArchiveConcepts } from "../lib/data/discovery";
+import { questionTopics } from "../lib/ai/ask";
+import { fetchActiveFeeds, pollTrialFeeds } from "../lib/data/feed-registry";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -31,6 +35,7 @@ const cosmicId = `arxiv:${externalId}-cosmic`;
 const archiveId = `github:${externalId}-archive`;
 const crowdPrefix = `github:${externalId}-crowd-`;
 const knowledgePrefix = `github:${externalId}-knowledge-`;
+const organicPrefix = `organic-check-${externalId}`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
 
@@ -87,6 +92,10 @@ async function main() {
   await sql.unsafe(openAlexMigration);
   const sourcePreviewMigration = await readFile(new URL("../supabase/migrations/20260924015000_source_preview_index.sql", import.meta.url), "utf8");
   await sql.unsafe(sourcePreviewMigration);
+  const organicMigration = await readFile(new URL("../supabase/migrations/20260924016000_organic_graph.sql", import.meta.url), "utf8");
+  await sql.unsafe(organicMigration);
+  await seedUniverseCatalog();
+  assert.equal((await getUniverseCatalog()).topics.length, 10);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
   assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
@@ -98,9 +107,10 @@ async function main() {
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_source_preview_idx'`)[0].count, 1);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
-    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations')
+    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
+      'concept_catalog', 'concept_candidates', 'concept_candidate_evidence', 'signal_concepts', 'catalog_revisions', 'source_catalog', 'source_trial_items', 'source_probes')
   `;
-  assert.equal(protectedTables.length, 7);
+  assert.equal(protectedTables.length, 15);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
@@ -114,6 +124,41 @@ async function main() {
     partial: true, scope: "sample",
   };
   try {
+    const feedSourceId = `feed-${externalId}`;
+    const feedEvent: SignalEvent = { ...event, id: `${feedSourceId}:one`, source: feedSourceId,
+      externalId: "one", title: "Independent quantum sensor report", url: `https://feed.example/${externalId}`,
+      summary: "An independent technical article about quantum sensing instrumentation." };
+    await sql`insert into source_catalog (id, name, kind, feed_url, status)
+      values (${feedSourceId}, 'Test publication', 'rss', 'https://feed.example/rss.xml', 'trial')`;
+    assert.equal(await persistSignals({ ...feed, events: [feedEvent] }), 1);
+    assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === feedEvent.id));
+    await sql`update source_catalog set status = 'active' where id = ${feedSourceId}`;
+    await recordCatalogRevision();
+    assert.equal((await getUniverseCatalog()).sourceLabels[feedSourceId], "Test publication");
+    assert.ok((await getStoredFeed())?.events.some((item) => item.id === feedEvent.id));
+    assert.equal((await sql`select source from signal_observations where source = ${feedSourceId} and external_id = 'one'`)[0]?.source, feedSourceId);
+    await sql`delete from signal_events where id = ${feedEvent.id}`;
+    await sql`delete from source_catalog where id = ${feedSourceId}`;
+    await recordCatalogRevision();
+    const trialSourceId = `feed-trial-${externalId}`;
+    await sql`insert into source_catalog (id, name, kind, feed_url, status)
+      values (${trialSourceId}, 'Trial publication', 'rss', 'https://trial.example/rss.xml', 'trial')`;
+    const trialEvents: SignalEvent[] = Array.from({ length: 6 }, (_, index) => ({ ...event,
+      id: `${trialSourceId}:${index}`, source: trialSourceId, externalId: String(index),
+      title: `Quantum sensor trial ${index}`, url: `https://trial.example/${externalId}/${index}`,
+      summary: `A technical report about quantum sensor system ${index} with detailed research observations.`,
+      publishedAt: new Date().toISOString(),
+    }));
+    const trialLoad = async () => trialEvents;
+    assert.equal(await pollTrialFeeds(new Date(Date.now() - 2 * 86400000), trialLoad), 0);
+    assert.equal(await pollTrialFeeds(new Date(Date.now() - 86400000), trialLoad), 0);
+    assert.equal(await pollTrialFeeds(new Date(), trialLoad), 1);
+    assert.equal((await sql`select status from source_catalog where id = ${trialSourceId}`)[0].status, "active");
+    assert.equal((await fetchActiveFeeds(new Date())).sources[trialSourceId], "ok");
+    assert.ok((await getStoredFeed())?.events.some((item) => item.source === trialSourceId));
+    await sql`delete from signal_events where source = ${trialSourceId}`;
+    await sql`delete from source_catalog where id = ${trialSourceId}`;
+    await recordCatalogRevision();
     const journalArticle: SignalEvent = { ...event, id: `openalex:${externalId}-journal`, source: "openalex",
       externalId: `${externalId}-journal`, title: "Journal study of AI agents", url: `https://doi.org/10.1234/${externalId}` };
     assert.equal(await persistSignals({ ...feed, events: [journalArticle] }), 1);
@@ -459,9 +504,11 @@ async function main() {
     await persistSignals({ ...feed, events: [archiveEvent] });
     const rollingSnapshot = rollingFeed(feed, await getStoredFeed(), 0);
     assert.deepEqual(new Set(rollingSnapshot.events.map((item) => item.id)), new Set([id, archiveId]));
-    await persistSnapshot({ ...rollingSnapshot, observedAt: "2099-01-03T12:00:00.000Z", sources: feed.sources, partial: feed.partial, activity });
+    const snapshotCatalog = await getUniverseCatalog();
+    await persistSnapshot({ ...rollingSnapshot, observedAt: "2099-01-03T12:00:00.000Z", sources: feed.sources, partial: feed.partial, activity, catalog: snapshotCatalog });
     assert.deepEqual(new Set((await getSnapshotFeed("2099-01-03"))?.events.map((item) => item.id)), new Set([id, archiveId]));
     assert.equal((await getSnapshotFeed("2099-01-03"))?.activity?.ai.count, activity.ai.count);
+    assert.equal((await getSnapshotFeed("2099-01-03"))?.catalog?.revision, snapshotCatalog.revision);
     await sql`delete from signal_events where id = ${archiveId}`;
     const firstDay = "2099-01-01";
     const secondDay = "2099-01-02";
@@ -592,11 +639,34 @@ async function main() {
     assert.equal((await searchKnowledge("What are people saying about exoplanets?", null))[0]?.event.id, exoplanetKnowledgeId);
     assert.equal((await searchKnowledge("What is new in tropical botany research?", null)).length, 0);
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
+    const organicRows = Array.from({ length: 12 }, (_, index) => ({
+      id: `${organicPrefix}:${index}`, source: ["hacker-news", "github", "arxiv"][index % 3],
+      external_id: `${externalId}-organic-${index}`, title: `Orbital Knitting ${index} research`,
+      url: `https://organic-${index % 3}.example/${externalId}/${index}`,
+      summary: `Orbital knitting systems and experiments number ${index} explore a new technical field.`,
+      published_at: new Date(Date.now() - (index % 4) * 86400000).toISOString(),
+    }));
+    await sql`insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      select id, source, external_id, title, url, summary, published_at::timestamptz, 30, '[]'::jsonb
+      from jsonb_to_recordset(${sql.json(organicRows)}::jsonb) as incoming
+        (id text, source text, external_id text, title text, url text, summary text, published_at text)`;
+    await sql`update signal_events set embedding = ${`[${Array(256).fill(.1).join(",")}]`}::vector(256), embedding_model = ${embeddingModelId()}
+      where id like ${`${organicPrefix}%`}`;
+    const discovery = await discoverConcepts();
+    assert.equal(discovery.promoted, 1);
+    const organicCatalog = await getUniverseCatalog();
+    const organicPoint = organicCatalog.topics.find((topic) => topic.name === "Orbital Knitting");
+    assert.ok(organicPoint);
+    assert.deepEqual(questionTopics("What is new in orbital knitting?", organicCatalog), [{ id: organicPoint.id, childId: null }]);
+    assert.ok(await syncArchiveConcepts() >= 12);
+    assert.equal((await getArchiveActivity(new Date(), organicCatalog))[organicPoint.id].count, 12);
+    await sql`delete from signal_events where id like ${`${organicPrefix}%`}`;
     console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${weakParentId}, ${sharedThreadId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
+    await sql`delete from signal_events where id like ${`${organicPrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02', '2099-01-03', '2099-01-04')`;

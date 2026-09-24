@@ -1,4 +1,4 @@
-import { unavailableSources, type SignalFeed } from "./model";
+import type { SignalFeed } from "./model";
 import { canonicalSignalUrl, signalContentKey } from "./normalize";
 
 const MAX_VISIBLE_SIGNALS = 300;
@@ -19,7 +19,7 @@ export function rollingFeed(live: SignalFeed, archive: SignalFeed | null, archiv
       return true;
     })
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  const reserved = new Set(Object.keys(unavailableSources()).flatMap((source) =>
+  const reserved = new Set([...new Set(ordered.map((event) => event.source))].flatMap((source) =>
     ordered.filter((event) => event.source === source).slice(0, 12).map((event) => event.id)));
   const events = [...ordered.filter((event) => reserved.has(event.id)), ...ordered.filter((event) => !reserved.has(event.id))]
     .slice(0, MAX_VISIBLE_SIGNALS).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));

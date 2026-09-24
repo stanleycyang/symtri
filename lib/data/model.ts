@@ -1,7 +1,8 @@
 import type { RegionActivity } from "./activity";
 import type { RegionRelationships } from "./activity";
+import type { UniverseCatalog } from "../universe";
 
-export type SourceId = "hacker-news" | "github" | "arxiv" | "openalex";
+export type SourceId = string;
 
 export type TopicMatch = {
   topicId: string;
@@ -42,6 +43,7 @@ export type SignalFeed = {
   relationships?: RegionRelationships;
   knowledgeGraph?: { updatedAt: string; regionCounts: Record<string, number>; relationships: RegionRelationships; recentRelationships?: RegionRelationships };
   semanticRelationships?: Record<string, number>;
+  catalog?: UniverseCatalog;
 };
 
 export type SnapshotDay = { day: string; capturedAt: string; eventCount: number; archiveCount?: number };
