@@ -32,6 +32,8 @@ Same-day snapshot retries must preserve both source coverage and mapped event co
 
 For ingestion changes, test the canonical URL uniqueness and hourly slot claim in `scripts/check-storage.ts`. The cron route only queues a Vercel Workflow; check `/api/status` for completion after triggering it. When rotating `CRON_SECRET`, deploy fresh production functions before testing authorization because redeploying an older build may retain its environment snapshot. Keep the value out of logs and command output.
 
+Hourly Workflow source fetches must use `cache: "no-store"`. A 15-minute `next.revalidate` cache can serve stale data on the first request after expiry, making hourly ingestion one run behind. Keep the direct public preview's short cache separate, and verify a newly published source item after the next cron run.
+
 Serve `/api/signals` and mapped Ask questions from the persisted hourly archive once it contains signals. Per-visitor Hacker News, GitHub, and arXiv fetches multiply source traffic and make exploration depend on those APIs; keep direct source fetches only for an empty archive or a local database-free preview. Verify both routes with `npm run test:storage:local`.
 
 The overview caps its event payload. A focused region or thread fetches recent matching archive events through `/api/topic`; keep those detail results distinct from the capped map activity calculation, and verify a niche source remains reachable beyond the overview cap.

@@ -1,20 +1,20 @@
 import { normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 import type { SignalEvent } from "./model";
 
-async function request(url: string, headers?: HeadersInit): Promise<Response> {
-  const response = await fetch(url, { headers, next: { revalidate: 900 }, signal: AbortSignal.timeout(12000) });
+async function request(url: string, headers?: HeadersInit, fresh = false): Promise<Response> {
+  const response = await fetch(url, { headers, ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: 900 } }), signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error(`Source returned HTTP ${response.status}`);
   return response;
 }
 
 export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent[]> {
-  const ids: unknown = await (await request("https://hacker-news.firebaseio.com/v0/topstories.json")).json();
+  const ids: unknown = await (await request("https://hacker-news.firebaseio.com/v0/topstories.json", undefined, forIngestion)).json();
   if (!Array.isArray(ids)) throw new Error("Invalid Hacker News story list");
   const topIds = ids.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, 60);
   let storyIds = topIds;
   if (forIngestion) {
     try {
-      const newest: unknown = await (await request("https://hacker-news.firebaseio.com/v0/newstories.json")).json();
+      const newest: unknown = await (await request("https://hacker-news.firebaseio.com/v0/newstories.json", undefined, true)).json();
       if (!Array.isArray(newest)) throw new Error("Invalid Hacker News new story list");
       storyIds = [...new Set([...topIds, ...newest.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, 60)])];
     } catch (error) {
@@ -24,7 +24,7 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
   const output: SignalEvent[] = [];
   for (let offset = 0; offset < storyIds.length; offset += 12) {
     const batch = await Promise.allSettled(storyIds.slice(offset, offset + 12).map(async (id) => {
-      const item: unknown = await (await request(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)).json();
+      const item: unknown = await (await request(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, undefined, forIngestion)).json();
       return normalizeHackerNews(item);
     }));
     for (const result of batch) if (result.status === "fulfilled" && result.value) output.push(result.value);
@@ -43,7 +43,7 @@ export async function fetchGitHub(forIngestion = false): Promise<SignalEvent[]> 
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "SYMTRI/0.1", "X-GitHub-Api-Version": "2026-03-10" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   async function search(searchUrl: URL): Promise<SignalEvent[]> {
-    const data: unknown = await (await request(searchUrl.toString(), headers)).json();
+    const data: unknown = await (await request(searchUrl.toString(), headers, forIngestion)).json();
     const items = data && typeof data === "object" && "items" in data ? data.items : null;
     if (!Array.isArray(items)) throw new Error("Invalid GitHub search response");
     return items.map(normalizeGitHub).filter((event): event is SignalEvent => event !== null);
@@ -70,14 +70,14 @@ const arxivIngestionQueries = [
   { query: "cat:q-fin.TR OR cat:q-fin.ST OR cat:q-fin.EC OR cat:q-fin.CP", limit: 10 },
 ] as const;
 
-async function queryArxiv(query: string, limit: number): Promise<SignalEvent[]> {
+async function queryArxiv(query: string, limit: number, fresh = false): Promise<SignalEvent[]> {
   const url = new URL("https://export.arxiv.org/api/query");
   url.searchParams.set("search_query", query);
   url.searchParams.set("start", "0");
   url.searchParams.set("max_results", String(limit));
   url.searchParams.set("sortBy", "submittedDate");
   url.searchParams.set("sortOrder", "descending");
-  const xml = await (await request(url.toString(), { "User-Agent": "SYMTRI/0.1 (https://symtri.com)" })).text();
+  const xml = await (await request(url.toString(), { "User-Agent": "SYMTRI/0.1 (https://symtri.com)" }, fresh)).text();
   return normalizeArxivFeed(xml);
 }
 
@@ -91,7 +91,7 @@ export async function fetchArxiv(forIngestion = false, pause: (milliseconds: num
   for (const [index, group] of arxivIngestionQueries.entries()) {
     // arXiv requests a three-second pause between API calls.
     if (index) await pause(3000);
-    results.push(...await queryArxiv(group.query, group.limit));
+    results.push(...await queryArxiv(group.query, group.limit, true));
   }
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const events = [...new Map(results.filter((event) => Date.parse(event.publishedAt) >= cutoff)
