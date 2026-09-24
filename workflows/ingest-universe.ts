@@ -1,7 +1,8 @@
 import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
-import { acquireIngestionLease, countNewSignalsForRun, finishIngestionRun, getPendingEmbeddingEvents, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { rollingFeed } from "@/lib/data/rolling";
+import { acquireIngestionLease, countNewSignalsForRun, finishIngestionRun, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import type { SignalFeed } from "@/lib/data/model";
 
 async function begin(slot: string): Promise<boolean> {
@@ -25,7 +26,8 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   "use step";
   await persistSignals(feed);
   const mapped = selectFeedEvents(feed.events, 300);
-  await persistSnapshot({ ...feed, events: mapped });
+  const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), 0);
+  await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial });
   await rebuildKnowledgeGraph();
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length };
 }

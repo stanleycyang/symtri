@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
+import { rollingFeed } from "../lib/data/rolling";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -18,6 +19,7 @@ const id = `github:${externalId}`;
 const unclassifiedId = `github:${externalId}-unclassified`;
 const relatedId = `github:${externalId}-related`;
 const foreignId = `github:${externalId}-foreign`;
+const archiveId = `github:${externalId}-archive`;
 const crowdPrefix = `github:${externalId}-crowd-`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
@@ -165,6 +167,14 @@ async function main() {
     await releaseIngestionLease(competingRunId);
     const rows = await sql`select count(*)::int as count from signal_events where id = ${id}`;
     assert.equal(rows[0].count, 1);
+    const archiveEvent: SignalEvent = { ...event, id: archiveId, externalId: `${externalId}-archive`,
+      title: "Earlier archived signal", url: `${event.url}/archive`, publishedAt: new Date(Date.now() - 86_400_000).toISOString() };
+    await persistSignals({ ...feed, events: [archiveEvent] });
+    const rollingSnapshot = rollingFeed(feed, await getStoredFeed(), 0);
+    assert.deepEqual(new Set(rollingSnapshot.events.map((item) => item.id)), new Set([id, archiveId]));
+    await persistSnapshot({ ...rollingSnapshot, observedAt: "2099-01-03T12:00:00.000Z", sources: feed.sources, partial: feed.partial });
+    assert.deepEqual(new Set((await getSnapshotFeed("2099-01-03"))?.events.map((item) => item.id)), new Set([id, archiveId]));
+    await sql`delete from signal_events where id = ${archiveId}`;
     const firstDay = "2099-01-01";
     const secondDay = "2099-01-02";
     feed.observedAt = `${firstDay}T12:00:00.000Z`;
@@ -200,7 +210,7 @@ async function main() {
     event.title = "Sparse retry";
     await persistSnapshot(completeFeed);
     const days = await getSnapshotDays();
-    assert.deepEqual(days.slice(0, 2).map((item) => item.day), [secondDay, firstDay]);
+    assert.deepEqual(days.slice(0, 3).map((item) => item.day), ["2099-01-03", secondDay, firstDay]);
     const snapshot = await getSnapshotFeed(secondDay);
     assert.equal(snapshot?.events[0].title, "Two-event snapshot");
     assert.equal(snapshot?.events.length, 2);
@@ -208,11 +218,11 @@ async function main() {
     assert.equal(snapshot?.scope, "history");
     console.log("Postgres migrations, API table protection, signal upsert, topic lookup beyond the map cap, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
-    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId})`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
-    await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;
+    await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02', '2099-01-03')`;
     await sql.end();
   }
 }
