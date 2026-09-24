@@ -7,6 +7,8 @@ import { recordCatalogRevision } from "./catalog";
 
 type FeedRow = { id: string; name: string; feed_url: string; status: "trial" | "active"; consecutive_failures: number; successful_days: number; last_success_day: Date | null; last_checked_at: Date | null };
 const techTerms = /\b(?:technology|software|hardware|science|research|computer|computing|security|energy|engineering|robotics|artificial intelligence|machine learning|quantum|biotech|semiconductor|startup|cryptograph|blockchain)\b/i;
+// Ten feeds per hourly slot gives each active feed a six-hour turn at this cap.
+const MAX_ACTIVE_RSS_FEEDS = 60;
 
 export async function discoverFeedCandidates(now = new Date()): Promise<number> {
   const sql = database();
@@ -63,20 +65,18 @@ async function fetchFeed(row: FeedRow): Promise<SignalEvent[]> {
   return events;
 }
 
-export async function fetchActiveFeeds(now = new Date()): Promise<{ events: SignalEvent[]; sources: SourceStatus }> {
+export async function fetchActiveFeeds(now = new Date(), load: (row: FeedRow) => Promise<SignalEvent[]> = fetchFeed): Promise<{ events: SignalEvent[]; sources: SourceStatus }> {
   const sql = database();
   const rows = await sql<FeedRow[]>`select id, name, feed_url, status, consecutive_failures, successful_days, last_success_day, last_checked_at
     from source_catalog where kind = 'rss' and status = 'active'
-    order by last_checked_at nulls first limit 10`;
+    order by last_checked_at nulls first limit ${MAX_ACTIVE_RSS_FEEDS}`;
   const events: SignalEvent[] = [];
-  const sources: SourceStatus = {};
-  for (const row of rows) {
-    if (row.last_checked_at && row.last_checked_at.getTime() > now.getTime() - 6 * 60 * 60 * 1000) {
-      sources[row.id] = row.consecutive_failures ? "partial" : "ok";
-      continue;
-    }
+  const due = (row: FeedRow) => !row.last_checked_at || row.last_checked_at.getTime() <= now.getTime() - 6 * 60 * 60 * 1000;
+  const sources: SourceStatus = Object.fromEntries(rows.map((row) => [row.id,
+    due(row) || row.consecutive_failures ? "partial" : "ok"]));
+  for (const row of rows.filter(due).slice(0, 10)) {
     try {
-      events.push(...await fetchFeed(row));
+      events.push(...await load(row));
       sources[row.id] = "ok";
       await sql`update source_catalog set last_checked_at = ${now}, consecutive_failures = 0 where id = ${row.id}`;
     } catch {
@@ -90,6 +90,9 @@ export async function fetchActiveFeeds(now = new Date()): Promise<{ events: Sign
 
 export async function pollTrialFeeds(now = new Date(), load: (row: FeedRow) => Promise<SignalEvent[]> = fetchFeed): Promise<number> {
   const sql = database();
+  await sql`delete from source_trial_items as item using source_catalog as source
+    where source.id = item.source_id and (
+      source.status = 'active' or item.first_seen_at < ${now}::timestamptz - interval '90 days')`;
   const rows = await sql<FeedRow[]>`select id, name, feed_url, status, consecutive_failures, successful_days, last_success_day, last_checked_at
     from source_catalog where kind = 'rss' and status = 'trial'
       and (last_checked_at is null or last_checked_at <= ${now}::timestamptz - interval '6 hours')
@@ -117,10 +120,23 @@ export async function pollTrialFeeds(now = new Date(), load: (row: FeedRow) => P
       if (Number(duplicates[0].count) / unique > .4) continue;
       const active = Number((await sql`select count(*)::int as count from source_catalog where kind = 'rss' and status = 'active'`)[0].count);
       const recent = Number((await sql`select count(*)::int as count from source_catalog where kind = 'rss' and promoted_at >= ${now}::timestamptz - interval '7 days'`)[0].count);
-      if (active >= 10 || recent >= 2) continue;
-      await sql`update source_catalog set status = 'active', promoted_at = ${now} where id = ${row.id}`;
+      if (recent >= 2) continue;
+      const replacement = active >= MAX_ACTIVE_RSS_FEEDS ? await sql<{ id: string }[]>`
+        select candidate.id from source_catalog as candidate
+        where candidate.kind = 'rss' and candidate.status = 'active'
+          and candidate.promoted_at < ${now}::timestamptz - interval '30 days'
+          and not exists (select 1 from signal_observations as observation
+            where observation.source = candidate.id
+              and observation.first_seen_at >= ${now}::timestamptz - interval '30 days')
+        order by candidate.promoted_at, candidate.id limit 1` : [];
+      if (active >= MAX_ACTIVE_RSS_FEEDS && !replacement.length) continue;
       const trial = await sql<{ event: SignalEvent }[]>`select event from source_trial_items where source_id = ${row.id}`;
       await persistSignals({ observedAt: now.toISOString(), events: trial.map((item) => item.event), sources: { [row.id]: "ok" }, partial: false, scope: "sample" });
+      await sql.begin(async (tx) => {
+        if (replacement[0]) await tx`update source_catalog set status = 'paused' where id = ${replacement[0].id} and status = 'active'`;
+        await tx`update source_catalog set status = 'active', promoted_at = ${now} where id = ${row.id} and status = 'trial'`;
+      });
+      await sql`delete from source_trial_items where source_id = ${row.id}`;
       promoted++;
     } catch {
       await sql`update source_catalog set last_checked_at = ${now}, consecutive_failures = consecutive_failures + 1,

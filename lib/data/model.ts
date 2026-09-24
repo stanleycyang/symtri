@@ -39,6 +39,8 @@ export type SignalFeed = {
   partial: boolean;
   scope: "sample" | "rolling" | "archive" | "history" | "knowledge";
   archiveCount?: number;
+  classifierVersion?: number;
+  childCounts?: Record<string, number>;
   activity?: Record<string, RegionActivity>;
   relationships?: RegionRelationships;
   knowledgeGraph?: { updatedAt: string; regionCounts: Record<string, number>; relationships: RegionRelationships; recentRelationships?: RegionRelationships };

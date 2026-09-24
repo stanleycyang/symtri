@@ -14,7 +14,7 @@ export async function syncArchiveConcepts(limit = 1000): Promise<number> {
   const rows = await sql<(DiscoveryRow & { external_id: string; importance: number; classifier_version: number; classification_input: SignalEvent["classificationInput"] })[]>`
     select id, source, external_id, title, summary, url, published_at, importance, topics, classifier_version, classification_input
     from signal_events where catalog_revision < ${catalog.revision}
-    order by first_seen_at desc, id limit ${limit}`;
+    order by catalog_revision, first_seen_at, id limit ${limit}`;
   if (!rows.length) return 0;
   const updates = rows.map((row) => {
     const event: SignalEvent = {
@@ -52,10 +52,17 @@ export async function discoverConcepts(now = new Date()): Promise<{ candidates: 
   const sql = database();
   const catalog = await getUniverseCatalog();
   const rows = await sql<DiscoveryRow[]>`
-    select event.id, event.source, event.title, event.summary, event.url, event.topics, event.published_at
-    from signal_events as event join source_catalog as source on source.id = event.source and source.status = 'active'
-    where event.published_at >= ${now}::timestamptz - interval '30 days'
-    order by event.published_at desc limit 2000`;
+    with ranked as (
+      select event.id, event.source, event.title, event.summary, event.url, event.topics, event.published_at,
+        row_number() over (partition by event.source order by event.published_at desc, event.id desc) as source_rank
+      from signal_events as event
+      where event.published_at >= ${now}::timestamptz - interval '30 days'
+        and exists (select 1 from signal_observations as observation
+          join source_catalog as source on source.id = observation.source and source.status = 'active'
+          where observation.signal_id = event.id)
+    )
+    select id, source, title, summary, url, topics, published_at from ranked
+    where source_rank <= 64`;
   const known = new Set(catalog.topics.flatMap((topic) => [topic.name.toLowerCase(), ...topic.children.map((child) => child.name.toLowerCase())]));
   const groups = new Map<string, DiscoveryRow[]>();
   for (const row of rows) for (const phrase of candidatePhrases(row.title)) {
@@ -65,7 +72,7 @@ export async function discoverConcepts(now = new Date()): Promise<{ candidates: 
     groups.set(phrase, members);
   }
   const eligible = [...groups].filter(([, members]) => members.length >= 5)
-    .sort((a, b) => b[1].length - a[1].length).slice(0, 40);
+    .sort((a, b) => b[1].length - a[1].length).slice(0, 100);
   let promoted = 0;
   let changed = false;
   const existingPositions = catalog.topics.flatMap((topic) => [topic.position, ...topic.children.map((child) => child.position)]);

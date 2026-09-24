@@ -18,6 +18,7 @@ export type UniverseProps = {
   hoveredId: string | null;
   signalMarkers: { id: string; source: string }[];
   regionActivity: Record<string, RegionActivity> | null;
+  childCounts: Record<string, number>;
   regionRelationships: RegionRelationships | null;
   archiveRelationships: RegionRelationships | null;
   semanticRelationships: Record<string, number> | null;
@@ -355,7 +356,7 @@ function SignalCloud({ topic, reducedMotion }: { topic: Topic; reducedMotion: bo
   return <points ref={points} position={topic.position} geometry={geometry} raycast={() => null}><pointsMaterial ref={material} color={topic.color} size={.035} transparent opacity={Math.min(.58, .33 + topic.change / 1000)} sizeAttenuation depthWrite={false} /></points>;
 }
 
-function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
+function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, childCounts, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
   const { camera } = useThree();
   const topicPoints = useMemo(() => new Map(catalog.topics.map((topic) => [topic.id, new THREE.Vector3(...topic.position)])), [catalog]);
@@ -367,7 +368,14 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
   const activeEdges = useMemo(() => attentionEdges(regionRelationships, catalog), [catalog, regionRelationships]);
   const flowingEdges = useMemo(() => flowingAttentionEdges(activeEdges, regionRelationships), [activeEdges, regionRelationships]);
   const focused = getTopic(focusedId, catalog);
-  const pathChildren = new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null));
+  const pathChildren = useMemo(() => new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null)), [askSteps]);
+  const sceneChildren = useMemo(() => new Map(catalog.topics.map((topic) => {
+    const ranked = [...topic.children].sort((a, b) => (childCounts[b.id] ?? 0) - (childCounts[a.id] ?? 0) || a.name.localeCompare(b.name));
+    const visible = new Set(ranked.slice(0, compact ? 12 : 24).map((child) => child.id));
+    if (selectedChildId) visible.add(selectedChildId);
+    for (const id of pathChildren) visible.add(id);
+    return [topic.id, visible] as const;
+  })), [catalog, childCounts, compact, selectedChildId, pathChildren]);
   const pathPosition = (step: AskResult["pathSteps"][number]): Vec3 => {
     const topic = getTopic(step.regionId, catalog)!;
     return topic.children.find((child) => child.id === step.subtopicId)?.position ?? topic.position;
@@ -422,7 +430,7 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
     {activeTopics.map((topic) => <group key={topic.id}>
       <SignalCloud topic={topic} reducedMotion={reducedMotion} />
       <GlowNode topic={topic} focused={focusedId === topic.id} hovered={hoveredId === topic.id} muted={Boolean(focused && focused.id !== topic.id && !askPathIds.includes(topic.id))} emphasized={askPathIds.includes(topic.id)} onFocus={(id) => onFocus(id)} onHover={onHover} reducedMotion={reducedMotion} compact={compact} measured={Boolean(regionActivity)} showLabel={entered} />
-      {topic.children.filter((child) => revealId === topic.id || pathChildren.has(child.id)).map((child) => <group key={child.id}>
+      {topic.children.filter((child) => (revealId === topic.id && sceneChildren.get(topic.id)?.has(child.id)) || pathChildren.has(child.id)).map((child) => <group key={child.id}>
         <Filament from={topic.position} to={child.position} color={pathChildren.has(child.id) ? "#e6b988" : topic.color} opacity={pathChildren.has(child.id) ? .55 : .21} bend={.45} />
         <ChildNode position={child.position} name={child.name} color={topic.color} active={selectedChildId === child.id || pathChildren.has(child.id)} onClick={() => { if (focusedId !== topic.id) onFocus(topic.id); onChild(child.id); }} />
         {revealSignals && selectedChildId === child.id && signalMarkers.map((signal, index) => {

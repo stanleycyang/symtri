@@ -1,10 +1,17 @@
 import { getSignalFeed } from "./feed";
-import { getArchiveCount, getLatestIngestionFeedMetadata, getStoredFeed } from "./storage";
+import { getArchiveCount, getLatestIngestionFeedMetadata, getPersistedCurrentFeed, getStoredFeed } from "./storage";
 import type { SignalFeed } from "./model";
 import { getUniverseCatalog } from "./catalog";
 
 export async function getCurrentFeed(): Promise<SignalFeed> {
   if (!process.env.DATABASE_URL) return getSignalFeed();
+  const prepared = await getPersistedCurrentFeed();
+  if (prepared) {
+    const stale = Date.now() - Date.parse(prepared.observedAt) > 3 * 60 * 60 * 1000;
+    return { ...prepared, observedAt: new Date().toISOString(), lastIngestedAt: prepared.observedAt,
+      activity: stale ? undefined : prepared.activity, partial: stale || prepared.partial,
+      scope: stale ? "archive" : "rolling" };
+  }
   const archiveCount = await getArchiveCount();
   if (!archiveCount) return getSignalFeed();
 

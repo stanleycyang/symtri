@@ -7,12 +7,13 @@ import type { AskResult } from "@/lib/ai/ask";
 import { getTopic, seedCatalog } from "@/lib/universe";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay } from "@/lib/data/model";
 import { regionActivity, regionRelationships, relationshipKey } from "@/lib/data/activity";
-import { selectFocusedSignals } from "@/lib/data/select";
+import { selectDistinctHeadlines, selectFocusedSignals } from "@/lib/data/select";
 
 const Universe = dynamic(() => import("@/components/universe/Universe"), { ssr: false, loading: () => <div className="universe-loading">AWAKENING THE MAP</div> });
 
 type DisplaySignal = { id: string; title: string; source: string; publishedAt: string; age: string; summary: string; url?: string; live: boolean };
 const emptySignals: SignalEvent[] = [];
+const emptyCounts: Record<string, number> = {};
 function ageOf(publishedAt: string, referenceAt: string) {
   const minutes = Math.max(0, Math.floor((Date.parse(referenceAt) - Date.parse(publishedAt)) / 60000));
   if (minutes < 1) return "just now";
@@ -20,8 +21,15 @@ function ageOf(publishedAt: string, referenceAt: string) {
   const hours = Math.floor(minutes / 60);
   return hours < 24 ? `${hours} hour${hours === 1 ? "" : "s"} ago` : `${Math.floor(hours / 24)} day${hours < 48 ? "" : "s"} ago`;
 }
+function sourceName(source: string, url: string, sourceLabels: Record<string, string>) {
+  if (sourceLabels[source]) return sourceLabels[source];
+  if (source.startsWith("feed-")) {
+    try { return new URL(url).hostname.replace(/^www\./, ""); } catch { /* Retain the source ID. */ }
+  }
+  return source;
+}
 function showLive(event: Pick<SignalEvent, "id" | "title" | "source" | "publishedAt" | "summary" | "url">, observedAt: string, sourceLabels: Record<string, string>): DisplaySignal {
-  return { id: event.id, title: event.title, source: sourceLabels[event.source] ?? event.source, publishedAt: event.publishedAt,
+  return { id: event.id, title: event.title, source: sourceName(event.source, event.url, sourceLabels), publishedAt: event.publishedAt,
     age: event.source === "openalex" ? shortDay(event.publishedAt.slice(0, 10)) : ageOf(event.publishedAt, observedAt),
     summary: event.summary, url: event.url, live: true };
 }
@@ -41,14 +49,19 @@ export default function Experience() {
   const [feedError, setFeedError] = useState(false);
   const [feedRetry, setFeedRetry] = useState(0);
   const [topicArchive, setTopicArchive] = useState<{ key: string; events: SignalEvent[] } | null>(null);
+  const [browse, setBrowse] = useState<{ key: string; events: SignalEvent[]; cursor: string | null; previousCursors: (string | null)[]; nextCursor: string | null; loading: boolean; error: boolean } | null>(null);
+  const [childPage, setChildPage] = useState(0);
   const [historyDays, setHistoryDays] = useState<SnapshotDay[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [pendingDay, setPendingDay] = useState<string | null>(null);
   const [historicalFeed, setHistoricalFeed] = useState<{ day: string; feed: SignalFeed } | null>(null);
   const [historyError, setHistoryError] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [mobileGuideOpen, setMobileGuideOpen] = useState(false);
+  const [mobileRegionPage, setMobileRegionPage] = useState(0);
   const [mapSearch, setMapSearch] = useState("");
   const askTrigger = useRef<HTMLButtonElement>(null);
+  const mobileGuideTrigger = useRef<HTMLButtonElement>(null);
   const [askSteps, setAskSteps] = useState<AskResult["pathSteps"]>([]);
   const askPath = useMemo(() => askSteps.map((step) => step.regionId).filter((id, index, ids) => index === 0 || id !== ids[index - 1]), [askSteps]);
   const displayFeed = selectedDay && historicalFeed?.day === selectedDay ? historicalFeed.feed : liveFeed;
@@ -61,6 +74,16 @@ export default function Experience() {
   const measuredRelationships = useMemo(() => displayFeed ? displayFeed.relationships ?? regionRelationships(displayFeed.events, Date.parse(displayFeed.observedAt), catalog) : null, [displayFeed, catalog]);
   const leadingRegion = measuredActivity && topics.length ? topics.reduce((leader, topic) => (measuredActivity[topic.id]?.score ?? 0) > (measuredActivity[leader.id]?.score ?? 0) ? topic : leader, topics[0]) : null;
   const leadingRegionActivity = leadingRegion ? measuredActivity?.[leadingRegion.id] : null;
+  const rankedRegions = useMemo(() => [...topics].sort((a, b) => (measuredActivity?.[b.id]?.score ?? 0) - (measuredActivity?.[a.id]?.score ?? 0)), [topics, measuredActivity]);
+  const shownMobileRegionPage = Math.min(mobileRegionPage, Math.max(0, Math.ceil((rankedRegions.length - 3) / 12) - 1));
+  const mobileLatest = useMemo(() => {
+    const recent = [...(displayFeed?.events ?? [])].filter((event) => event.topics.length > 0)
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+    const firstBySource = new Map<string, SignalEvent>();
+    for (const event of recent) if (!firstBySource.has(event.source)) firstBySource.set(event.source, event);
+    return selectDistinctHeadlines([...firstBySource.values(), ...recent], 4)
+      .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  }, [displayFeed]);
   const overviewCatalog = useMemo(() => {
     const ranked = [...catalog.topics].sort((a, b) => (measuredActivity?.[b.id]?.score ?? 0) - (measuredActivity?.[a.id]?.score ?? 0));
     const ids = new Set(ranked.slice(0, 12).map((topic) => topic.id));
@@ -69,12 +92,16 @@ export default function Experience() {
     return { ...catalog, topics: catalog.topics.filter((topic) => ids.has(topic.id)),
       topicEdges: catalog.topicEdges.filter(([a, b]) => ids.has(a) && ids.has(b)) };
   }, [catalog, measuredActivity, focusedId, askPath]);
-  const searchMatches = mapSearch.trim().length >= 2 ? topics.flatMap((topic) => [
+  const searchCandidates = useMemo(() => topics.flatMap((topic) => [
     { id: topic.id, childId: null as string | null, name: topic.name, region: topic.short },
     ...topic.children.map((child) => ({ id: topic.id, childId: child.id, name: child.name, region: topic.short })),
-  ]).filter((item) => item.name.toLowerCase().includes(mapSearch.trim().toLowerCase())).slice(0, 6) : [];
+  ]), [topics]);
+  const searchMatches = useMemo(() => mapSearch.trim().length >= 2
+    ? searchCandidates.filter((item) => item.name.toLowerCase().includes(mapSearch.trim().toLowerCase())).slice(0, 6)
+    : [], [mapSearch, searchCandidates]);
   const archiveRelationships = selectedDay ? null : liveFeed?.knowledgeGraph?.relationships ?? null;
   const focus = getTopic(focusedId, catalog);
+  const shownChildPage = focus ? Math.min(childPage, Math.max(0, Math.ceil(focus.children.length / 24) - 1)) : 0;
   const hover = getTopic(hoveredId, catalog);
   const focusActivity = focus && measuredActivity?.[focus.id];
   const hoverActivity = hover && measuredActivity?.[hover.id];
@@ -85,11 +112,29 @@ export default function Experience() {
     .sort((a, b) => b.count - a.count).slice(0, 3) : [];
   const child = focus?.children.find((item) => item.id === childId);
   const topicKey = focus ? `${focus.id}:${childId ?? ""}` : null;
+  const activeBrowse = browse?.key === topicKey ? browse : null;
+  const loadBrowse = (cursor: string | null = null, previousCursors: (string | null)[] = []) => {
+    if (!topicKey || !focus || selectedDay) return;
+    const key = topicKey;
+    setBrowse((previous) => ({ key, events: previous?.key === key ? previous.events : [], cursor, previousCursors,
+      nextCursor: previous?.key === key ? previous.nextCursor : null, loading: true, error: false }));
+    const params = new URLSearchParams({ regionId: focus.id, browse: "1" });
+    if (childId) params.set("childId", childId);
+    if (cursor) params.set("cursor", cursor);
+    fetch(`/api/topic?${params}`, { cache: "no-store" }).then(async (response) => {
+      if (!response.ok) throw new Error("Topic archive unavailable");
+      return response.json() as Promise<{ events: SignalEvent[]; nextCursor: string | null }>;
+    }).then((page) => setBrowse((previous) => previous?.key === key
+      ? { key, events: page.events, cursor, previousCursors, nextCursor: page.nextCursor, loading: false, error: false }
+      : previous)).catch(() => setBrowse((previous) => previous?.key === key ? { ...previous, loading: false, error: true } : previous));
+  };
   const archiveForFocus = !selectedDay && topicArchive?.key === topicKey ? topicArchive.events : emptySignals;
   const focusedSignals = focus && displayFeed ? selectFocusedSignals(displayFeed.events, archiveForFocus, focus.id) : emptySignals;
+  const childSignals = child && selectedDay && displayFeed
+    ? displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === child.id)) : emptySignals;
   const visibleIds = new Set(displayFeed?.events.map((event) => event.id));
   const archiveExpansion = focusedSignals.some((event) => !visibleIds.has(event.id));
-  const liveForChild = child ? focusedSignals.filter((event) => event.topics.some((match) => match.subtopicId === child.id)).slice(0, 3) : [];
+  const liveForChild = child ? (selectedDay ? childSignals : focusedSignals.filter((event) => event.topics.some((match) => match.subtopicId === child.id))).slice(0, 3) : [];
   const regionSignals = focus && displayFeed ? focusedSignals.slice(0, 3).map((event) => showLive(event, ageReference, sourceLabels)) : [];
   const visibleSignals: DisplaySignal[] = child
     ? liveForChild.length ? liveForChild.map((event) => showLive(event, ageReference, sourceLabels)) : []
@@ -98,7 +143,7 @@ export default function Experience() {
   const nearbySignals = nearbyResult?.id === signalId ? nearbyResult.signals : [];
   const signalMarkers = connectedSignal?.id === signalId && !visibleSignals.some((item) => item.id === signalId)
     ? [...visibleSignals, connectedSignal] : visibleSignals;
-  const chooseTopic = (id: string | null) => { setFocusedId(id); setHoveredId(null); setChildId(null); setSignalId(null); setAskSteps([]); };
+  const chooseTopic = (id: string | null) => { setFocusedId(id); setHoveredId(null); setChildId(null); setSignalId(null); setAskSteps([]); setChildPage(0); setMobileGuideOpen(false); setMobileRegionPage(0); };
   const followNearby = (item: RelatedSignal) => {
     const match = item.topics.find((candidate) => getTopic(candidate.topicId, catalog));
     if (!match) return;
@@ -108,9 +153,11 @@ export default function Experience() {
     setHoveredId(null);
     setSignalId(item.id);
     setAskSteps([]);
+    setMobileGuideOpen(false);
   };
   const followAnswer = (result: AskResult) => { setAskSteps(result.pathSteps); setFocusedId(result.regionIds[0] ?? null); setChildId(result.subtopicId); setSignalId(null); setHoveredId(null); };
   const goBack = () => { if (signalId) setSignalId(null); else if (childId) setChildId(null); else chooseTopic(null); };
+  const returnToNow = () => { setPendingDay(null); setSelectedDay(null); setSignalId(null); setHistoryError(false); setAskOpen(false); setAskSteps([]); setMobileGuideOpen(false); };
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date().toISOString()), 60_000);
@@ -125,11 +172,12 @@ export default function Experience() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") {
       if (askOpen) { setAskOpen(false); setAskSteps([]); askTrigger.current?.focus(); return; }
+      if (mobileGuideOpen) { setMobileGuideOpen(false); mobileGuideTrigger.current?.focus(); return; }
       setSignalId(null); setChildId(null); setFocusedId(null); setAskSteps([]);
     } };
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("keydown", onKey); };
-  }, [askOpen]);
+  }, [askOpen, mobileGuideOpen]);
   useEffect(() => {
     if (!entered) return;
     const controller = new AbortController();
@@ -207,7 +255,7 @@ export default function Experience() {
   }, [entered, selectedDay, signalId]);
 
   return <main className={`experience ${entered ? "experience--entered" : ""}`}>
-    <Universe catalog={overviewCatalog} entered={entered} askOpen={askOpen} focusedId={focusedId} selectedChildId={childId} selectedSignalId={signalId} hoveredId={hoveredId} signalMarkers={signalMarkers.map((item) => ({ id: item.id, source: item.source }))} regionActivity={measuredActivity} regionRelationships={measuredRelationships} archiveRelationships={archiveRelationships} semanticRelationships={displayFeed?.semanticRelationships ?? null} askPathIds={askPath} askSteps={askSteps} onFocus={chooseTopic} onChild={(id) => { setChildId(id); setSignalId(null); }} onSignal={setSignalId} onHover={setHoveredId} reducedMotion={reducedMotion} />
+    <Universe catalog={overviewCatalog} entered={entered} askOpen={askOpen} focusedId={focusedId} selectedChildId={childId} selectedSignalId={signalId} hoveredId={hoveredId} signalMarkers={signalMarkers.map((item) => ({ id: item.id, source: item.source }))} regionActivity={measuredActivity} childCounts={displayFeed?.childCounts ?? emptyCounts} regionRelationships={measuredRelationships} archiveRelationships={archiveRelationships} semanticRelationships={displayFeed?.semanticRelationships ?? null} askPathIds={askPath} askSteps={askSteps} onFocus={chooseTopic} onChild={(id) => { setChildId(id); setSignalId(null); }} onSignal={setSignalId} onHover={setHoveredId} reducedMotion={reducedMotion} />
     <div className="grain" aria-hidden="true" />
     <div className="edge-vignette" aria-hidden="true" />
 
@@ -224,7 +272,7 @@ export default function Experience() {
     </section>
 
     <div className="universe-ui" aria-hidden={!entered} inert={!entered}>
-      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "14-DAY SAMPLE" : displayFeed ? "SAMPLE ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div><div className="topbar-actions">{feedError && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button ref={askTrigger} type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { setAskOpen((open) => !open); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
+      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "14-DAY SAMPLE" : displayFeed ? "SAMPLE ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div>{selectedDay && <button type="button" className="mobile-history-status" onClick={returnToNow}>{shortDay(selectedDay)} <span>NOW ↗</span></button>}<div className="topbar-actions">{feedError && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button ref={askTrigger} type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { setAskOpen((open) => !open); setMobileGuideOpen(false); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
       {askOpen && <AskSymtri key={selectedDay ?? "now"} day={selectedDay} sourceLabels={sourceLabels} onClose={() => { setAskOpen(false); setAskSteps([]); askTrigger.current?.focus(); }} onResult={followAnswer} onNavigate={(id, subtopicId) => { setFocusedId(id); setChildId(subtopicId); setSignalId(null); setHoveredId(null); }} />}
       {!focus && <div className="scene-heading"><p className="eyebrow">{displayFeed ? sampleProvenance : "EXPLORE THE SIGNAL"}</p><h2>A map of what matters.</h2><p>Ideas gather. Connections form. Attention moves.</p>{feedError && !selectedDay && !liveFeed && <p className="feed-error-copy">Live observations could not load. Explore the map or retry the feed.</p>}{displayFeed?.archiveCount ? <p className="archive-total">{displayFeed.archiveCount.toLocaleString()} UNIQUE SIGNALS OBSERVED {selectedDay ? "BY THIS SNAPSHOT" : "SINCE LAUNCH"}</p> : null}{!selectedDay && liveFeed?.lastIngestedAt ? <div className="feed-freshness">LAST INGEST · {ageOf(liveFeed.lastIngestedAt, now).toUpperCase()}</div> : null}{leadingRegion && leadingRegionActivity && leadingRegionActivity.count > 0 && <button type="button" className="scene-leader" onClick={() => chooseTopic(leadingRegion.id)}><span>{displayFeed?.activity ? "MOST ACTIVE · PAST 14 DAYS" : "MOST ACTIVE IN THIS SAMPLE"}</span><strong>{leadingRegion.name}</strong><b aria-hidden="true">↗</b></button>}</div>}
       <div className="breadcrumbs" aria-label="Current location"><button onClick={() => chooseTopic(null)}>UNIVERSE</button>{focus && <><span>/</span><button onClick={() => { setChildId(null); setSignalId(null); }}>{focus.short}</button></>}{child && <><span>/</span><span>{child.name.toUpperCase()}</span></>}</div>
@@ -233,18 +281,55 @@ export default function Experience() {
       {focus && <aside key={signalId ?? childId ?? focusedId} className="detail-panel">
         <div className="panel-top"><span className="eyebrow">{signal ? "SIGNAL / SOURCE" : child ? liveForChild.length ? selectedDay ? "TOPIC / HISTORICAL SIGNALS" : "TOPIC / LIVE SIGNALS" : selectedDay ? "TOPIC / NO HISTORICAL SIGNALS" : "TOPIC / NO OBSERVED SIGNALS" : "REGION / ACTIVE TOPICS"}</span><button className="icon-button" onClick={goBack} aria-label="Go back">↗</button></div>
         <h3>{signal ? signal.title : child ? child.name : focus.name}</h3>
-        {signal ? <div className="signal-detail"><p>{signal.summary}</p><div className="signal-meta"><span>{signal.source}</span><span>{signal.age}</span></div>{signal.live && signal.url ? <a className="read-source" href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span>↗</span></a> : <span className="mock-notice">SOURCE UNAVAILABLE</span>}{!selectedDay && nearbySignals.length > 0 && <div className="nearby-signals"><span>NEARBY IDEAS IN THE ARCHIVE</span>{nearbySignals.map((item) => <button key={item.id} type="button" onClick={() => followNearby(item)}><small>{(sourceLabels[item.source] ?? item.source).toUpperCase()} · {getTopic(item.topics[0]?.topicId, catalog)?.short.toUpperCase() ?? "TECHNOLOGY"}</small><strong>{item.title}</strong><b aria-hidden="true">↗</b></button>)}</div>}</div> : child ? <><p className="panel-description">{liveForChild.length ? `${selectedDay ? "Observed then" : "Recent observations"} about ${child.name.toLowerCase()}.` : selectedDay ? `No sampled signals matched ${child.name.toLowerCase()} on ${shortDay(selectedDay)}.` : `No observed signals yet for ${child.name.toLowerCase()}.`}</p>{visibleSignals.length ? <div className="signal-list">{visibleSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div> : <p className="history-empty" role="status">NO OBSERVED SIGNALS YET</p>}</> : <><p className="panel-description">{focusActivity ? focusedSignals.length ? `Recent research, code, and conversation matched to ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : ""}.` : `No sampled signals matched ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : " recently"}.${selectedDay ? "" : " Explore its topics while the feed updates."}` : focus.description}</p><div className="activity-readout"><span>{focusActivity ? displayFeed?.activity ? "OBSERVED · PAST 14 DAYS" : archiveExpansion ? "MAP SAMPLE · PAST 14 DAYS" : displayFeed?.partial ? sampleProvenance : "OBSERVED SAMPLE · PAST 14 DAYS" : "AWAITING OBSERVATIONS"}</span><strong>{focusActivity ? focusActivity.momentum.toUpperCase() : "PENDING"}</strong><span>{focusActivity ? focusActivity.count : 0} SIGNALS</span></div>{relatedRegions.length > 0 && <div className="related-regions"><span>{archiveRelationships ? "KNOWLEDGE LINKS" : "SHARED SIGNALS WITH"}</span><div>{relatedRegions.map(({ topic, count }) => <button key={topic.id} onClick={() => chooseTopic(topic.id)}>{topic.short} <small>{count}</small> ↗</button>)}</div></div>}{regionSignals.length > 0 && <><div className="panel-section-title">{archiveExpansion ? "RECENT SIGNALS · INCLUDING ARCHIVE" : "RECENT SIGNALS"}</div><div className="signal-list">{regionSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div></>}<div className="panel-section-title">FOLLOW A THREAD <span>{focus.children.length.toString().padStart(2, "0")}</span></div><div className="topic-list">{focus.children.map((item) => <button key={item.id} onClick={() => { setChildId(item.id); setSignalId(null); }}><span>{item.name}</span><small>{displayFeed ? displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === item.id)).length : 0} {displayFeed ? "SEEN" : "PENDING"}</small><b>↗</b></button>)}</div></>}
+        {signal?.live && signal.url && <a className="mobile-read-source" href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span aria-hidden="true">↗</span></a>}
+        {!signal && !selectedDay && liveFeed && (liveFeed.scope === "rolling" || liveFeed.scope === "archive") && <div className="archive-browser">
+          <button type="button" className="archive-browser-toggle" aria-expanded={Boolean(activeBrowse)} onClick={() => activeBrowse ? setBrowse(null) : loadBrowse()}>
+            {activeBrowse ? "HIDE ARCHIVE" : "BROWSE ALL SOURCES"} <span aria-hidden="true">↗</span>
+          </button>
+          {activeBrowse && <div className="archive-browser-results" aria-busy={activeBrowse.loading}>
+            {activeBrowse.events.map((event) => <button key={event.id} type="button" onClick={() => {
+              setConnectedSignal(showLive(event, ageReference, sourceLabels)); setSignalId(event.id);
+            }}><small>{sourceName(event.source, event.url, sourceLabels).toUpperCase()} · {shortDay(event.publishedAt.slice(0, 10))}</small><strong>{event.title}</strong></button>)}
+            {!activeBrowse.loading && !activeBrowse.events.length && !activeBrowse.error && <p>No sources found for this point.</p>}
+            {activeBrowse.error && <p role="status">Archive unavailable. <button type="button" onClick={() => loadBrowse(activeBrowse.cursor, activeBrowse.previousCursors)}>Retry</button></p>}
+            {activeBrowse.loading && <p role="status">Loading sources…</p>}
+            {!activeBrowse.loading && (activeBrowse.previousCursors.length > 0 || activeBrowse.nextCursor) && <div className="thread-pages">
+              <button type="button" disabled={!activeBrowse.previousCursors.length} onClick={() => loadBrowse(activeBrowse.previousCursors.at(-1) ?? null, activeBrowse.previousCursors.slice(0, -1))}>PREVIOUS</button>
+              <span>PAGE {activeBrowse.previousCursors.length + 1}</span>
+              <button type="button" disabled={!activeBrowse.nextCursor} onClick={() => loadBrowse(activeBrowse.nextCursor, [...activeBrowse.previousCursors, activeBrowse.cursor])}>NEXT</button>
+            </div>}
+          </div>}
+        </div>}
+        {signal ? <div className="signal-detail"><p>{signal.summary}</p><div className="signal-meta"><span>{signal.source}</span><span>{signal.age}</span></div>{signal.live && signal.url ? <a className="read-source" href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span>↗</span></a> : <span className="mock-notice">SOURCE UNAVAILABLE</span>}{!selectedDay && nearbySignals.length > 0 && <div className="nearby-signals"><span>NEARBY IDEAS IN THE ARCHIVE</span>{nearbySignals.map((item) => <button key={item.id} type="button" onClick={() => followNearby(item)}><small>{(sourceLabels[item.source] ?? item.source).toUpperCase()} · {getTopic(item.topics[0]?.topicId, catalog)?.short.toUpperCase() ?? "TECHNOLOGY"}</small><strong>{item.title}</strong><b aria-hidden="true">↗</b></button>)}</div>}</div> : child ? <><p className="panel-description">{liveForChild.length ? `${selectedDay ? "Observed then" : "Recent observations"} about ${child.name.toLowerCase()}.` : selectedDay ? `No sampled signals matched ${child.name.toLowerCase()} on ${shortDay(selectedDay)}.` : `No observed signals yet for ${child.name.toLowerCase()}.`}</p>{visibleSignals.length ? <div className="signal-list">{visibleSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div> : <p className="history-empty" role="status">NO OBSERVED SIGNALS YET</p>}</> : <><p className="panel-description">{focusActivity ? focusedSignals.length ? `Recent research, code, and conversation matched to ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : ""}.` : `No sampled signals matched ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : " recently"}.${selectedDay ? "" : " Explore its topics while the feed updates."}` : focus.description}</p><div className="activity-readout"><span>{focusActivity ? displayFeed?.activity ? "OBSERVED · PAST 14 DAYS" : archiveExpansion ? "MAP SAMPLE · PAST 14 DAYS" : displayFeed?.partial ? sampleProvenance : "OBSERVED SAMPLE · PAST 14 DAYS" : "AWAITING OBSERVATIONS"}</span><strong>{focusActivity ? focusActivity.momentum.toUpperCase() : "PENDING"}</strong><span>{focusActivity ? focusActivity.count : 0} SIGNALS</span></div>{relatedRegions.length > 0 && <div className="related-regions"><span>{archiveRelationships ? "KNOWLEDGE LINKS" : "SHARED SIGNALS WITH"}</span><div>{relatedRegions.map(({ topic, count }) => <button key={topic.id} onClick={() => chooseTopic(topic.id)}>{topic.short} <small>{count}</small> ↗</button>)}</div></div>}{regionSignals.length > 0 && <><div className="panel-section-title">{archiveExpansion ? "RECENT SIGNALS · INCLUDING ARCHIVE" : "RECENT SIGNALS"}</div><div className="signal-list">{regionSignals.map((item) => <button key={item.id} onClick={() => setSignalId(item.id)}><span>{item.source.toUpperCase()} · {item.age.toUpperCase()}</span><strong>{item.title}</strong><span className="signal-list-arrow">↗</span></button>)}</div></>}<div className="panel-section-title">FOLLOW A THREAD <span>{focus.children.length.toString().padStart(2, "0")}</span></div><div className="topic-list">{focus.children.slice(shownChildPage * 24, shownChildPage * 24 + 24).map((item) => <button key={item.id} onClick={() => { setChildId(item.id); setSignalId(null); }}><span>{item.name}</span><small>{displayFeed ? !selectedDay && displayFeed.childCounts ? displayFeed.childCounts[item.id] ?? 0 : displayFeed.events.filter((event) => event.topics.some((match) => match.subtopicId === item.id)).length : 0} {displayFeed ? selectedDay ? "IN SNAPSHOT" : displayFeed.childCounts ? "IN 14 DAYS" : "IN SAMPLE" : "PENDING"}</small><b>↗</b></button>)}</div>{focus.children.length > 24 && <div className="thread-pages"><button type="button" disabled={shownChildPage === 0} onClick={() => setChildPage(shownChildPage - 1)}>PREVIOUS</button><span>{shownChildPage + 1} / {Math.ceil(focus.children.length / 24)}</span><button type="button" disabled={(shownChildPage + 1) * 24 >= focus.children.length} onClick={() => setChildPage(shownChildPage + 1)}>NEXT</button></div>}</>}
       </aside>}
       {historyDays.length > 1 && <div className={`history-timeline ${focus ? "history-timeline--focused" : ""}`} role="group" aria-label="Explore historical snapshots" aria-busy={Boolean(pendingDay)}>
         <span className="history-caption" role="status">{pendingDay ? `LOADING ${shortDay(pendingDay)}` : historyError ? "ARCHIVE UNAVAILABLE" : selectedDay ? `VIEWING ${shortDay(selectedDay)}` : "MOVE THROUGH TIME"}</span>
         <div className="history-track">
           <span>{shortDay(historyDays[historyDays.length - 1].day)}</span>
           {[...historyDays].reverse().map((item) => <button key={item.day} type="button" title={`${shortDay(item.day)} · ${item.archiveCount ? `${item.archiveCount} unique signals observed` : `${item.eventCount} sampled signals`}`} aria-label={`View ${shortDay(item.day)} snapshot${item.archiveCount ? ` with ${item.archiveCount} unique signals observed` : ""}`} aria-pressed={selectedDay === item.day} className={selectedDay === item.day ? "history-day history-day--active" : "history-day"} onClick={() => { setPendingDay(item.day); setHistoryError(false); }} />)}
-          <button type="button" className={`history-now ${selectedDay ? "" : "history-now--active"}`} aria-pressed={!selectedDay} onClick={() => { setPendingDay(null); setSelectedDay(null); setSignalId(null); setHistoryError(false); setAskOpen(false); setAskSteps([]); }}>NOW</button>
+          <button type="button" className={`history-now ${selectedDay ? "" : "history-now--active"}`} aria-pressed={!selectedDay} onClick={returnToNow}>NOW</button>
         </div>
       </div>}
-      {!focus && <div className="explore-strip"><span className="explore-index">01 — {String(overviewCatalog.topics.length).padStart(2, "0")}</span><span>CHOOSE A REGION TO FOLLOW ITS SIGNALS</span><div className="region-dots">{overviewCatalog.topics.map((topic) => <button key={topic.id} type="button" aria-label={`Explore ${topic.name}`} title={topic.name} style={{ background: topic.color }} onClick={() => chooseTopic(topic.id)} />)}</div><select className="mobile-region-select" aria-label="Choose a region" value="" onChange={(event) => chooseTopic(event.target.value)}><option value="" disabled>CHOOSE A REGION</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></div>}
+      {!focus && <div className="explore-strip"><span className="explore-index">01 — {String(overviewCatalog.topics.length).padStart(2, "0")}</span><span>CHOOSE A REGION TO FOLLOW ITS SIGNALS</span><div className="region-dots">{overviewCatalog.topics.map((topic) => <button key={topic.id} type="button" aria-label={`Explore ${topic.name}`} title={topic.name} style={{ background: topic.color }} onClick={() => chooseTopic(topic.id)} />)}</div><select className="mobile-region-select" aria-label="Choose a region" value="" onChange={(event) => chooseTopic(event.target.value)}><option value="" disabled>CHOOSE A REGION</option>{overviewCatalog.topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></div>}
       {!focus && <div className="map-search"><label htmlFor="map-point-search">FIND A POINT</label><input id="map-point-search" value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="Search the growing map" autoComplete="off" />{searchMatches.length > 0 && <div className="map-search-results">{searchMatches.map((item) => <button key={item.childId ?? item.id} type="button" onClick={() => { chooseTopic(item.id); setChildId(item.childId); setMapSearch(""); }}>{item.name}<small>{item.region}</small></button>)}</div>}</div>}
+      {!focus && !askOpen && <section className={`mobile-guide ${mobileGuideOpen ? "mobile-guide--open" : ""}`} aria-label="Discover the universe">
+        <div className="mobile-guide-peek">
+          <button ref={mobileGuideTrigger} className="mobile-guide-toggle" type="button" aria-expanded={mobileGuideOpen} onClick={() => setMobileGuideOpen((open) => !open)}>
+            <span>{selectedDay ? `FIELD GUIDE · ${shortDay(selectedDay)}` : "FIELD GUIDE · NOW"}</span>
+            <strong>{leadingRegion && leadingRegionActivity?.count ? leadingRegion.name : "Explore the living map"}</strong>
+            <small>{mobileLatest[0] ? mobileLatest[0].title : displayFeed ? "Choose a region to follow its signals." : "Connecting to live sources…"}</small>
+            <b>{mobileGuideOpen ? "CLOSE ↑" : "DISCOVER ↓"}</b>
+          </button>
+          <button className="mobile-guide-ask" type="button" onClick={() => { setMobileGuideOpen(false); setAskOpen(true); }}>ASK<br />SYMTRI <span>↗</span></button>
+        </div>
+        {mobileGuideOpen && <div className="mobile-guide-content" id="mobile-guide-content">
+          <div className="mobile-guide-search"><label htmlFor="mobile-map-search">Find a subject or region</label><input id="mobile-map-search" type="search" value={mapSearch} onChange={(event) => setMapSearch(event.target.value)} placeholder="Try fusion, robotics, security…" autoComplete="off" />{searchMatches.length > 0 && <div className="mobile-guide-search-results">{searchMatches.map((item) => <button key={item.childId ?? item.id} type="button" onClick={() => { chooseTopic(item.id); setChildId(item.childId); setMapSearch(""); }}>{item.name}<small>{item.region}</small></button>)}</div>}</div>
+          {historyDays.length > 1 && <div className="mobile-guide-time"><h3>Through time</h3><div>{[...historyDays].reverse().map((item) => <button key={item.day} type="button" aria-pressed={selectedDay === item.day} onClick={() => { setPendingDay(item.day); setMobileGuideOpen(false); }}>{shortDay(item.day)}</button>)}<button type="button" aria-pressed={!selectedDay} onClick={returnToNow}>NOW</button></div></div>}
+          <div className="mobile-guide-shortcuts" aria-label="Leading regions">{rankedRegions.slice(0, 3).map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.short}</strong><small>{measuredActivity?.[topic.id]?.count ?? 0} seen</small></button>)}</div>
+          <div className="mobile-guide-stories"><h3>From the sources</h3>{mobileLatest.length ? mobileLatest.map((event) => <button key={event.id} type="button" onClick={() => followNearby(event)}><span>{(sourceLabels[event.source] ?? event.source).toUpperCase()} · {event.source === "openalex" ? shortDay(event.publishedAt.slice(0, 10)) : ageOf(event.publishedAt, ageReference).toUpperCase()}</span><strong>{event.title}</strong><b aria-hidden="true">↗</b></button>) : <p>Fresh signals will appear here as the sources connect.</p>}</div>
+          <div className="mobile-guide-regions"><h3>More regions</h3><div>{rankedRegions.slice(3 + shownMobileRegionPage * 12, 3 + (shownMobileRegionPage + 1) * 12).map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.name}</strong><small>{measuredActivity?.[topic.id]?.count ?? 0} {displayFeed?.activity ? "signals" : "in sample"}</small></button>)}</div>{rankedRegions.length > 15 && <div className="thread-pages"><button type="button" disabled={shownMobileRegionPage === 0} onClick={() => setMobileRegionPage(shownMobileRegionPage - 1)}>PREVIOUS</button><span>{shownMobileRegionPage + 1} / {Math.ceil((rankedRegions.length - 3) / 12)}</span><button type="button" disabled={3 + (shownMobileRegionPage + 1) * 12 >= rankedRegions.length} onClick={() => setMobileRegionPage(shownMobileRegionPage + 1)}>NEXT</button></div>}</div>
+        </div>}
+      </section>}
       <div className="controls-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM <span>·</span> CLICK TO EXPLORE</div>
       <div className="side-coordinate">SYMTRI / FIELD NOTES / 001</div>
     </div>

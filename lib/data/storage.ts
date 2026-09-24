@@ -228,8 +228,11 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
       select event.id, event.source, event.external_id, event.title, event.url, event.summary,
         event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version,
         row_number() over (partition by event.source order by event.published_at desc, event.first_seen_at desc) as source_rank
-      from signal_events as event join source_catalog as source on source.id = event.source and source.status = 'active'
+      from signal_events as event
       where event.published_at >= now() - interval '14 days' and jsonb_array_length(event.topics) > 0
+        and exists (select 1 from signal_observations as observation
+          join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+          where observation.signal_id = event.id)
     ), chosen as (
       select * from ranked
       order by case when source_rank <= case when source like 'feed-%' then 6 else 12 end then 0 else 1 end,
@@ -250,6 +253,34 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
   return { observedAt: new Date().toISOString(), events, sources, partial: true, scope: "archive" };
 }
 
+export async function persistCurrentFeed(feed: SignalFeed): Promise<void> {
+  const sql = database();
+  await sql`insert into current_feed (id, feed, updated_at)
+    values ('current', ${sql.json({ ...feed, classifierVersion: CLASSIFIER_VERSION })}::jsonb, now())
+    on conflict (id) do update set feed = excluded.feed, updated_at = excluded.updated_at`;
+}
+
+export async function getPersistedCurrentFeed(): Promise<SignalFeed | null> {
+  const rows = await database()<{ feed: SignalFeed }[]>`select feed from current_feed where id = 'current'`;
+  return rows[0]?.feed?.classifierVersion === CLASSIFIER_VERSION ? rows[0].feed : null;
+}
+
+export async function getArchiveChildCounts(at = new Date()): Promise<Record<string, number>> {
+  const rows = await database()<{ child_id: string; signals: number }[]>`
+    select match.value->>'subtopicId' as child_id, count(distinct event.id)::int as signals
+    from signal_events as event
+    cross join lateral jsonb_array_elements(event.topics) as match(value)
+    where event.published_at >= ${at.toISOString()}::timestamptz - interval '14 days'
+      and event.published_at <= ${at.toISOString()}::timestamptz + interval '1 hour'
+      and event.first_seen_at <= ${new Date(at.getTime() + 10 * 60 * 1000).toISOString()}::timestamptz
+      and match.value->>'subtopicId' is not null
+      and exists (select 1 from signal_observations as observation
+        join source_catalog as source on source.id = observation.source and source.status = 'active'
+        where observation.signal_id = event.id)
+    group by match.value->>'subtopicId'`;
+  return Object.fromEntries(rows.map((row) => [row.child_id, Number(row.signals)]));
+}
+
 export async function getRecentTopicEvents(references: { id: string; childId: string | null }[]): Promise<SignalEvent[]> {
   const sql = database();
   const found = new Map<string, SignalEvent>();
@@ -262,7 +293,9 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
         select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
         from signal_events
         where published_at >= now() - interval '14 days'
-          and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
+          and exists (select 1 from signal_observations as observation
+            join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+            where observation.signal_id = signal_events.id)
           and topics @> ${sql.json([filter])}::jsonb
         order by published_at desc limit 40
       `;
@@ -281,9 +314,56 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
   return [...found.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }
 
+type TopicPageCursor = { publishedAt: string; id: string };
+export type TopicPage = { events: SignalEvent[]; nextCursor: string | null };
+
+function parseTopicCursor(value: string | null): TopicPageCursor | null {
+  if (!value) return null;
+  try {
+    if (value.length > 600) return null;
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as TopicPageCursor;
+    if (typeof parsed.id !== "string" || !parsed.id || parsed.id.length > 300 ||
+      typeof parsed.publishedAt !== "string" || !Number.isFinite(Date.parse(parsed.publishedAt))) return null;
+    return parsed;
+  } catch { return null; }
+}
+
+export async function getTopicPage(topicId: string, childId: string | null, cursor: string | null, limit = 20): Promise<TopicPage> {
+  const position = parseTopicCursor(cursor);
+  if (cursor && !position) throw new Error("Invalid topic cursor");
+  const size = Math.max(1, Math.min(40, Math.floor(limit)));
+  const sql = database();
+  const filter = childId ? { topicId, subtopicId: childId } : { topicId };
+  const rows = await sql`
+    select event.id, event.source, event.external_id, event.title, event.url, event.summary,
+      event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version
+    from signal_events as event
+    where event.topics @> ${sql.json([filter])}::jsonb
+      and jsonb_array_length(event.topics) > 0
+      and (${position?.publishedAt ?? null}::timestamptz is null or
+        (event.published_at, event.id) < (${position?.publishedAt ?? null}::timestamptz, ${position?.id ?? null}::text))
+      and exists (select 1 from signal_observations as observation
+        join source_catalog as source on source.id = observation.source and source.status = 'active'
+        where observation.signal_id = event.id)
+    order by event.published_at desc, event.id desc limit ${size + 1}`;
+  const pageRows = rows.slice(0, size);
+  const events: SignalEvent[] = pageRows.map((row) => ({
+    id: row.id, source: row.source, externalId: row.external_id,
+    title: row.title, url: row.url, summary: row.summary,
+    publishedAt: new Date(row.published_at).toISOString(), importance: row.importance,
+    topics: currentTopics(row),
+  })).filter((event) => event.topics.some((match) => match.topicId === topicId && (!childId || match.subtopicId === childId)));
+  const last = pageRows.at(-1);
+  const nextCursor = rows.length > size && last
+    ? Buffer.from(JSON.stringify({ publishedAt: new Date(last.published_at).toISOString(), id: last.id })).toString("base64url") : null;
+  return { events, nextCursor };
+}
+
 export async function getArchiveCount(): Promise<number> {
   const rows = await database()`select count(*)::int as count from signal_events
-    where exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')`;
+    where exists (select 1 from signal_observations as observation
+      join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+      where observation.signal_id = signal_events.id)`;
   return Number(rows[0].count);
 }
 
@@ -291,7 +371,9 @@ async function getArchiveCountAt(capturedAt: Date): Promise<number> {
   // A snapshot is captured before its source rows finish persisting.
   const rows = await database()`select count(*)::int as count from signal_events
     where first_seen_at <= ${capturedAt.toISOString()}::timestamptz + interval '5 minutes'
-      and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')`;
+      and exists (select 1 from signal_observations as observation
+        join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+        where observation.signal_id = signal_events.id)`;
   return Number(rows[0].count);
 }
 
@@ -308,11 +390,14 @@ export async function getArchiveActivity(at = new Date(), catalog: UniverseCatal
       select event.id, event.published_at, event.importance,
         match.value->>'topicId' as topic_id,
         max(greatest(0, least(1, (match.value->>'relevance')::double precision))) as relevance
-      from signal_events as event join source_catalog as catalog_source on catalog_source.id = event.source and catalog_source.status = 'active'
+      from signal_events as event
       cross join lateral jsonb_array_elements(event.topics) as match(value)
       where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
         and ${at.toISOString()}::timestamptz + interval '1 hour'
         and event.first_seen_at <= ${new Date(at.getTime() + 10 * 60 * 1000).toISOString()}::timestamptz
+        and exists (select 1 from signal_observations as observation
+          join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+          where observation.signal_id = event.id)
         and match.value ? 'topicId'
       group by event.id, event.published_at, event.importance, match.value->>'topicId'
     ), weighted as (
@@ -336,11 +421,14 @@ export async function getArchiveRelationships(at = new Date(), catalog: Universe
   const rows = await sql<{ first_id: string; second_id: string; signals: number }[]>`
     with matches as (
       select distinct event.id, match.value->>'topicId' as topic_id
-      from signal_events as event join source_catalog as catalog_source on catalog_source.id = event.source and catalog_source.status = 'active'
+      from signal_events as event
       cross join lateral jsonb_array_elements(event.topics) as match(value)
       where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
         and ${at.toISOString()}::timestamptz + interval '1 hour'
         and event.first_seen_at <= ${new Date(at.getTime() + 10 * 60 * 1000).toISOString()}::timestamptz
+        and exists (select 1 from signal_observations as observation
+          join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+          where observation.signal_id = event.id)
         and match.value ? 'topicId'
         and match.value->>'topicId' in ${sql(catalog.topics.map((topic) => topic.id))}
     )
@@ -361,22 +449,55 @@ export async function countNewSignalsForRun(runId: string): Promise<number> {
   return Number(rows[0].count);
 }
 
-export async function rebuildKnowledgeGraph(recentRelationships?: RegionRelationships): Promise<void> {
+export async function rebuildKnowledgeGraph(recentRelationships?: RegionRelationships): Promise<number> {
   const recent = recentRelationships ?? await getArchiveRelationships();
   const sql = database();
+  const dirty = await sql<{ day: Date }[]>`select day from knowledge_graph_dirty_days order by day desc limit 30`;
+  for (const row of dirty) await sql.begin(async (tx) => {
+    const day = row.day.toISOString().slice(0, 10);
+    const locked = await tx`select day from knowledge_graph_dirty_days where day = ${day}::date for update`;
+    if (!locked.length) return;
+    await tx`
+      with matches as (
+        select distinct event.id, match.value->>'topicId' as topic_id
+        from signal_events as event
+        cross join lateral jsonb_array_elements(event.topics) as match(value)
+        where event.published_at >= (${day}::date::timestamp at time zone 'UTC')
+          and event.published_at < ((${day}::date + 1)::timestamp at time zone 'UTC')
+          and match.value ? 'topicId'
+          and exists (select 1 from signal_observations as observation
+            join source_catalog as source on source.id = observation.source and source.status = 'active'
+            where observation.signal_id = event.id)
+      ), region_totals as (
+        select topic_id, count(*)::int as signals from matches group by topic_id
+      ), link_totals as (
+        select first.topic_id || ':' || second.topic_id as link, count(*)::int as signals
+        from matches as first join matches as second
+          on first.id = second.id and first.topic_id < second.topic_id
+        group by first.topic_id, second.topic_id
+      )
+      insert into knowledge_graph_days (day, region_counts, relationships, updated_at)
+      select ${day}::date,
+        coalesce((select jsonb_object_agg(topic_id, signals) from region_totals), '{}'::jsonb),
+        coalesce((select jsonb_object_agg(link, signals) from link_totals), '{}'::jsonb), now()
+      on conflict (day) do update set region_counts = excluded.region_counts,
+        relationships = excluded.relationships, updated_at = excluded.updated_at`;
+    await tx`delete from knowledge_graph_dirty_days where day = ${day}::date`;
+  });
+  const pending = await sql`select exists(select 1 from knowledge_graph_dirty_days) as pending`;
+  if (pending[0].pending) {
+    await sql`update knowledge_graph set recent_relationships = ${sql.json(recent)}::jsonb where id = 'current'`;
+    return dirty.length;
+  }
   await sql`
-    with matches as (
-      select distinct event.id, match.value->>'topicId' as topic_id
-      from signal_events as event join source_catalog as catalog_source on catalog_source.id = event.source and catalog_source.status = 'active'
-      cross join lateral jsonb_array_elements(event.topics) as match(value)
-      where match.value ? 'topicId'
-    ), region_totals as (
-      select topic_id, count(*)::int as signals from matches group by topic_id
+    with region_totals as (
+      select key as topic_id, sum(value::int)::int as signals
+      from knowledge_graph_days cross join lateral jsonb_each_text(region_counts)
+      group by key
     ), link_totals as (
-      select first.topic_id || ':' || second.topic_id as link, count(*)::int as signals
-      from matches as first join matches as second
-        on first.id = second.id and first.topic_id < second.topic_id
-      group by first.topic_id, second.topic_id
+      select key as link, sum(value::int)::int as signals
+      from knowledge_graph_days cross join lateral jsonb_each_text(relationships)
+      group by key
     )
     insert into knowledge_graph (id, updated_at, region_counts, relationships, recent_relationships)
     select 'current', now(),
@@ -387,10 +508,12 @@ export async function rebuildKnowledgeGraph(recentRelationships?: RegionRelation
       region_counts = excluded.region_counts, relationships = excluded.relationships,
       recent_relationships = excluded.recent_relationships
   `;
+  return dirty.length;
 }
 
 export async function getKnowledgeGraph(): Promise<SignalFeed["knowledgeGraph"] | null> {
-  const rows = await database()`select updated_at, region_counts, relationships, recent_relationships from knowledge_graph where id = 'current'`;
+  const rows = await database()`select updated_at, region_counts, relationships, recent_relationships
+    from knowledge_graph where id = 'current' and not exists (select 1 from knowledge_graph_dirty_days)`;
   if (!rows.length) return null;
   return { updatedAt: new Date(rows[0].updated_at).toISOString(), regionCounts: rows[0].region_counts,
     relationships: rows[0].relationships,
@@ -452,6 +575,8 @@ export type IngestionResult = {
   embedded?: number;
   embeddingStatus?: string;
   activity?: Record<string, RegionActivity>;
+  archiveCount?: number;
+  childCounts?: Record<string, number>;
   error?: string;
 };
 
@@ -463,7 +588,10 @@ export async function finishIngestionRun(runId: string, result: IngestionResult)
       fetched_count = ${result.fetched ?? 0}, mapped_count = ${result.mapped ?? 0},
       new_count = ${result.added ?? 0}, embedded_count = ${result.embedded ?? 0},
       embedding_status = ${result.embeddingStatus ?? "unavailable"},
-      activity = ${sql.json(result.activity ?? {})}::jsonb, error = ${result.error ?? null}
+      activity = ${sql.json(result.activity ?? {})}::jsonb,
+      archive_count = ${result.archiveCount ?? null},
+      child_counts = ${sql.json(result.childCounts ?? {})}::jsonb,
+      error = ${result.error ?? null}
     where id = ${runId}
   `;
 }
@@ -526,14 +654,18 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
         from signal_events cross join request
         where to_tsvector('english', title || ' ' || summary) @@ request.terms
-          and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
+          and exists (select 1 from signal_observations as observation join source_catalog as active_source
+            on active_source.id = observation.source and active_source.status = 'active'
+            where observation.signal_id = signal_events.id)
         order by rank desc, published_at desc limit 30
       ), recent as (
         select id, source, external_id, title, url, summary, published_at, importance, topics,
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
         from signal_events cross join request
         where to_tsvector('english', title || ' ' || summary) @@ request.terms
-          and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
+          and exists (select 1 from signal_observations as observation join source_catalog as active_source
+            on active_source.id = observation.source and active_source.status = 'active'
+            where observation.signal_id = signal_events.id)
         order by published_at desc limit 30
       )
       select distinct on (id) * from (select * from ranked union all select * from recent) as candidates
@@ -544,7 +676,9 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
         1 - (embedding <=> ${literal}::vector(256)) as similarity
       from signal_events
       where embedding is not null and embedding_model = ${embeddingModelId()}
-        and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
+        and exists (select 1 from signal_observations as observation join source_catalog as active_source
+          on active_source.id = observation.source and active_source.status = 'active'
+          where observation.signal_id = signal_events.id)
       order by embedding <=> ${literal}::vector(256) limit 30
     ` : [];
   const scores = new Map<string, { row: (typeof lexical)[number]; score: number; similarity: number | null }>();
@@ -575,7 +709,9 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
     select embedding::text as vector, topics, title
     from signal_events
     where id = ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
-      and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
+      and exists (select 1 from signal_observations as observation join source_catalog as active_source
+        on active_source.id = observation.source and active_source.status = 'active'
+        where observation.signal_id = signal_events.id)
     limit 1
   `;
   if (!origin.length) return [];
@@ -586,7 +722,9 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
     from signal_events
     where id <> ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
       and jsonb_array_length(topics) > 0
-      and exists (select 1 from source_catalog where source_catalog.id = signal_events.source and source_catalog.status = 'active')
+      and exists (select 1 from signal_observations as observation join source_catalog as active_source
+        on active_source.id = observation.source and active_source.status = 'active'
+        where observation.signal_id = signal_events.id)
     order by embedding <=> ${origin[0].vector}::vector(256)
     limit 24
   `;

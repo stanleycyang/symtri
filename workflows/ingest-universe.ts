@@ -2,7 +2,7 @@ import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
-import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveCount, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { catalogMatches, getUniverseCatalog, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
@@ -34,7 +34,7 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
   return feed;
 }
 
-async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]> }> {
+async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]>; archiveCount: number; childCounts: Record<string, number> }> {
   "use step";
   await seedUniverseCatalog();
   await persistSignals(feed);
@@ -47,6 +47,7 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   await syncArchiveConcepts();
   const catalog = await getUniverseCatalog();
   const activity = await getArchiveActivity(new Date(feed.observedAt), catalog);
+  const childCounts = await getArchiveChildCounts(new Date(feed.observedAt));
   const relationships = await getArchiveRelationships(new Date(feed.observedAt), catalog);
   const archiveCount = await getArchiveCount();
   const mapped = selectFeedEvents(feed.events.map((event) => ({ ...event, topics: catalogMatches(event, catalog) })), 300);
@@ -54,7 +55,9 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships, catalog });
   await backfillSnapshotMetadata();
   await rebuildKnowledgeGraph(relationships);
-  return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity };
+  await persistCurrentFeed({ ...snapshot, observedAt: feed.observedAt, archiveCount, activity, childCounts,
+    catalog, sources: feed.sources, partial: feed.partial });
+  return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity, archiveCount, childCounts };
 }
 
 async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: string; hasMore: boolean }> {
@@ -98,7 +101,8 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
     result = {
       status: feed.partial || embedding.embeddingStatus !== "ok" ? "partial" : "complete",
       sources: feed.sources, fetched: feed.events.length, mapped: stored.mapped,
-      added: stored.added, activity: stored.activity, ...embedding,
+      added: stored.added, activity: stored.activity, archiveCount: stored.archiveCount,
+      childCounts: stored.childCounts, ...embedding,
     };
   } catch (error) {
     result = { status: "failed", error: error instanceof Error ? error.message.slice(0, 200) : "unknown error" };

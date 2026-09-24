@@ -22,11 +22,17 @@ export async function seedUniverseCatalog(): Promise<void> {
 
 export function catalogFromRows(rows: ConceptRow[], revision: number, sourceLabels: Record<string, string>): UniverseCatalog {
   const roots = rows.filter((row) => !row.parent_id && row.status === "public");
+  const children = new Map<string, ConceptRow[]>();
+  for (const row of rows) if (row.parent_id && row.status === "public") {
+    const siblings = children.get(row.parent_id) ?? [];
+    siblings.push(row);
+    children.set(row.parent_id, siblings);
+  }
   const topics: Topic[] = roots.map((row) => ({
     id: row.id, name: row.name, short: row.short,
     description: `Explore recent observations about ${row.name.toLowerCase()}.`,
     position: row.position, color: row.color, activity: 30, change: 0, signals: 0,
-    children: rows.filter((child) => child.parent_id === row.id && child.status === "public")
+    children: (children.get(row.id) ?? [])
       .map((child) => ({ id: child.id, name: child.name, position: child.position, activity: 30, signals: 0 })),
   }));
   const known = new Set(topics.map((topic) => topic.id));
@@ -40,6 +46,7 @@ export async function recordCatalogRevision(): Promise<number> {
   const sources = await sql<{ id: string; name: string }[]>`select id, name from source_catalog where status = 'active' order by id`;
   const catalog = catalogFromRows(rows, 0, Object.fromEntries(sources.map((row) => [row.id, row.name])));
   const saved = await sql<{ id: number }[]>`insert into catalog_revisions (catalog) values (${sql.json(catalog)}::jsonb) returning id`;
+  await sql`delete from current_feed where id = 'current'`;
   return Number(saved[0].id);
 }
 
@@ -91,7 +98,8 @@ export function catalogMatches(event: SignalEvent, catalog: UniverseCatalog): To
   for (const topic of catalog.topics) {
     const organicRoot = topic.id.startsWith("organic-");
     const root = [topic.name.toLowerCase(), topic.id.replaceAll("-", " ")];
-    const rootMatch = organicRoot && root.some((alias) => alias.length >= 4 && new RegExp(`(^|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`, "i").test(text));
+    const rootMatch = organicRoot && root.some((alias) => alias.length >= 4 && text.includes(alias) &&
+      new RegExp(`(^|[^a-z0-9])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`, "i").test(text));
     const child = topic.children.find((item) => item.id.startsWith("organic-") && item.name.length >= 5 && text.includes(item.name.toLowerCase()));
     if (!rootMatch && !child) continue;
     const existing = matches.get(topic.id);
@@ -115,7 +123,11 @@ export async function getGrowthStatus() {
     count(*) filter (where status = 'inactive')::int as inactive_points
     from concept_catalog`;
   const candidates = await sql`select count(*)::int as count from concept_candidates where status = 'candidate'`;
+  const revision = await sql`select id from catalog_revisions order by id desc limit 1`;
+  const stale = await sql`select count(*)::int as count from signal_events where catalog_revision < ${Number(revision[0]?.id ?? 0)}`;
+  const graph = await sql`select count(*)::int as count from knowledge_graph_dirty_days`;
   const sources = await sql`select status, count(*)::int as count from source_catalog group by status`;
   return { ...concepts[0], candidates: Number(candidates[0].count),
+    catalogBacklog: Number(stale[0].count), graphDirtyDays: Number(graph[0].count),
     sources: Object.fromEntries(sources.map((row) => [row.status, Number(row.count)])) };
 }

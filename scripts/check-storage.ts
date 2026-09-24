@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveRelationships, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -96,6 +96,8 @@ async function main() {
   await sql.unsafe(organicMigration);
   const seedCatalogMigration = await readFile(new URL("../supabase/migrations/20260924017000_seed_catalog.sql", import.meta.url), "utf8");
   await sql.unsafe(seedCatalogMigration);
+  const growthScalingMigration = await readFile(new URL("../supabase/migrations/20260924018000_growth_scaling.sql", import.meta.url), "utf8");
+  await sql.unsafe(growthScalingMigration);
   assert.equal((await sql`select count(*)::int as count from concept_catalog`)[0].count, 76);
   await seedUniverseCatalog();
   assert.equal((await getUniverseCatalog()).topics.length, 10);
@@ -111,9 +113,10 @@ async function main() {
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
-      'concept_catalog', 'concept_candidates', 'concept_candidate_evidence', 'signal_concepts', 'catalog_revisions', 'source_catalog', 'source_trial_items', 'source_probes')
+      'concept_catalog', 'concept_candidates', 'concept_candidate_evidence', 'signal_concepts', 'catalog_revisions', 'source_catalog', 'source_trial_items', 'source_probes',
+      'current_feed', 'knowledge_graph_days', 'knowledge_graph_dirty_days')
   `;
-  assert.equal(protectedTables.length, 15);
+  assert.equal(protectedTables.length, 18);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
@@ -162,6 +165,37 @@ async function main() {
     await sql`delete from signal_events where source = ${trialSourceId}`;
     await sql`delete from source_catalog where id = ${trialSourceId}`;
     await recordCatalogRevision();
+    const rotationPrefix = `feed-rotation-${externalId}`;
+    const rotationRows = Array.from({ length: 60 }, (_, index) => ({
+      id: `${rotationPrefix}-${index}`, name: `Dormant feed ${index}`, feed_url: `https://rotation.example/${index}.xml`,
+    }));
+    await sql`insert into source_catalog (id, name, kind, feed_url, status, promoted_at, last_checked_at)
+      select id, name, 'rss', feed_url, 'active', now() - interval '40 days', now()
+      from jsonb_to_recordset(${sql.json(rotationRows)}::jsonb) as incoming(id text, name text, feed_url text)`;
+    await sql`update source_catalog set last_checked_at = now() - interval '7 hours' where id like ${`${rotationPrefix}%`}`;
+    const firstFeedTurn = await fetchActiveFeeds(new Date(), async () => [event]);
+    assert.equal(firstFeedTurn.events.length, 10);
+    assert.equal(Object.keys(firstFeedTurn.sources).length, 60);
+    assert.equal(Object.values(firstFeedTurn.sources).filter((status) => status === "partial").length, 50);
+    const secondFeedTurn = await fetchActiveFeeds(new Date(), async () => [event]);
+    assert.equal(secondFeedTurn.events.length, 10);
+    const replacementId = `${rotationPrefix}-replacement`;
+    await sql`insert into source_catalog (id, name, kind, feed_url, status)
+      values (${replacementId}, 'Fresh publication', 'rss', 'https://rotation.example/fresh.xml', 'trial')`;
+    const replacementEvents = Array.from({ length: 6 }, (_, index) => ({ ...event,
+      id: `${replacementId}:${index}`, source: replacementId, externalId: String(index),
+      title: `Fresh quantum instrument ${index}`, url: `https://rotation.example/new/${externalId}/${index}`,
+      summary: `New research report about quantum instruments ${index}.`, publishedAt: new Date().toISOString(),
+    }));
+    const replacementLoad = async () => replacementEvents;
+    await pollTrialFeeds(new Date(Date.now() - 2 * 86400000), replacementLoad);
+    await pollTrialFeeds(new Date(Date.now() - 86400000), replacementLoad);
+    assert.equal(await pollTrialFeeds(new Date(), replacementLoad), 1);
+    assert.equal((await sql`select status from source_catalog where id = ${replacementId}`)[0].status, "active");
+    assert.equal((await sql`select count(*)::int as count from source_catalog where id like ${`${rotationPrefix}%`} and status = 'active'`)[0].count, 60);
+    assert.equal((await sql`select count(*)::int as count from source_catalog where id like ${`${rotationPrefix}%`} and status = 'paused'`)[0].count, 1);
+    await sql`delete from signal_events where source = ${replacementId}`;
+    await sql`delete from source_catalog where id like ${`${rotationPrefix}%`}`;
     const journalArticle: SignalEvent = { ...event, id: `openalex:${externalId}-journal`, source: "openalex",
       externalId: `${externalId}-journal`, title: "Journal study of AI agents", url: `https://doi.org/10.1234/${externalId}` };
     assert.equal(await persistSignals({ ...feed, events: [journalArticle] }), 1);
@@ -204,6 +238,10 @@ async function main() {
     assert.equal((await sql`select count(*)::int as count from signal_events where content_key =
       (select content_key from signal_events where id = ${id})`)[0].count, 1);
     assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${id}`)[0].count, 3);
+    await sql`update source_catalog set status = 'paused' where id = 'github'`;
+    assert.ok((await getStoredFeed())?.events.some((item) => item.id === id));
+    assert.ok(await getArchiveCount() > 0);
+    await sql`update source_catalog set status = 'active' where id = 'github'`;
     const stored = await getStoredFeed();
     const result = stored?.events.find((item) => item.id === id);
     assert.equal(result?.title, "Updated title");
@@ -334,6 +372,14 @@ async function main() {
     `;
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === `${crowdPrefix}battery-recycling`));
     assert.ok(!(await getRecentTopicEvents([{ id: "energy", childId: "energy-battery-storage" }])).some((item) => item.id === `${crowdPrefix}battery-recycling`));
+    const firstBatteryPage = await getTopicPage("energy", "energy-battery-storage", null, 20);
+    assert.equal(firstBatteryPage.events.length, 20);
+    assert.ok(firstBatteryPage.nextCursor);
+    const secondBatteryPage = await getTopicPage("energy", "energy-battery-storage", firstBatteryPage.nextCursor, 20);
+    assert.ok(!firstBatteryPage.events.some((item) => secondBatteryPage.events.some((next) => next.id === item.id)));
+    const thirdBatteryPage = await getTopicPage("energy", "energy-battery-storage", secondBatteryPage.nextCursor, 20);
+    assert.ok(thirdBatteryPage.events.some((item) => item.id === `${crowdPrefix}battery-recycling`));
+    assert.ok((await getArchiveChildCounts(new Date(Date.now() + 4 * 3_600_000)))["energy-battery-storage"] >= 42);
     const sharedTopics = sql.json([{ topicId: "ai", subtopicId: null, relevance: 1 }, { topicId: "markets", subtopicId: null, relevance: 1 }]);
     for (const [suffix, ageDays] of [["recent-1", 2], ["recent-2", 3], ["expired", 20]] as const) {
       await sql`
@@ -349,6 +395,12 @@ async function main() {
     await rebuildKnowledgeGraph(recentRelationships);
     assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"], 3);
     assert.equal((await getKnowledgeGraph())?.recentRelationships?.["ai:markets"], 2);
+    await sql`update source_catalog set status = 'paused' where id = 'github'`;
+    await rebuildKnowledgeGraph(await getArchiveRelationships());
+    assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"], undefined);
+    await sql`update source_catalog set status = 'active' where id = 'github'`;
+    await rebuildKnowledgeGraph(await getArchiveRelationships());
+    assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"], 3);
     assert.equal((await (await getPublicSignals()).json() as SignalFeed).relationships?.["ai:markets"], 2);
     const gatewayKeyForArchive = process.env.AI_GATEWAY_API_KEY;
     const vercelFlagForArchive = process.env.VERCEL;
@@ -441,6 +493,10 @@ async function main() {
     assert.equal(latestFeed?.partial, feed.partial);
     assert.equal(latestFeed?.activity?.ai.count, activity.ai.count);
     assert.ok(Date.parse(latestFeed!.observedAt) <= Date.now());
+    await persistCurrentFeed({ ...(await getStoredFeed())!, observedAt: new Date().toISOString(),
+      sources: feed.sources, partial: feed.partial, activity, archiveCount: await getArchiveCount(),
+      childCounts: await getArchiveChildCounts(), catalog: await getUniverseCatalog() });
+    assert.equal((await getPersistedCurrentFeed())?.archiveCount, await getArchiveCount());
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => { throw new Error("Public feed contacted a source"); };
     try {
