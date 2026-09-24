@@ -6,3 +6,4 @@ supabase/.temp/
 !.env.example
 *.tsbuildinfo
 .DS_Store
+/.swc

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 
@@ -30,6 +30,8 @@ async function main() {
   await sql.unsafe(ingestionMigration);
   const graphMigration = await readFile(new URL("../supabase/migrations/20260924001000_knowledge_graph.sql", import.meta.url), "utf8");
   await sql.unsafe(graphMigration);
+  const canonicalMigration = await readFile(new URL("../supabase/migrations/20260924002000_canonical_ingestion.sql", import.meta.url), "utf8");
+  await sql.unsafe(canonicalMigration);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph')
@@ -51,12 +53,15 @@ async function main() {
     assert.equal(await persistSignals(feed), 1);
     assert.ok((await getPendingEmbeddingEvents()).some((item) => item.id === id));
     event.title = "Updated title";
-    assert.equal(await persistSignals(feed), 1);
+    assert.equal(await persistSignals(feed), 0);
+    const duplicate: SignalEvent = { ...event, id: `hacker-news:${externalId}`, source: "hacker-news", externalId, url: `${event.url}/?utm_source=hn`, title: "Duplicate item" };
+    assert.equal(await persistSignals({ ...feed, events: [duplicate] }), 0);
+    assert.equal((await sql`select count(*)::int as count from signal_events where canonical_url = ${`github.com/symtri/${externalId}`}`)[0].count, 1);
     const stored = await getStoredFeed();
     const result = stored?.events.find((item) => item.id === id);
     assert.equal(result?.title, "Updated title");
     assert.deepEqual(result?.topics, event.topics);
-    const unclassified: SignalEvent = { ...event, id: unclassifiedId, externalId: `${externalId}-unclassified`, title: "Urban gardening", summary: "Growing city vegetables", topics: [] };
+    const unclassified: SignalEvent = { ...event, id: unclassifiedId, externalId: `${externalId}-unclassified`, title: "Urban gardening", summary: "Growing city vegetables", url: `${event.url}/gardening`, topics: [] };
     await persistSignals({ ...feed, events: [unclassified] });
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === unclassifiedId));
     assert.equal((await searchKnowledge("Urban gardening", null))[0]?.event.id, unclassifiedId);
@@ -93,7 +98,14 @@ async function main() {
     assert.notEqual(refreshed[0].embedding_input_hash, embedded[0].embedding_input_hash);
     assert.equal(await acquireIngestionLease(runId), true);
     assert.equal(await acquireIngestionLease(competingRunId), false);
+    const slot = `hour:${randomUUID()}`;
+    assert.equal(await claimIngestionSlot(slot), true);
+    assert.equal(await claimIngestionSlot(slot), false);
+    await releaseQueuedIngestionSlot(slot);
+    assert.equal(await claimIngestionSlot(slot), true);
+    await releaseQueuedIngestionSlot(slot);
     await startIngestionRun(runId);
+    assert.ok(await countNewSignalsForRun(runId) >= 0);
     await finishIngestionRun(runId, { status: "complete", sources: feed.sources, fetched: 1, mapped: 1, added: 1, embedded: 1, embeddingStatus: "ok" });
     const status = await getIngestionStatus();
     assert.equal(status.lastRun?.status, "complete");

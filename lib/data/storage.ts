@@ -29,20 +29,26 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
     published_at: event.publishedAt, importance: event.importance, topics: event.topics,
   }));
   await sql`
+    update signal_events as target set
+      title = incoming.title, summary = incoming.summary,
+      importance = incoming.importance, topics = incoming.topics,
+      embedding = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding end,
+      embedding_input_hash = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding_input_hash end,
+      embedding_model = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding_model end
+    from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
+      (id text, title text, summary text, importance double precision, topics jsonb)
+    where target.id = incoming.id
+  `;
+  const inserted = await sql`
     insert into signal_events
       (id, source, external_id, title, url, summary, published_at, importance, topics)
     select id, source, external_id, title, url, summary, published_at::timestamptz, importance, topics
     from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
       (id text, source text, external_id text, title text, url text, summary text,
        published_at text, importance double precision, topics jsonb)
-    on conflict (id) do update set
-      title = excluded.title, url = excluded.url, summary = excluded.summary,
-      importance = excluded.importance, topics = excluded.topics,
-      embedding = case when signal_events.title is distinct from excluded.title or signal_events.summary is distinct from excluded.summary then null else signal_events.embedding end,
-      embedding_input_hash = case when signal_events.title is distinct from excluded.title or signal_events.summary is distinct from excluded.summary then null else signal_events.embedding_input_hash end,
-      embedding_model = case when signal_events.title is distinct from excluded.title or signal_events.summary is distinct from excluded.summary then null else signal_events.embedding_model end
+    on conflict do nothing returning id
   `;
-  return rows.length;
+  return inserted.length;
 }
 
 export async function persistEmbeddings(feed: SignalFeed, embedder: (inputs: string[]) => Promise<number[][]>): Promise<number> {
@@ -165,6 +171,15 @@ export async function getArchiveCount(): Promise<number> {
   return Number(rows[0].count);
 }
 
+export async function countNewSignalsForRun(runId: string): Promise<number> {
+  const rows = await database()`
+    select count(*)::int as count from signal_events as event
+    join ingestion_runs as run on run.id = ${runId}
+    where event.first_seen_at >= run.started_at
+  `;
+  return Number(rows[0].count);
+}
+
 export async function rebuildKnowledgeGraph(): Promise<void> {
   await database()`
     with matches as (
@@ -212,7 +227,7 @@ export async function getPendingEmbeddingEvents(limit = 200): Promise<SignalEven
 export async function acquireIngestionLease(runId: string): Promise<boolean> {
   const rows = await database()`
     insert into ingestion_lease (name, run_id, expires_at)
-    values ('main', ${runId}, now() + interval '3 minutes')
+    values ('main', ${runId}, now() + interval '45 minutes')
     on conflict (name) do update set run_id = excluded.run_id, expires_at = excluded.expires_at
     where ingestion_lease.expires_at < now()
     returning name
@@ -225,7 +240,18 @@ export async function releaseIngestionLease(runId: string): Promise<void> {
 }
 
 export async function startIngestionRun(runId: string): Promise<void> {
-  await database()`insert into ingestion_runs (id, status) values (${runId}, 'running')`;
+  await database()`insert into ingestion_runs (id, status) values (${runId}, 'running')
+    on conflict (id) do update set status = 'running' where ingestion_runs.status = 'queued'`;
+}
+
+export async function claimIngestionSlot(slot: string): Promise<boolean> {
+  const rows = await database()`insert into ingestion_runs (id, status) values (${slot}, 'queued')
+    on conflict do nothing returning id`;
+  return rows.length === 1;
+}
+
+export async function releaseQueuedIngestionSlot(slot: string): Promise<void> {
+  await database()`delete from ingestion_runs where id = ${slot} and status = 'queued'`;
 }
 
 export type IngestionResult = {
