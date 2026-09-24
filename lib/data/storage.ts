@@ -4,6 +4,7 @@ import { embeddingModelId } from "../ai/embed";
 import { topicEdges, topics } from "../universe";
 import { relationshipKey } from "./activity";
 import { CLASSIFIER_VERSION, classifySignal } from "./classify";
+import { selectDistinctHeadlines } from "./select";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
 
 let connection: ReturnType<typeof postgres> | undefined;
@@ -430,13 +431,14 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
 export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
   const sql = database();
   const origin = await sql`
-    select embedding::text as vector, topics
+    select embedding::text as vector, topics, title
     from signal_events
     where id = ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
     limit 1
   `;
   if (!origin.length) return [];
-  const candidates = await sql`
+  const candidates = await sql<{ id: string; source: SignalEvent["source"]; title: string; url: string; summary: string;
+    published_at: Date; topics: SignalEvent["topics"]; similarity: number }[]>`
     select id, source, title, url, summary, published_at, topics,
       1 - (embedding <=> ${origin[0].vector}::vector(256)) as similarity
     from signal_events
@@ -446,11 +448,11 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
     limit 24
   `;
   const originRegions = new Set((origin[0].topics as SignalEvent["topics"]).map((match) => match.topicId));
-  return candidates.filter((row) => {
+  return selectDistinctHeadlines(candidates.filter((row) => {
     const similarity = Number(row.similarity);
     const sharedRegion = (row.topics as SignalEvent["topics"]).some((match) => originRegions.has(match.topicId));
     return Number.isFinite(similarity) && similarity >= (sharedRegion ? .55 : .68);
-  }).slice(0, 3).map((row) => ({
+  }), 3, [origin[0].title]).map((row) => ({
     id: row.id, source: row.source, title: row.title, url: row.url, summary: row.summary,
     publishedAt: new Date(row.published_at).toISOString(), topics: row.topics,
   }));

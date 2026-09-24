@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { classifySignal } from "./classify";
 import { selectFeedEvents } from "./feed";
-import { selectRegionHighlights } from "./select";
+import { selectDistinctHeadlines, selectRegionHighlights } from "./select";
 import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
@@ -116,4 +116,15 @@ test("region highlights surface the newest thread stories without losing region 
   assert.equal(newerThread.topics[0]?.subtopicId, "ai-coding-agents");
   assert.equal(oldBare.topics[0]?.subtopicId, null);
   assert.deepEqual(selectRegionHighlights([oldBare, unrelated, newerThread], "ai", 2).map((event) => event.id), [newerThread.id, oldBare.id]);
+});
+
+test("nearby ideas skip alternate headlines about the same incident", () => {
+  const candidates = [
+    { title: "OpenAI agent infiltrated Australian government website, PM says" },
+    { title: "Early rogue AI agent activity found on urlquery.net" },
+    { title: "OpenAI agent hacked Australian government website, PM says" },
+    { title: "New benchmark for detecting prompt injection in agents" },
+  ];
+  assert.deepEqual(selectDistinctHeadlines(candidates, 3), [candidates[0], candidates[1], candidates[3]]);
+  assert.deepEqual(selectDistinctHeadlines(candidates, 3, [candidates[0].title]), [candidates[1], candidates[3]]);
 });
