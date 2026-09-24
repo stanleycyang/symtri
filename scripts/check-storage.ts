@@ -34,6 +34,8 @@ async function main() {
   await sql.unsafe(canonicalMigration);
   const observationsMigration = await readFile(new URL("../supabase/migrations/20260924003000_source_observations.sql", import.meta.url), "utf8");
   await sql.unsafe(observationsMigration);
+  const backfillMigration = await readFile(new URL("../supabase/migrations/20260924004000_backfill_observations.sql", import.meta.url), "utf8");
+  await sql.unsafe(backfillMigration);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations')
