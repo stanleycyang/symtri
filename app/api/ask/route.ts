@@ -1,4 +1,4 @@
-import { answerKnowledgeQuestion, answerQuestion, questionTopics, shouldSearchKnowledge, type AskResult } from "@/lib/ai/ask";
+import { answerKnowledgeQuestion, answerQuestion, questionSpecificWords, questionTopics, shouldSearchKnowledge, type AskResult } from "@/lib/ai/ask";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
@@ -81,7 +81,18 @@ export async function POST(request: Request) {
         console.warn("SYMTRI semantic retrieval unavailable", error instanceof Error ? error.message : "unknown error");
       }
     }
-    const answer = await withSourceSummary(answerQuestion(trimmed, feed, semanticMatches), feed);
+    let answer = answerQuestion(trimmed, feed, semanticMatches);
+    if (!day && process.env.DATABASE_URL && !answer.evidenceCount && questionSpecificWords(trimmed).length) {
+      try {
+        const seen = new Set(feed.events.map((event) => event.id));
+        const archived = (await searchKnowledge(trimmed, null)).map(({ event }) => event).filter((event) => !seen.has(event.id));
+        if (archived.length) {
+          feed = { ...feed, events: [...feed.events, ...archived] };
+          answer = answerQuestion(trimmed, feed, semanticMatches);
+        }
+      } catch (error) { console.warn("SYMTRI specific archive search unavailable", error instanceof Error ? error.message : "unknown error"); }
+    }
+    answer = await withSourceSummary(answer, feed);
     return Response.json(answer, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.warn("SYMTRI ask unavailable", error instanceof Error ? error.message : "unknown error");

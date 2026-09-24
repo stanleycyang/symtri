@@ -4,6 +4,8 @@ import { knowledgeSearchQuery } from "./search";
 
 test("archive search keeps the subject and removes recency intent", () => {
   assert.equal(knowledgeSearchQuery("What is new in exoplanet research?"), "exoplanet");
+  assert.equal(knowledgeSearchQuery("What's happening with AI agents?"), "ai agents");
+  assert.equal(knowledgeSearchQuery("How are AI agents doing?"), "ai agents");
   assert.equal(knowledgeSearchQuery("Latest papers on exoplanets"), "exoplanets");
   assert.equal(knowledgeSearchQuery("What do we know about exoplanets?"), "exoplanets");
   assert.equal(knowledgeSearchQuery("What are people saying about exoplanets?"), "exoplanets");

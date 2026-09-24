@@ -1,5 +1,6 @@
 import { regionActivity, regionRelationships, relationshipKey } from "../data/activity";
 import type { SignalEvent, SignalFeed } from "../data/model";
+import { knowledgeSearchQuery } from "../data/search";
 import { topicEdges, topics } from "../universe";
 
 export type AskResult = {
@@ -41,7 +42,7 @@ const subtopicAliases: Record<string, string[]> = {
   "energy-power-demand": ["power demand", "data center power"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
   "energy-fusion": ["fusion", "tokamak", "tokamaks", "stellarator", "stellarators"],
-  "hardware-semiconductors": ["semiconductor", "semiconductors", "chip design"],
+  "hardware-semiconductors": ["semiconductor", "semiconductors"],
   "hardware-networks": ["network hardware", "network devices", "hardware networks"],
   "startups-product": ["startup product", "product launch"],
   "startups-growth": ["startup growth", "company growth"],
@@ -96,6 +97,25 @@ export function shouldSearchKnowledge(question: string): boolean {
   return words(question).length > 0 && questionTopics(question).length === 0;
 }
 
+export function questionSpecificWords(question: string): string[] {
+  const [detected, other] = questionTopics(question);
+  if (!detected || other) return [];
+  const region = topics.find((topic) => topic.id === detected.id)!;
+  const child = region.children.find((item) => item.id === detected.childId);
+  const aliases = [...(regionAliases[detected.id] ?? []), region.name,
+    ...(child ? [...(subtopicAliases[child.id] ?? []), child.name] : [])];
+  const mapped = new Set(aliases.flatMap((alias) => alias.toLowerCase().match(/[a-z0-9]+/g) ?? []));
+  return (knowledgeSearchQuery(question).match(/[a-z0-9]+/g) ?? []).filter((word) => !mapped.has(word));
+}
+
+function matchesSpecificWords(event: SignalEvent, terms: string[]): boolean {
+  const content = `${event.title} ${event.summary}`.toLowerCase();
+  return terms.every((term) => {
+    const root = term.replace(/(?:ing|ed|es|s)$/, "");
+    return content.includes(root.length >= 4 ? root : term);
+  });
+}
+
 export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[]): AskResult {
   const selected = results.slice(0, 4);
   const location = selected[0]?.event.topics.find((match) => match.relevance >= .67 && topics.some((topic) => topic.id === match.topicId));
@@ -132,9 +152,10 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
     ? regionIds[0] === "energy" ? energyAiSteps : [...energyAiSteps].reverse()
     : regionIds.length === 1 && subtopicId ? [regionStep(regionIds[0]), childStep(subtopicId)] : pathIds.map(regionStep);
   const queryWords = words(question);
+  const specificWords = regionIds.length === 1 ? questionSpecificWords(question) : [];
   const matching = feed.events.filter((event) => event.topics.some((match) => regionIds.includes(match.topicId)));
   const scoped = subtopicId ? matching.filter((event) => event.topics.some((match) => match.subtopicId === subtopicId)) : matching;
-  const candidates = subtopicId ? scoped : matching;
+  const candidates = scoped.filter((event) => matchesSpecificWords(event, specificWords));
   const semanticScores = new Map(semanticMatches.filter((match) => Number.isFinite(match.similarity)).map((match) => [match.id, Math.max(0, Math.min(1, match.similarity))]));
   const observedAt = Date.parse(feed.observedAt);
   const score = (event: SignalEvent) => {
@@ -179,10 +200,12 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
       : missingRegions.length
         ? `No sampled signal connects ${names[0]} and ${names[1]}. ${missingRegions.map((id) => topics.find((topic) => topic.id === id)!.name).join(" and ")} ${missingRegions.length === 1 ? "has" : "have"} no source in this sample${candidates.length ? "; the links below are from the other region" : ""}.`
       : `The map links ${names[0]} and ${names[1]}, but this sample has no signal classified to both. The sources below show each region separately.`;
+  } else if (specificWords.length && !candidates.length && matching.length) {
+    summary = `No sampled signal matches ${knowledgeSearchQuery(question)} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this subject.`;
   } else if (subtopicId && !scoped.length && matching.length) {
     summary = `No sampled signal matches ${childName} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this thread.`;
   } else if (candidates.length) {
-    summary = `${candidates.length} sampled signal${candidates.length === 1 ? " matches" : "s match"} ${childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : "GitHub"}).`;
+    summary = `${candidates.length} sampled signal${candidates.length === 1 ? " matches" : "s match"} ${specificWords.length ? knowledgeSearchQuery(question) : childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : "GitHub"}).`;
   } else {
     summary = feed.scope === "history"
       ? `No sampled signal matches ${childName ?? names[0]} in this snapshot. Explore another date or region.`

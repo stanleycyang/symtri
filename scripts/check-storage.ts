@@ -232,6 +232,42 @@ async function main() {
     `;
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === id));
     assert.ok((await getRecentTopicEvents([{ id: "ai", childId: "ai-agents" }])).some((item) => item.id === id));
+    const batteryRows = Array.from({ length: 41 }, (_, index) => ({
+      id: `${crowdPrefix}battery-${index}`, external_id: `${externalId}-battery-${index}`,
+      title: `Battery cell simulation ${index}`, url: `https://github.com/symtri/${externalId}-battery-${index}`,
+      summary: "Battery cell simulation methods", published_at: new Date(Date.now() + 10_800_000 + index).toISOString(),
+    }));
+    batteryRows.push({
+      id: `${crowdPrefix}battery-recycling`, external_id: `${externalId}-battery-recycling`,
+      title: "Battery recycling recovers cathode materials", url: `https://github.com/symtri/${externalId}-battery-recycling`,
+      summary: "A process for recycling spent battery cells", published_at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    });
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      select id, 'github', external_id, title, url, summary, published_at::timestamptz, 30,
+        ${sql.json([{ topicId: "energy", subtopicId: "energy-battery-storage", relevance: 1 }])}::jsonb
+      from jsonb_to_recordset(${sql.json(batteryRows)}::jsonb) as incoming
+        (id text, external_id text, title text, url text, summary text, published_at text)
+    `;
+    assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === `${crowdPrefix}battery-recycling`));
+    assert.ok(!(await getRecentTopicEvents([{ id: "energy", childId: "energy-battery-storage" }])).some((item) => item.id === `${crowdPrefix}battery-recycling`));
+    const gatewayKeyForArchive = process.env.AI_GATEWAY_API_KEY;
+    const vercelFlagForArchive = process.env.VERCEL;
+    process.env.AI_GATEWAY_API_KEY = "";
+    process.env.VERCEL = "";
+    try {
+      const response = await askSymtri(new Request("http://localhost/api/ask", {
+        method: "POST", body: JSON.stringify({ question: "What is new in battery recycling?" }),
+      }));
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.deepEqual(result.events.map((item: SignalEvent) => item.id), [`${crowdPrefix}battery-recycling`]);
+    } finally {
+      if (gatewayKeyForArchive === undefined) delete process.env.AI_GATEWAY_API_KEY;
+      else process.env.AI_GATEWAY_API_KEY = gatewayKeyForArchive;
+      if (vercelFlagForArchive === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = vercelFlagForArchive;
+    }
     const olderAiId = `${crowdPrefix}older-ai`;
     await sql`
       insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)

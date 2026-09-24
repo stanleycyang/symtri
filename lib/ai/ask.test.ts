@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { answerKnowledgeQuestion, answerQuestion, questionTopics, shouldSearchKnowledge } from "./ask";
+import { answerKnowledgeQuestion, answerQuestion, questionSpecificWords, questionTopics, shouldSearchKnowledge } from "./ask";
 import type { SignalEvent, SignalFeed } from "../data/model";
 
 const observedAt = "2026-09-22T12:00:00.000Z";
@@ -94,7 +94,23 @@ test("a thread without exact evidence does not cite unrelated parent-region sour
   assert.equal(semiconductorResult.subtopicId, "hardware-semiconductors");
   assert.equal(semiconductorResult.evidenceCount, 0);
   assert.deepEqual(semiconductorResult.events, []);
-  assert.match(semiconductorResult.summary, /No sampled signal matches Semiconductors/);
+  assert.match(semiconductorResult.summary, /No sampled signal matches semiconductor design/);
+});
+
+test("a specific region question excludes nearby stories about only the broad subject", () => {
+  const simulation = event("simulation", "Simulation of a battery cell", "energy", "energy-battery-storage");
+  const recycling = event("recycling", "Battery recycling process improves material recovery", "energy", "energy-battery-storage");
+  const question = "What is new in battery recycling?";
+  assert.deepEqual(questionSpecificWords(question), ["recycling"]);
+  assert.deepEqual(questionSpecificWords("What's happening with AI agents?"), []);
+  assert.deepEqual(questionSpecificWords("How are AI agents?"), []);
+  assert.deepEqual(questionSpecificWords("What connects AI and energy?"), []);
+  const answered = answerQuestion(question, { ...feed, events: [simulation, recycling] }, [{ id: simulation.id, similarity: 1 }]);
+  assert.deepEqual(answered.events.map((item) => item.id), [recycling.id]);
+  const empty = answerQuestion(question, { ...feed, events: [simulation] });
+  assert.equal(empty.evidenceCount, 0);
+  assert.deepEqual(empty.events, []);
+  assert.match(empty.summary, /No sampled signal matches battery recycling/);
 });
 
 test("semantic similarity reorders sources only within the identified region", () => {
@@ -151,6 +167,7 @@ test("unmapped subjects use the knowledge archive without inventing a map locati
   assert.deepEqual(questionTopics("What is new in product launch startups?"), [{ id: "startups", childId: "startups-product" }]);
   assert.deepEqual(questionTopics("What is new in network hardware?"), [{ id: "hardware", childId: "hardware-networks" }]);
   assert.deepEqual(questionTopics("What is new in semiconductor design?"), [{ id: "hardware", childId: "hardware-semiconductors" }]);
+  assert.deepEqual(questionSpecificWords("What is new in semiconductor design?"), ["design"]);
   const garden = { ...event("garden", "Urban gardens", "science", "science-climate-science"), topics: [] };
   const result = answerKnowledgeQuestion("What is new with urban gardening?", [{ event: garden, similarity: .7 }]);
   assert.equal(result.scope, "knowledge");
