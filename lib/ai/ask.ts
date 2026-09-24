@@ -125,7 +125,7 @@ export function answerKnowledgeQuestion(question: string, results: { event: Sign
   const child = region?.children.find((item) => item.id === location?.subtopicId);
   return {
     question,
-    summary: selected.length ? `The knowledge archive has ${results.length} source${results.length === 1 ? "" : "s"} related to this question. The closest sources are linked below; this sample does not establish a broad trend.` : "No indexed source matches this question yet. The universe is still growing from its connected sources.",
+    summary: selected.length ? `The knowledge archive has ${results.length} source${results.length === 1 ? "" : "s"} related to this question. The closest sources are linked below; these sources do not establish a broad trend.` : "No indexed source matches this question yet. The universe is still growing from its connected sources.",
     regionIds: region ? [region.id] : [], pathIds: region ? [region.id] : [],
     pathSteps: region ? [{ regionId: region.id, subtopicId: null, label: region.short },
       ...(child ? [{ regionId: region.id, subtopicId: child.id, label: child.name }] : [])] : [],
@@ -200,20 +200,20 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
   let summary: string;
   if (regionIds.length === 2) {
     summary = sharedCount
-      ? `${sharedCount} sampled signal${sharedCount === 1 ? "" : "s"} ${sharedCount === 1 ? "links" : "link"} ${names[0]} and ${names[1]}. ${crossChildName && !crossChildShared ? `None of those shared signals is tagged ${crossChildName}; the sources show nearby activity.` : `The first source is classified to both regions.`}`
+      ? `${sharedCount} observed signal${sharedCount === 1 ? "" : "s"} ${sharedCount === 1 ? "links" : "link"} ${names[0]} and ${names[1]}. ${crossChildName && !crossChildShared ? `None of those shared signals is tagged ${crossChildName}; the sources show nearby activity.` : `The first source is classified to both regions.`}`
       : missingRegions.length
-        ? `No sampled signal connects ${names[0]} and ${names[1]}. ${missingRegions.map((id) => catalog.topics.find((topic) => topic.id === id)!.name).join(" and ")} ${missingRegions.length === 1 ? "has" : "have"} no source in this sample${candidates.length ? "; the links below are from the other region" : ""}.`
-      : `The map links ${names[0]} and ${names[1]}, but this sample has no signal classified to both. The sources below show each region separately.`;
+        ? `No observed signal connects ${names[0]} and ${names[1]}. ${missingRegions.map((id) => catalog.topics.find((topic) => topic.id === id)!.name).join(" and ")} ${missingRegions.length === 1 ? "has" : "have"} no source in current observations${candidates.length ? "; the links below are from the other region" : ""}.`
+      : `The map links ${names[0]} and ${names[1]}, but current observations have no signal classified to both. The sources below show each region separately.`;
   } else if (specificWords.length && !candidates.length && matching.length) {
-    summary = `No sampled signal matches ${knowledgeSearchQuery(question)} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this subject.`;
+    summary = `No observed signal matches ${knowledgeSearchQuery(question)} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this subject.`;
   } else if (subtopicId && !scoped.length && matching.length) {
-    summary = `No sampled signal matches ${childName} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this thread.`;
+    summary = `No observed signal matches ${childName} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this thread.`;
   } else if (candidates.length) {
-    summary = `${candidates.length} sampled signal${candidates.length === 1 ? " matches" : "s match"} ${specificWords.length ? knowledgeSearchQuery(question) : childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : selected[0].source === "openalex" ? "OpenAlex" : "GitHub"}).`;
+    summary = `${candidates.length} observed signal${candidates.length === 1 ? " matches" : "s match"} ${specificWords.length ? knowledgeSearchQuery(question) : childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : selected[0].source === "openalex" ? "OpenAlex" : "GitHub"}).`;
   } else {
     summary = feed.scope === "history"
-      ? `No sampled signal matches ${childName ?? names[0]} in this snapshot. Explore another date or region.`
-      : `No sampled signal matches ${childName ?? names[0]} right now. Explore the region while the feed continues to update.`;
+      ? `No observed signal matches ${childName ?? names[0]} in this snapshot. Explore another date or region.`
+      : `No observed signal matches ${childName ?? names[0]} right now. Explore the region while the feed continues to update.`;
   }
   return {
     question, summary, regionIds, pathIds, pathSteps, subtopicId,

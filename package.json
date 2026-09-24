@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "audit:deps": "npm audit --audit-level=moderate",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test lib/data/*.test.ts lib/ai/*.test.ts",
     "test:storage": "tsx scripts/check-storage.ts",
@@ -39,5 +40,16 @@
     "eslint-config-next": "^16.1.1",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@workflow/core": {
+      "nanoid": "^5.1.16"
+    },
+    "@workflow/world-local": {
+      "undici": "^7.29.1"
+    },
+    "@workflow/world-vercel": {
+      "undici": "^7.29.1"
+    }
   }
 }

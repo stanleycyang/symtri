@@ -23,7 +23,7 @@ test("an agents question navigates to its thread with real evidence", () => {
   assert.deepEqual(result.pathSteps.map((step) => step.label), ["AI", "Agents"]);
   assert.equal(result.events[0].id, agents.id);
   assert.equal(result.evidenceCount, 1);
-  assert.match(result.summary, /1 sampled signal matches Agents/);
+  assert.match(result.summary, /1 observed signal matches Agents/);
   assert.equal(result.retrieval, "terms");
 });
 
@@ -47,7 +47,7 @@ test("a broad shared signal leads the evidence without claiming a nuclear connec
     topics: [{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }, { topicId: "energy", subtopicId: "energy-solar", relevance: 1 }] };
   const result = answerQuestion("What connects nuclear energy and AI?", { ...feed, events: [agents, nuclear, shared] });
   assert.equal(result.events[0].id, shared.id);
-  assert.match(result.summary, /1 sampled signal links Energy and Artificial Intelligence/);
+  assert.match(result.summary, /1 observed signal links Energy and Artificial Intelligence/);
   assert.match(result.summary, /None of those shared signals is tagged Nuclear/);
 });
 
@@ -58,9 +58,9 @@ test("the curated route reverses with question order and stays out of broad ques
   assert.deepEqual(broad.pathSteps.map((step) => step.label), ["AI", "ENERGY"]);
 });
 
-test("a cross-region answer names a region absent from the current sample", () => {
+test("a cross-region answer names a region absent from current observations", () => {
   const result = answerQuestion("What connects nuclear energy and AI?", { ...feed, events: [agents] });
-  assert.match(result.summary, /Energy has no source in this sample/);
+  assert.match(result.summary, /Energy has no source in current observations/);
   assert.deepEqual(result.events.map((item) => item.id), [agents.id]);
 });
 
@@ -82,7 +82,7 @@ test("an open question selects the most active observed region", () => {
 test("a thread without exact evidence does not cite unrelated parent-region sources", () => {
   const result = answerQuestion("What is happening with AI robotics?", feed);
   assert.equal(result.subtopicId, "ai-robotics");
-  assert.match(result.summary, /No sampled signal matches Robotics right now/);
+  assert.match(result.summary, /No observed signal matches Robotics right now/);
   assert.equal(result.evidenceCount, 0);
   assert.deepEqual(result.events, []);
   const climate = event("biotech", "Claude discovers a new enzyme", "science", "science-biotechnology");
@@ -94,7 +94,7 @@ test("a thread without exact evidence does not cite unrelated parent-region sour
   assert.equal(semiconductorResult.subtopicId, "hardware-semiconductors");
   assert.equal(semiconductorResult.evidenceCount, 0);
   assert.deepEqual(semiconductorResult.events, []);
-  assert.match(semiconductorResult.summary, /No sampled signal matches semiconductor design/);
+  assert.match(semiconductorResult.summary, /No observed signal matches semiconductor design/);
 });
 
 test("a specific region question excludes nearby stories about only the broad subject", () => {
@@ -110,7 +110,7 @@ test("a specific region question excludes nearby stories about only the broad su
   const empty = answerQuestion(question, { ...feed, events: [simulation] });
   assert.equal(empty.evidenceCount, 0);
   assert.deepEqual(empty.events, []);
-  assert.match(empty.summary, /No sampled signal matches battery recycling/);
+  assert.match(empty.summary, /No observed signal matches battery recycling/);
 });
 
 test("semantic similarity reorders sources only within the identified region", () => {

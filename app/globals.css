@@ -152,3 +152,9 @@
 .share-point{min-height:44px;padding:0 9px;border:1px solid var(--line);background:none;color:var(--copper);font:9px var(--mono);letter-spacing:.12em}
 .share-point:hover,.share-point:focus-visible{border-color:var(--copper);color:#f3d7b4}
 .panel-actions .icon-button{width:44px;height:44px}
+.entrance-bottom{gap:12px;flex-wrap:wrap}
+.entrance-bottom a,.github-link{color:#c8aa85;text-decoration:none;font:9px var(--mono);letter-spacing:.12em;white-space:nowrap}
+.entrance-bottom a:hover,.github-link:hover{color:#f5dcc0}
+.entrance-bottom a:focus-visible,.github-link:focus-visible{outline:1px solid var(--copper);outline-offset:5px}
+.github-link{display:inline-flex;align-items:center;min-height:44px;pointer-events:auto}
+@media(max-width:700px){.entrance-bottom{align-items:flex-start}.entrance-bottom a{font-size:8px}.topbar-actions{gap:9px}.github-link{font-size:8px}}
