@@ -1,7 +1,7 @@
 const intentWords = new Set([
   "a", "about", "an", "are", "can", "could", "did", "do", "does", "for", "how", "in", "is", "of", "on", "should", "the", "to", "was", "were", "what", "whats", "when", "where", "which", "who", "why", "will", "would", "with",
   "new", "latest", "recent", "currently", "today", "now", "update", "updates", "news",
-  "doing", "going", "happening", "research", "paper", "papers", "study", "studies",
+  "doing", "going", "happening", "say", "says", "said", "saying", "tell", "tells", "told", "research", "paper", "papers", "study", "studies",
 ]);
 
 export function knowledgeSearchQuery(question: string): string {

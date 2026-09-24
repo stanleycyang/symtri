@@ -146,6 +146,14 @@ test("mapped and archive answers show distinct news instead of alternate headlin
   assert.deepEqual(archive.events.map((item) => item.id), [first.id, other.id]);
 });
 
+test("a question about council remarks can cite the matching AI source", () => {
+  const remarks = event("council", "Anthropic CEO warns UN Security Council on AI risks", "ai", "ai-research");
+  assert.deepEqual(questionSpecificWords("What did the UN Security Council say about AI?"), ["un", "security", "council"]);
+  const result = answerQuestion("What did the UN Security Council say about AI?", { ...feed, events: [remarks] });
+  assert.deepEqual(result.regionIds, ["ai"]);
+  assert.deepEqual(result.events.map((item) => item.id), [remarks.id]);
+});
+
 test("a specific older source can outrank a newer broad source", () => {
   const specific = { ...event("specific", "Coding agents for repositories", "ai", "ai-agents"),
     publishedAt: "2026-09-15T12:00:00.000Z", importance: 20,
