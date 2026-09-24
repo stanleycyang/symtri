@@ -45,6 +45,11 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
     from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
       (id text, title text, summary text, importance double precision, topics jsonb, classification_input jsonb)
     where target.id = incoming.id
+      and not exists (
+        select 1 from signal_events as other
+        where other.id <> target.id and other.content_key =
+          md5(lower(regexp_replace(btrim(incoming.title) || E'\n' || btrim(incoming.summary), '[[:space:]]+', ' ', 'g')))
+      )
   `;
   const inserted = await sql`
     insert into signal_events
@@ -59,9 +64,17 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
     insert into signal_observations (source, external_id, signal_id, observed_url)
     select incoming.source, incoming.external_id, stored.id, incoming.url
     from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
-      (source text, external_id text, url text)
-    join signal_events as stored on stored.canonical_url =
-      lower(regexp_replace(regexp_replace(split_part(split_part(incoming.url, '?', 1), '#', 1), '^https?://', ''), '/+$', ''))
+      (source text, external_id text, url text, title text, summary text)
+    cross join lateral (select
+      lower(regexp_replace(regexp_replace(split_part(split_part(incoming.url, '?', 1), '#', 1), '^https?://', ''), '/+$', '')) as canonical_url,
+      md5(lower(regexp_replace(btrim(incoming.title) || E'\n' || btrim(incoming.summary), '[[:space:]]+', ' ', 'g'))) as content_key
+    ) as identity
+    join lateral (
+      select id from signal_events as candidate
+      where candidate.canonical_url = identity.canonical_url or candidate.content_key = identity.content_key
+      order by (candidate.canonical_url = identity.canonical_url) desc, candidate.first_seen_at
+      limit 1
+    ) as stored on true
     on conflict (source, external_id) do update set
       signal_id = excluded.signal_id, observed_url = excluded.observed_url, last_seen_at = now()
   `;

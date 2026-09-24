@@ -48,7 +48,27 @@ async function main() {
   await sql.unsafe(foreignAgentsMigration);
   const classificationMigration = await readFile(new URL("../supabase/migrations/20260924007000_classification_refresh.sql", import.meta.url), "utf8");
   await sql.unsafe(classificationMigration);
+  const legacyFirst = `github:${externalId}-legacy-first`;
+  const legacySecond = `hacker-news:${externalId}-legacy-second`;
+  await sql`
+    insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+    values
+      (${legacyFirst}, 'github', ${`${externalId}-legacy-first`}, 'Mirrored paper', ${`https://first.example/${externalId}`}, 'Same content', now(), 50, '[]'::jsonb),
+      (${legacySecond}, 'hacker-news', ${`${externalId}-legacy-second`}, 'Mirrored paper', ${`https://second.example/${externalId}`}, 'Same content', now(), 20, '[]'::jsonb)
+  `;
+  await sql`
+    insert into signal_observations (source, external_id, signal_id, observed_url)
+    values
+      ('github', ${`${externalId}-legacy-first`}, ${legacyFirst}, ${`https://first.example/${externalId}`}),
+      ('hacker-news', ${`${externalId}-legacy-second`}, ${legacySecond}, ${`https://second.example/${externalId}`})
+  `;
+  const uniqueContentMigration = await readFile(new URL("../supabase/migrations/20260924008000_unique_content.sql", import.meta.url), "utf8");
+  await sql.unsafe(uniqueContentMigration);
+  assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
+  assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${legacyFirst}`)[0].count, 2);
+  await sql`delete from signal_events where id = ${legacyFirst}`;
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_topics_gin_idx'`)[0].count, 1);
+  assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_content_key_key'`)[0].count, 1);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations')
@@ -75,6 +95,12 @@ async function main() {
     assert.equal(await persistSignals({ ...feed, events: [duplicate] }), 0);
     assert.equal((await sql`select count(*)::int as count from signal_events where canonical_url = ${`github.com/symtri/${externalId}`}`)[0].count, 1);
     assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${id}`)[0].count, 2);
+    const sameContent: SignalEvent = { ...event, id: `hacker-news:${externalId}-mirror`, source: "hacker-news",
+      externalId: `${externalId}-mirror`, url: `https://mirror.example/${externalId}` };
+    assert.equal(await persistSignals({ ...feed, events: [sameContent] }), 0);
+    assert.equal((await sql`select count(*)::int as count from signal_events where content_key =
+      (select content_key from signal_events where id = ${id})`)[0].count, 1);
+    assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${id}`)[0].count, 3);
     const stored = await getStoredFeed();
     const result = stored?.events.find((item) => item.id === id);
     assert.equal(result?.title, "Updated title");
@@ -127,7 +153,7 @@ async function main() {
     await sql`delete from signal_events where id = ${relatedId}`;
     const crowd = Array.from({ length: 300 }, (_, index) => ({
       id: `${crowdPrefix}${index}`, source: "github", external_id: `${externalId}-crowd-${index}`,
-      title: "Software sample", url: `https://github.com/symtri/${externalId}-crowd-${index}`,
+      title: `Software sample ${index}`, url: `https://github.com/symtri/${externalId}-crowd-${index}`,
       summary: "A newer unrelated signal", published_at: new Date(Date.now() + 7_200_000 + index).toISOString(),
       importance: 10, topics: [{ topicId: "software", subtopicId: null, relevance: 1 }],
     }));

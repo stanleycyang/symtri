@@ -90,6 +90,14 @@ test("deduplication keeps the stronger observation for the same URL", () => {
   assert.equal(canonicalSignalUrl("https://EXAMPLE.com/Agent/?ref=hn"), "example.com/agent");
 });
 
+test("deduplication keeps one copy of identical content across URLs", () => {
+  const first = normalizeHackerNews({ id: 47, type: "story", title: "AI agent toolkit", time: 1780000000,
+    score: 100, url: "https://original.example/agent" })!;
+  const mirror = { ...first, id: "hacker-news:48", externalId: "48", url: "https://mirror.example/agent",
+    title: "  AI agent toolkit  ", importance: 5 };
+  assert.deepEqual(deduplicateSignals([mirror, first]).map((item) => item.id), [first.id]);
+});
+
 test("feed selection keeps mapped signals before applying the cap or deduplicating", () => {
   const mapped = normalizeHackerNews({ id: 71, type: "story", title: "AI agent toolkit", time: Date.parse("2026-09-22T12:00:00Z") / 1000, score: 2, url: "https://example.com/agent" })!;
   const unmapped = { ...mapped, id: "hacker-news:72", externalId: "72", title: "Garden calendar", topics: [], importance: 99, publishedAt: "2026-09-23T12:00:00Z" };

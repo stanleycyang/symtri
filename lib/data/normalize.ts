@@ -63,10 +63,12 @@ export function normalizeArxivFeed(xml: string): SignalEvent[] {
 export function deduplicateSignals(events: SignalEvent[]): SignalEvent[] {
   const seenIds = new Set<string>();
   const seenUrls = new Set<string>();
+  const seenContent = new Set<string>();
   return [...events].sort((a, b) => b.importance - a.importance).filter((event) => {
     const canonical = canonicalSignalUrl(event.url);
-    if (seenIds.has(event.id) || seenUrls.has(canonical)) return false;
-    seenIds.add(event.id); seenUrls.add(canonical); return true;
+    const content = `${event.title}\n${event.summary}`.trim().replace(/\s+/g, " ").toLowerCase();
+    if (seenIds.has(event.id) || seenUrls.has(canonical) || seenContent.has(content)) return false;
+    seenIds.add(event.id); seenUrls.add(canonical); seenContent.add(content); return true;
   });
 }
 
