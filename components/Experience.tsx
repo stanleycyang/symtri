@@ -181,7 +181,7 @@ export default function Experience() {
     <div className="grain" aria-hidden="true" />
     <div className="edge-vignette" aria-hidden="true" />
 
-    <section className="entrance" aria-label="Welcome to Symtri" aria-hidden={entered}>
+    <section className="entrance" aria-label="Welcome to Symtri" aria-hidden={entered} inert={entered}>
       <div className="entrance-top"><span className="wordmark">SYMTRI<span className="wordmark-dot">.</span></span><span className="entrance-edition">AN ATLAS OF COLLECTIVE ATTENTION</span></div>
       <div className="entrance-center">
         <div className="symbol" aria-hidden="true"><i /><i /><i /><b /></div>
