@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, backfillSnapshotActivity, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotActivity, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveRelationships, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -79,6 +79,8 @@ async function main() {
   await sql.unsafe(queryIdentityMigration);
   const archiveActivityMigration = await readFile(new URL("../supabase/migrations/20260924011000_archive_activity.sql", import.meta.url), "utf8");
   await sql.unsafe(archiveActivityMigration);
+  const recentRelationshipsMigration = await readFile(new URL("../supabase/migrations/20260924012000_recent_relationships.sql", import.meta.url), "utf8");
+  await sql.unsafe(recentRelationshipsMigration);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
   assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
@@ -251,6 +253,22 @@ async function main() {
     `;
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === `${crowdPrefix}battery-recycling`));
     assert.ok(!(await getRecentTopicEvents([{ id: "energy", childId: "energy-battery-storage" }])).some((item) => item.id === `${crowdPrefix}battery-recycling`));
+    const sharedTopics = sql.json([{ topicId: "ai", subtopicId: null, relevance: 1 }, { topicId: "markets", subtopicId: null, relevance: 1 }]);
+    for (const [suffix, ageDays] of [["recent-1", 2], ["recent-2", 3], ["expired", 20]] as const) {
+      await sql`
+        insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+        values (${`${crowdPrefix}link-${suffix}`}, 'github', ${`${externalId}-link-${suffix}`},
+          ${`AI markets connection ${suffix}`}, ${`https://github.com/symtri/${externalId}-link-${suffix}`},
+          ${`Shared topic observation ${suffix}`}, now() - ${ageDays} * interval '1 day', 30, ${sharedTopics}::jsonb)
+      `;
+    }
+    assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === `${crowdPrefix}link-recent-1`));
+    const recentRelationships = await getArchiveRelationships();
+    assert.equal(recentRelationships["ai:markets"], 2);
+    await rebuildKnowledgeGraph(recentRelationships);
+    assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"], 3);
+    assert.equal((await getKnowledgeGraph())?.recentRelationships?.["ai:markets"], 2);
+    assert.equal((await (await getPublicSignals()).json() as SignalFeed).relationships?.["ai:markets"], 2);
     const gatewayKeyForArchive = process.env.AI_GATEWAY_API_KEY;
     const vercelFlagForArchive = process.env.VERCEL;
     process.env.AI_GATEWAY_API_KEY = "";
@@ -453,16 +471,17 @@ async function main() {
         (${historicId}, 'github', ${`${externalId}-historic`}, 'Historical agent research',
           ${`https://github.com/symtri/${externalId}-historic`}, 'An earlier observation',
           '2099-01-04T11:00:00Z', '2099-01-04T12:02:00Z', 50,
-          ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }])}::jsonb),
+          ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }, { topicId: "markets", subtopicId: null, relevance: 1 }])}::jsonb),
         (${laterId}, 'github', ${`${externalId}-historic-later`}, 'Later agent research',
           ${`https://github.com/symtri/${externalId}-historic-later`}, 'Discovered on a later run',
           '2099-01-04T11:00:00Z', '2099-01-04T13:00:00Z', 50,
-          ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }])}::jsonb)
+          ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }, { topicId: "markets", subtopicId: null, relevance: 1 }])}::jsonb)
     `;
     await persistSnapshot({ ...feed, observedAt: `${historicDay}T12:00:00.000Z`, events: [{ ...event, id: historicId }] });
     assert.equal((await getSnapshotFeed(historicDay))?.activity, undefined);
     assert.ok(await backfillSnapshotActivity() >= 1);
     assert.equal((await getSnapshotFeed(historicDay))?.activity?.ai.count, 1);
+    assert.equal((await getSnapshotFeed(historicDay))?.relationships?.["ai:markets"], 1);
     assert.equal(await backfillSnapshotActivity(), 0);
     await sql`delete from signal_events where id in (${historicId}, ${laterId})`;
     await sql`delete from signal_snapshots where day = ${historicDay}::date`;

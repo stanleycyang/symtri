@@ -53,7 +53,7 @@ export default function Experience() {
   const ageReference = selectedDay && displayFeed ? displayFeed.observedAt : now;
   const sampleProvenance = displayFeed?.scope === "archive" ? "ARCHIVED SAMPLE" : displayFeed?.scope === "rolling" ? displayFeed.partial ? "PARTIAL ROLLING SAMPLE" : "ROLLING SAMPLE" : displayFeed?.partial ? "PARTIAL SAMPLE" : "OBSERVED SAMPLE";
   const measuredActivity = useMemo(() => displayFeed ? displayFeed.activity ?? regionActivity(displayFeed.events, Date.parse(displayFeed.observedAt)) : null, [displayFeed]);
-  const measuredRelationships = useMemo(() => displayFeed ? regionRelationships(displayFeed.events, Date.parse(displayFeed.observedAt)) : null, [displayFeed]);
+  const measuredRelationships = useMemo(() => displayFeed ? displayFeed.relationships ?? regionRelationships(displayFeed.events, Date.parse(displayFeed.observedAt)) : null, [displayFeed]);
   const leadingRegion = measuredActivity ? topics.reduce((leader, topic) => measuredActivity[topic.id].score > measuredActivity[leader.id].score ? topic : leader, topics[0]) : null;
   const leadingRegionActivity = leadingRegion ? measuredActivity?.[leadingRegion.id] : null;
   const archiveRelationships = selectedDay ? null : liveFeed?.knowledgeGraph?.relationships ?? null;

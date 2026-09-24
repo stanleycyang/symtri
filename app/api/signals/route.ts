@@ -23,7 +23,8 @@ export async function GET() {
   if (process.env.DATABASE_URL) {
     try {
       const knowledgeGraph = await getKnowledgeGraph();
-      if (knowledgeGraph) result = { ...result, knowledgeGraph };
+      if (knowledgeGraph) result = { ...result, knowledgeGraph,
+        ...(knowledgeGraph.recentRelationships ? { relationships: knowledgeGraph.recentRelationships } : {}) };
     } catch (error) {
       console.warn("SYMTRI knowledge graph unavailable", error instanceof Error ? error.message : "unknown error");
     }

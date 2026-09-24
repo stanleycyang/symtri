@@ -2,7 +2,7 @@ import postgres from "postgres";
 import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_DIMENSIONS } from "../ai/embed";
 import { embeddingModelId } from "../ai/embed";
 import { topicEdges, topics } from "../universe";
-import { completeRegionActivity, relationshipKey, type RegionActivity } from "./activity";
+import { completeRegionActivity, relationshipKey, type RegionActivity, type RegionRelationships } from "./activity";
 import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import { selectDistinctHeadlines } from "./select";
 import { knowledgeSearchQuery } from "./search";
@@ -311,6 +311,27 @@ export async function getArchiveActivity(at = new Date()): Promise<Record<string
   }])));
 }
 
+export async function getArchiveRelationships(at = new Date()): Promise<RegionRelationships> {
+  const sql = database();
+  const rows = await sql<{ first_id: string; second_id: string; signals: number }[]>`
+    with matches as (
+      select distinct event.id, match.value->>'topicId' as topic_id
+      from signal_events as event
+      cross join lateral jsonb_array_elements(event.topics) as match(value)
+      where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
+        and ${at.toISOString()}::timestamptz + interval '1 hour'
+        and event.first_seen_at <= ${new Date(at.getTime() + 10 * 60 * 1000).toISOString()}::timestamptz
+        and match.value ? 'topicId'
+        and match.value->>'topicId' in ${sql(topics.map((topic) => topic.id))}
+    )
+    select first.topic_id as first_id, second.topic_id as second_id, count(*)::int as signals
+    from matches as first join matches as second
+      on first.id = second.id and first.topic_id < second.topic_id
+    group by first.topic_id, second.topic_id
+  `;
+  return Object.fromEntries(rows.map((row) => [relationshipKey(row.first_id, row.second_id), Number(row.signals)]));
+}
+
 export async function countNewSignalsForRun(runId: string): Promise<number> {
   const rows = await database()`
     select count(*)::int as count from signal_events as event
@@ -320,8 +341,10 @@ export async function countNewSignalsForRun(runId: string): Promise<number> {
   return Number(rows[0].count);
 }
 
-export async function rebuildKnowledgeGraph(): Promise<void> {
-  await database()`
+export async function rebuildKnowledgeGraph(recentRelationships?: RegionRelationships): Promise<void> {
+  const recent = recentRelationships ?? await getArchiveRelationships();
+  const sql = database();
+  await sql`
     with matches as (
       select distinct event.id, match.value->>'topicId' as topic_id
       from signal_events as event
@@ -335,19 +358,23 @@ export async function rebuildKnowledgeGraph(): Promise<void> {
         on first.id = second.id and first.topic_id < second.topic_id
       group by first.topic_id, second.topic_id
     )
-    insert into knowledge_graph (id, updated_at, region_counts, relationships)
+    insert into knowledge_graph (id, updated_at, region_counts, relationships, recent_relationships)
     select 'current', now(),
       coalesce((select jsonb_object_agg(topic_id, signals) from region_totals), '{}'::jsonb),
-      coalesce((select jsonb_object_agg(link, signals) from link_totals), '{}'::jsonb)
+      coalesce((select jsonb_object_agg(link, signals) from link_totals), '{}'::jsonb),
+      ${sql.json(recent)}::jsonb
     on conflict (id) do update set updated_at = excluded.updated_at,
-      region_counts = excluded.region_counts, relationships = excluded.relationships
+      region_counts = excluded.region_counts, relationships = excluded.relationships,
+      recent_relationships = excluded.recent_relationships
   `;
 }
 
 export async function getKnowledgeGraph(): Promise<SignalFeed["knowledgeGraph"] | null> {
-  const rows = await database()`select updated_at, region_counts, relationships from knowledge_graph where id = 'current'`;
+  const rows = await database()`select updated_at, region_counts, relationships, recent_relationships from knowledge_graph where id = 'current'`;
   if (!rows.length) return null;
-  return { updatedAt: new Date(rows[0].updated_at).toISOString(), regionCounts: rows[0].region_counts, relationships: rows[0].relationships };
+  return { updatedAt: new Date(rows[0].updated_at).toISOString(), regionCounts: rows[0].region_counts,
+    relationships: rows[0].relationships,
+    ...(rows[0].recent_relationships ? { recentRelationships: rows[0].recent_relationships } : {}) };
 }
 
 export async function getPendingEmbeddingEvents(limit = 200): Promise<SignalEvent[]> {
@@ -571,15 +598,23 @@ export async function persistSnapshot(feed: SignalFeed): Promise<void> {
 
 export async function backfillSnapshotActivity(limit = 14): Promise<number> {
   const sql = database();
-  const rows = await sql<{ day: string; captured_at: Date }[]>`
-    select day::text as day, captured_at from signal_snapshots
-    where feed->'activity' is null order by day desc limit ${limit}
+  const rows = await sql<{ day: string; captured_at: Date; missing_activity: boolean; missing_relationships: boolean }[]>`
+    select day::text as day, captured_at,
+      feed->'activity' is null as missing_activity,
+      feed->'relationships' is null as missing_relationships
+    from signal_snapshots
+    where feed->'activity' is null or feed->'relationships' is null
+    order by day desc limit ${limit}
   `;
   for (const row of rows) {
-    const activity = await getArchiveActivity(new Date(row.captured_at));
+    const at = new Date(row.captured_at);
+    const patch = {
+      ...(row.missing_activity ? { activity: await getArchiveActivity(at) } : {}),
+      ...(row.missing_relationships ? { relationships: await getArchiveRelationships(at) } : {}),
+    };
     await sql`
-      update signal_snapshots set feed = jsonb_set(feed, '{activity}', ${sql.json(activity)}::jsonb)
-      where day = ${row.day}::date and feed->'activity' is null
+      update signal_snapshots set feed = feed || ${sql.json(patch)}::jsonb
+      where day = ${row.day}::date and captured_at = ${at.toISOString()}::timestamptz
     `;
   }
   return rows.length;
