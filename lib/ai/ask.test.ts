@@ -110,3 +110,12 @@ test("unmapped subjects use the knowledge archive without inventing a map locati
   assert.deepEqual(result.regionIds, []);
   assert.deepEqual(result.events.map((item) => item.id), [garden.id]);
 });
+
+test("quantum computing questions navigate to the physics thread", () => {
+  assert.deepEqual(questionTopics("What is happening with quantum computing?"), [{ id: "science", childId: "science-physics" }]);
+  assert.equal(shouldSearchKnowledge("What is happening with quantum computing?"), false);
+  const paper = event("quantum", "Quantum computing with shallow circuits", "science", "science-physics");
+  const result = answerQuestion("What is happening with quantum computing?", { ...feed, events: [paper] });
+  assert.deepEqual(result.pathSteps.map((step) => step.label), ["SCIENCE", "Physics"]);
+  assert.deepEqual(result.events.map((item) => item.id), [paper.id]);
+});

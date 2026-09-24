@@ -18,6 +18,8 @@ React Three Fiber can emit `onClick` after a drag. Gate scene navigation by the 
 
 Keep `/api/signals` responses uncached when classification or feed display logic changes; upstream source fetches may retain a short revalidation window. Verify the rendered panel against the current classifier after such edits.
 
+When changing classification, remember that archived topic tags are stored in Postgres and only fetched IDs are refreshed by the next ingestion. Verify the affected archive signals and knowledge graph after ingestion; use a targeted backfill for older IDs outside source fetch windows.
+
 Before Vercel deployment work, run `vercel whoami` and check whether `.vercel` links the intended project and team. CLI sign-in does not guarantee project creation access. If project creation returns a 402 fair-use block, stop retries and ask the owner to resolve the block or name an authorized, unblocked team before connecting GitHub. Verify the local build and configuration before requesting missing account access.
 
 In Vercel functions, OIDC arrives through the request context/header, not reliably through `process.env.VERCEL_OIDC_TOKEN`. For AI Gateway, let the AI SDK read it and verify a model response in production before declaring Gateway active.

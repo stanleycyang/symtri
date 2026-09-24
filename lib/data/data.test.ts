@@ -25,6 +25,17 @@ test("solar wind research does not create a false energy connection", () => {
   assert.ok(classifySignal("Solar panels built over irrigation canals", "Hacker News discussion").some((match) => match.topicId === "energy" && match.subtopicId === "energy-solar"));
 });
 
+test("arXiv quantum subjects keep their physics location beside cross-domain topics", () => {
+  const battery = classifySignal("Simulation of a Battery Cell on Quantum Computers: Reactions & Transport", "", ["quant-ph"]);
+  assert.equal(battery[0]?.topicId, "science");
+  assert.equal(battery[0]?.subtopicId, "science-physics");
+  assert.ok(battery.some((match) => match.topicId === "energy"));
+  const circuits = classifySignal("Distilling Datasets into Shallow Circuits for Quantum Machine Learning", "", ["quant-ph"]);
+  assert.equal(circuits[0]?.topicId, "science");
+  assert.equal(circuits[0]?.subtopicId, "science-physics");
+  assert.ok(!classifySignal("Quantum art exhibit", "", []).some((match) => match.topicId === "science"));
+});
+
 test("specific story titles map to regions without inferring unrelated ones", () => {
   assert.equal(classifySignal("Obscura: VPN that cannot log your activity", "Hacker News discussion")[0]?.topicId, "security");
   assert.equal(classifySignal("GPT-6 Sol performance analysis", "Hacker News discussion")[0]?.topicId, "ai");

@@ -4,7 +4,7 @@ import type { TopicMatch } from "./model";
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
   software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "browsers", "sdk", "vscode", "vs code", "kafka", "nixos", "http", "debugger", "terminal", "tailscale"],
-  science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical", "crispr", "enzyme", "vaccine", "mrna", "dna"],
+  science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical", "crispr", "enzyme", "vaccine", "mrna", "dna", "quantum computing", "quantum computer", "quantum computers", "quantum software", "quantum algorithm", "quantum circuit", "quantum machine learning", "qubit", "qubits", "entanglement"],
   space: ["space", "satellite", "satellites", "rocket", "astronomy", "cosmology", "orbital", "spacecraft", "nasa"],
   energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
@@ -29,6 +29,7 @@ const childTerms: Record<string, string[]> = {
   "software-cloud": ["cloud", "serverless", "kubernetes", "container"],
   "science-biotechnology": ["biotech", "protein", "genome", "crispr"],
   "science-neuroscience": ["brain", "neuroscience", "neuron"],
+  "science-physics": ["physics", "quantum", "qubit", "entanglement"],
   "science-climate-science": ["climate", "carbon", "warming"],
   "space-launch-systems": ["rocket", "launch vehicle"],
   "space-satellites": ["satellite"],
@@ -76,7 +77,7 @@ export function classifySignal(title: string, summary: string, categories: strin
     const parentInTitle = matched(title, terms);
     const parentInSummary = matched(summary, terms);
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));
-    let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? 4 : 0);
+    let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? 6 : 0);
     let bestChild: { id: string; score: number } | null = null;
     for (const child of topic.children) {
       const childAliases = childTerms[child.id] ?? [child.name.toLowerCase()];

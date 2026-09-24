@@ -21,7 +21,7 @@ export type AskResult = {
 const regionAliases: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "llm", "language model", "agent", "agents"],
   software: ["software", "developer", "programming", "open source", "database"],
-  science: ["science", "biology", "physics", "medicine"],
+  science: ["science", "biology", "physics", "medicine", "quantum computing", "quantum computers", "qubits"],
   space: ["space", "satellite", "rocket", "astronomy"],
   energy: ["energy", "power demand", "electricity", "nuclear", "solar", "battery", "fusion"],
   markets: ["markets", "economy", "finance", "investment", "venture capital"],
@@ -36,6 +36,7 @@ const subtopicAliases: Record<string, string[]> = {
   "ai-language-models": ["llm", "llms", "language model", "language models"],
   "ai-coding-agents": ["coding agent", "coding agents"],
   "ai-ai-infrastructure": ["ai infrastructure", "inference"],
+  "science-physics": ["quantum computing", "quantum computers", "quantum physics", "qubits"],
   "energy-power-demand": ["power demand", "data center power"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
 };
