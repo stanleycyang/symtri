@@ -7,7 +7,7 @@ import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import { selectDistinctHeadlines } from "./select";
 import { knowledgeSearchQuery } from "./search";
 import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
-import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
+import { unavailableSources, type RelatedSignal, type SignalEvent, type SignalFeed, type SnapshotDay, type SourceStatus } from "./model";
 
 let connection: ReturnType<typeof postgres> | undefined;
 let lastDatabaseUse = 0;
@@ -236,7 +236,7 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
     importance: row.importance, topics: currentTopics(row),
   })).filter((event) => event.topics.length > 0);
   if (!events.length) return null;
-  const sources: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };
+  const sources = unavailableSources();
   return { observedAt: new Date().toISOString(), events, sources, partial: true, scope: "archive" };
 }
 
@@ -496,7 +496,7 @@ export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed,
     observedAt: new Date(latest.completed_at).toISOString(),
     sources: latest.source_status,
     activity: Object.keys(latest.activity).length ? latest.activity : undefined,
-    partial: latest.source_status["hacker-news"] !== "ok" || latest.source_status.github !== "ok" || latest.source_status.arxiv !== "ok",
+    partial: (["hacker-news", "github", "arxiv", "openalex"] as const).some((source) => latest.source_status[source] !== "ok"),
   };
 }
 

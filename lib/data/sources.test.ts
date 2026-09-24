@@ -1,6 +1,34 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion } from "./sources";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion, fetchOpenAlex } from "./sources";
+
+test("OpenAlex uses a bounded deterministic hourly sample and short public preview", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { url: URL; cache: RequestCache | undefined; revalidate: number | false | undefined }[] = [];
+  const abstract = "Fusion researchers tested a new stellarator configuration and measured plasma confinement across several magnetic field settings while comparing energy losses with earlier experiments and identifying practical limits for future reactor designs in a peer reviewed journal article";
+  const inverted: Record<string, number[]> = {};
+  abstract.split(" ").forEach((word, position) => (inverted[word] ??= []).push(position));
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: new URL(String(input)), cache: init?.cache, revalidate: init?.next?.revalidate });
+    return Response.json({ results: [{ id: "https://openalex.org/W12345", display_name: "A stellarator configuration for fusion energy",
+      publication_date: "2026-09-24", doi: "https://doi.org/10.1234/fusion.2026", abstract_inverted_index: inverted }] });
+  };
+  try {
+    assert.equal((await fetchOpenAlex("hour:2026-09-24T16"))[0]?.source, "openalex");
+    assert.equal(calls[0].url.searchParams.get("seed"), "hour:2026-09-24T16");
+    assert.equal(calls[0].url.searchParams.get("sample"), "50");
+    assert.equal(calls[0].url.searchParams.get("per_page"), "50");
+    assert.match(calls[0].url.searchParams.get("filter") ?? "", /from_publication_date:2026-09-22,to_publication_date:2026-09-24/);
+    assert.match(calls[0].url.searchParams.get("filter") ?? "", /primary_topic.field.id:17\|22\|31\|13\|21/);
+    assert.match(calls[0].url.searchParams.get("filter") ?? "", /language:en/);
+    assert.equal(calls[0].cache, "no-store");
+    assert.equal((await fetchOpenAlex()).length, 1);
+    assert.equal(calls[1].url.searchParams.get("sample"), "12");
+    assert.equal(calls[1].revalidate, 900);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("hourly source sampling finds new items without widening the public sample", async () => {
   const originalFetch = globalThis.fetch;

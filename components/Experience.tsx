@@ -12,7 +12,7 @@ import { selectFocusedSignals } from "@/lib/data/select";
 const Universe = dynamic(() => import("@/components/universe/Universe"), { ssr: false, loading: () => <div className="universe-loading">AWAKENING THE MAP</div> });
 
 type DisplaySignal = { id: string; title: string; source: string; publishedAt: string; age: string; summary: string; url?: string; live: boolean };
-const sourceLabels = { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv" } as const;
+const sourceLabels = { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv", openalex: "OpenAlex" } as const;
 const emptySignals: SignalEvent[] = [];
 function ageOf(publishedAt: string, referenceAt: string) {
   const minutes = Math.max(0, Math.floor((Date.parse(referenceAt) - Date.parse(publishedAt)) / 60000));
@@ -22,7 +22,9 @@ function ageOf(publishedAt: string, referenceAt: string) {
   return hours < 24 ? `${hours} hour${hours === 1 ? "" : "s"} ago` : `${Math.floor(hours / 24)} day${hours < 48 ? "" : "s"} ago`;
 }
 function showLive(event: Pick<SignalEvent, "id" | "title" | "source" | "publishedAt" | "summary" | "url">, observedAt: string): DisplaySignal {
-  return { id: event.id, title: event.title, source: sourceLabels[event.source], publishedAt: event.publishedAt, age: ageOf(event.publishedAt, observedAt), summary: event.summary, url: event.url, live: true };
+  return { id: event.id, title: event.title, source: sourceLabels[event.source], publishedAt: event.publishedAt,
+    age: event.source === "openalex" ? shortDay(event.publishedAt.slice(0, 10)) : ageOf(event.publishedAt, observedAt),
+    summary: event.summary, url: event.url, live: true };
 }
 function shortDay(day: string) { return new Date(`${day}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).toUpperCase(); }
 

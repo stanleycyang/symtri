@@ -208,7 +208,7 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
   } else if (subtopicId && !scoped.length && matching.length) {
     summary = `No sampled signal matches ${childName} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this thread.`;
   } else if (candidates.length) {
-    summary = `${candidates.length} sampled signal${candidates.length === 1 ? " matches" : "s match"} ${specificWords.length ? knowledgeSearchQuery(question) : childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : "GitHub"}).`;
+    summary = `${candidates.length} sampled signal${candidates.length === 1 ? " matches" : "s match"} ${specificWords.length ? knowledgeSearchQuery(question) : childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : selected[0].source === "openalex" ? "OpenAlex" : "GitHub"}).`;
   } else {
     summary = feed.scope === "history"
       ? `No sampled signal matches ${childName ?? names[0]} in this snapshot. Explore another date or region.`

@@ -1,6 +1,6 @@
 import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
-import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion } from "./sources";
-import type { SignalEvent, SignalFeed, SourceId, SourceStatus } from "./model";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion, fetchOpenAlex } from "./sources";
+import { unavailableSources, type SignalEvent, type SignalFeed, type SourceId } from "./model";
 
 export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEvent[] {
   return deduplicateSignals(events.filter((event) => event.topics.length > 0))
@@ -14,14 +14,16 @@ export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEven
     });
 }
 
-export async function getSignalFeed(options: { includeUnclassified?: boolean; forIngestion?: boolean } = {}): Promise<SignalFeed> {
+export async function getSignalFeed(options: { includeUnclassified?: boolean; forIngestion?: boolean; slot?: string } = {}): Promise<SignalFeed> {
+  if (options.forIngestion && !options.slot) throw new Error("An ingestion slot is required for source sampling");
   const sources: [SourceId, () => Promise<{ events: SignalEvent[]; status: "ok" | "partial" }>][] = [
     ["hacker-news", () => options.forIngestion ? fetchHackerNewsForIngestion() : fetchHackerNews().then((items) => ({ events: items, status: "ok" }))],
     ["github", () => options.forIngestion ? fetchGitHubForIngestion() : fetchGitHub().then((items) => ({ events: items, status: "ok" }))],
     ["arxiv", () => options.forIngestion ? fetchArxivForIngestion() : fetchArxiv().then((items) => ({ events: items, status: "ok" }))],
+    ["openalex", () => fetchOpenAlex(options.forIngestion ? options.slot : undefined).then((items) => ({ events: items, status: "ok" }))],
   ];
   const results = await Promise.allSettled(sources.map(([, fetchSource]) => fetchSource()));
-  const status: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };
+  const status = unavailableSources();
   const events: SignalEvent[] = [];
   results.forEach((result, index) => {
     const source = sources[index][0];

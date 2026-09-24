@@ -67,6 +67,35 @@ export function normalizeArxivFeed(xml: string): SignalEvent[] {
   });
 }
 
+function openAlexAbstract(value: unknown): string {
+  const index = record(value);
+  if (!index) return "";
+  const words: string[] = [];
+  for (const [word, positions] of Object.entries(index)) {
+    if (!Array.isArray(positions) || word.length > 80) continue;
+    for (const position of positions) {
+      if (Number.isInteger(position) && position >= 0 && position < 1200) words[position] = word;
+    }
+  }
+  return clean(words.filter(Boolean).join(" "));
+}
+
+export function normalizeOpenAlex(input: unknown): SignalEvent | null {
+  const work = record(input);
+  if (!work || work.is_retracted === true) return null;
+  const externalId = text(work.id).match(/W\d+$/)?.[0];
+  const title = clean(work.display_name);
+  const summary = openAlexAbstract(work.abstract_inverted_index);
+  const publishedAt = iso(work.publication_date);
+  const doi = safeUrl(work.doi, "");
+  if (!externalId || !title || summary.split(/\s+/).length < 30 || !publishedAt || !doi.startsWith("https://doi.org/")) return null;
+  const excerpt = short(summary, 600);
+  const classificationInput = { title, summary: excerpt, categories: [] as string[] };
+  return { id: `openalex:${externalId}`, source: "openalex", externalId, title, url: doi,
+    summary: excerpt, publishedAt, importance: 25,
+    topics: classifySignal(title, excerpt), classificationInput };
+}
+
 export function deduplicateSignals(events: SignalEvent[]): SignalEvent[] {
   const seenIds = new Set<string>();
   const seenUrls = new Set<string>();

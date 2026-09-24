@@ -1,6 +1,6 @@
 create table if not exists signal_events (
   id text primary key,
-  source text not null check (source in ('hacker-news', 'github', 'arxiv')),
+  source text not null check (source in ('hacker-news', 'github', 'arxiv', 'openalex')),
   external_id text not null,
   title text not null,
   url text not null,

@@ -5,7 +5,7 @@ import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
 import { getCurrentFeed } from "@/lib/data/current";
 import { canonicalSignalUrl, signalContentKey } from "@/lib/data/normalize";
 import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
-import type { SignalFeed } from "@/lib/data/model";
+import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         }
         const results = await searchKnowledge(trimmed, vector);
         const knowledgeFeed: SignalFeed = { observedAt: new Date().toISOString(), events: results.map((item) => item.event),
-          sources: { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" }, partial: true, scope: "knowledge" };
+          sources: unavailableSources(), partial: true, scope: "knowledge" };
         return Response.json(await withSourceSummary(answerKnowledgeQuestion(trimmed, results), knowledgeFeed), { headers: { "Cache-Control": "no-store" } });
       } catch (error) { console.warn("SYMTRI knowledge search unavailable", error instanceof Error ? error.message : "unknown error"); }
     }

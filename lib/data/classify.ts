@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 9;
+export const CLASSIFIER_VERSION = 10;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -13,7 +13,7 @@ const topicTerms: Record<string, string[]> = {
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
   security: ["security", "cyber", "cyberattack", "cyberattacks", "phishing", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "digital identity", "identity verification", "identity management", "identity theft", "authentication", "authorization", "access control", "hacked", "hacking", "supply-chain attack"],
   hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "sensor", "manufacturing", "uefi", "vga", "vr glasses", "microcontroller", "esp32", "raspberry pi", "laptop", "processor", "wearable"],
-  startups: ["startup", "founder", "funding", "seed round", "product launch", "launch hn", "venture", "growth"],
+  startups: ["startup", "founder", "funding", "seed round", "product launch", "launch hn", "venture"],
   crypto: ["crypto", "bitcoin", "ethereum", "blockchain", "stablecoin", "web3", "onchain"],
 };
 
@@ -78,7 +78,7 @@ function strongestTerm(text: string, terms: string[]) { return terms.filter((ter
 
 function astronomicalSense(text: string): string {
   return text
-    .replace(/\b(?:constant|linear|logarithmic|sublinear|state|feature|latent|vector|embedding|search|parameter|phase|sample|hilbert|memory|storage|disk|free|file|workspace)[ -]space\b/gi, "")
+    .replace(/\b(?:constant|linear|logarithmic|sublinear|state|feature|latent|vector|embedding|search|parameter|phase|sample|hilbert|eigen|memory|storage|disk|free|file|workspace)[ -]space\b/gi, "")
     .replace(/\bspace[ -](?:overhead|complexity|usage|efficiency|efficient|bound|requirements?)\b/gi, "");
 }
 

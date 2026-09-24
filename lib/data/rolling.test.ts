@@ -9,7 +9,7 @@ const event = (id: string, publishedAt: string): SignalEvent => ({
 });
 const feed = (events: SignalEvent[], scope: SignalFeed["scope"]): SignalFeed => ({
   observedAt: "2026-09-23T12:00:00.000Z", events,
-  sources: { "hacker-news": "unavailable", github: "ok", arxiv: "unavailable" },
+  sources: { "hacker-news": "unavailable", github: "ok", arxiv: "unavailable", openalex: "unavailable" },
   partial: true, scope,
 });
 

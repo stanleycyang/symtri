@@ -10,13 +10,13 @@ type Props = {
   onNavigate: (regionId: string, subtopicId: string | null) => void;
 };
 
-const sourceNames = { "hacker-news": "HACKER NEWS", github: "GITHUB", arxiv: "ARXIV" } as const;
-function sourceTime(publishedAt: string, observedAt: string, historical: boolean): string {
+const sourceNames = { "hacker-news": "HACKER NEWS", github: "GITHUB", arxiv: "ARXIV", openalex: "OPENALEX" } as const;
+function sourceTime(publishedAt: string, observedAt: string, historical: boolean, dateOnly: boolean): string {
   const published = Date.parse(publishedAt);
   const observed = Date.parse(observedAt);
   if (!Number.isFinite(published) || !Number.isFinite(observed)) return "DATE UNKNOWN";
   const minutes = Math.max(0, Math.floor((observed - published) / 60_000));
-  if (historical || minutes >= 14 * 24 * 60) {
+  if (historical || dateOnly || minutes >= 14 * 24 * 60) {
     return new Date(published).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).toUpperCase();
   }
   if (minutes < 1) return "JUST NOW";
@@ -78,7 +78,7 @@ export default function AskSymtri({ day, onClose, onResult, onNavigate }: Props)
       </div>}
       <p className="ask-summary">{result.summary}</p>
       {result.pathSteps.length > 0 && <><span className="ask-path-label">{result.regionIds.length > 1 ? "CONCEPTUAL MAP ROUTE" : "MAP LOCATION"}</span><div className="ask-path" aria-label="Highlighted map path">{result.pathSteps.map((step, index) => <span key={`${step.regionId}:${step.subtopicId ?? "region"}`}>{index > 0 && <b>↗</b>}<button type="button" onClick={() => onNavigate(step.regionId, step.subtopicId)}>{step.label.toUpperCase()}</button></span>)}</div></>}
-      {result.events.length > 0 && <div className="ask-sources" ref={sources}><span>{result.scope === "knowledge" ? "FROM THE KNOWLEDGE ARCHIVE" : result.retrieval === "semantic-assisted" ? "RANKED BY MEANING · SAMPLE" : "FROM THE SAMPLE"}</span>{result.events.map((event) => <a key={event.id} href={event.url} target="_blank" rel="noopener noreferrer"><small>{sourceNames[event.source]} · {sourceTime(event.publishedAt, result.observedAt, result.scope === "history")}{result.citedEventIds.includes(event.id) && " · CITED"}</small>{event.title}<b>↗</b></a>)}</div>}
+      {result.events.length > 0 && <div className="ask-sources" ref={sources}><span>{result.scope === "knowledge" ? "FROM THE KNOWLEDGE ARCHIVE" : result.retrieval === "semantic-assisted" ? "RANKED BY MEANING · SAMPLE" : "FROM THE SAMPLE"}</span>{result.events.map((event) => <a key={event.id} href={event.url} target="_blank" rel="noopener noreferrer"><small>{sourceNames[event.source]} · {sourceTime(event.publishedAt, result.observedAt, result.scope === "history", event.source === "openalex")}{result.citedEventIds.includes(event.id) && " · CITED"}</small>{event.title}<b>↗</b></a>)}</div>}
     </div>}
   </section>;
 }

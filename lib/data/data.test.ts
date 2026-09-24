@@ -3,7 +3,22 @@ import test from "node:test";
 import { classifySignal } from "./classify";
 import { selectFeedEvents } from "./feed";
 import { selectDistinctHeadlines, selectFocusedSignals, selectRegionHighlights } from "./select";
-import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews, uniqueSourceObservations } from "./normalize";
+import { canonicalSignalUrl, deduplicateSignals, normalizeArxivFeed, normalizeGitHub, normalizeHackerNews, normalizeOpenAlex, uniqueSourceObservations } from "./normalize";
+
+test("OpenAlex reconstructs a bounded journal abstract and rejects poor records", () => {
+  const abstract = "Fusion researchers tested a new stellarator configuration and measured plasma confinement across several magnetic field settings while comparing energy losses with earlier experiments and identifying practical limits for future reactor designs in a peer reviewed journal article";
+  const inverted: Record<string, number[]> = {};
+  abstract.split(" ").forEach((word, position) => (inverted[word] ??= []).push(position));
+  const work = { id: "https://openalex.org/W12345", display_name: "A stellarator configuration for fusion energy", publication_date: "2026-09-24",
+    doi: "https://doi.org/10.1234/fusion.2026", abstract_inverted_index: inverted, is_retracted: false };
+  const event = normalizeOpenAlex(work);
+  assert.equal(event?.id, "openalex:W12345");
+  assert.equal(event?.summary, abstract);
+  assert.equal(event?.url, work.doi);
+  assert.equal(event?.topics[0]?.subtopicId, "energy-fusion");
+  assert.equal(normalizeOpenAlex({ ...work, is_retracted: true }), null);
+  assert.equal(normalizeOpenAlex({ ...work, abstract_inverted_index: { Short: [0] } }), null);
+});
 
 test("classification prefers a specific thread and leaves unrelated stories unmapped", () => {
   assert.deepEqual(classifySignal("AI coding agents use tools", "A benchmark of tool use")[0]?.subtopicId, "ai-coding-agents");
@@ -52,9 +67,18 @@ test("computational space is not astronomy and astro-ph outweighs incidental GPU
 test("disk space and device activity do not create false map regions", () => {
   assert.ok(!classifySignal("cleanupper disk-space", "Open-source macOS disk cleanup CLI")
     .some((match) => match.topicId === "space"));
+  assert.ok(!classifySignal("Identifying systems in eigen-space", "A mathematical model")
+    .some((match) => match.topicId === "space"));
   assert.deepEqual(classifySignal("A 3D visualization for user/device activity data", "Hacker News discussion."), []);
   assert.ok(classifySignal("The newest ESP32 can run Linux", "A tiny microcontroller board")
     .some((match) => match.topicId === "hardware"));
+});
+
+test("biological growth is not startup activity", () => {
+  assert.ok(!classifySignal("Seedling growth under drought conditions", "Plant growth in a field trial")
+    .some((match) => match.topicId === "startups"));
+  assert.ok(classifySignal("Startup growth after a seed round", "Founders discuss acquisition")
+    .some((match) => match.topicId === "startups"));
 });
 
 test("cyberattack and phishing sources connect Security to adjacent topics", () => {

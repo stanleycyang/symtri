@@ -11,7 +11,7 @@ const event: SignalEvent = {
   publishedAt: "2026-09-22T12:00:00.000Z", importance: 60,
   topics: [{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }],
 };
-const feed: SignalFeed = { observedAt: "2026-09-22T13:00:00.000Z", events: [event], sources: { "hacker-news": "ok", github: "ok", arxiv: "ok" }, partial: false, scope: "sample" };
+const feed: SignalFeed = { observedAt: "2026-09-22T13:00:00.000Z", events: [event], sources: { "hacker-news": "ok", github: "ok", arxiv: "ok", openalex: "unavailable" }, partial: false, scope: "sample" };
 
 function modelResponse(note: { summary: string; source_ids: string[] }) {
   return new MockLanguageModelV4({ doGenerate: {

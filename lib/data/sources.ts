@@ -1,9 +1,10 @@
-import { normalizeArxivFeed, normalizeGitHub, normalizeHackerNews } from "./normalize";
+import { normalizeArxivFeed, normalizeGitHub, normalizeHackerNews, normalizeOpenAlex } from "./normalize";
 import type { SignalEvent } from "./model";
 
 const hackerNewsReplayLimit = 180;
 const hackerNewsFreshnessLimitMs = 45 * 60 * 1000;
 const hackerNewsRetryLimit = 24;
+const openAlexIngestionLimit = 50;
 
 async function request(url: string, headers?: HeadersInit, fresh = false): Promise<Response> {
   const response = await fetch(url, { headers, ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: 900 } }), signal: AbortSignal.timeout(12000) });
@@ -13,6 +14,29 @@ async function request(url: string, headers?: HeadersInit, fresh = false): Promi
 
 export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent[]> {
   return (await fetchHackerNewsSample(forIngestion)).events;
+}
+
+export async function fetchOpenAlex(slot?: string): Promise<SignalEvent[]> {
+  const hour = slot ? Date.parse(`${slot.replace(/^hour:/, "")}:00:00Z`) : Date.now();
+  if (!Number.isFinite(hour)) throw new Error("Invalid OpenAlex ingestion slot");
+  const from = new Date(hour - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const to = new Date(hour).toISOString().slice(0, 10);
+  const limit = slot ? openAlexIngestionLimit : 12;
+  const url = new URL("https://api.openalex.org/works");
+  url.searchParams.set("filter", `from_publication_date:${from},to_publication_date:${to},has_abstract:true,type:article,language:en,primary_location.source.type:journal,open_access.is_oa:true,primary_topic.field.id:17|22|31|13|21`);
+  url.searchParams.set("sample", String(limit));
+  url.searchParams.set("seed", slot ?? `preview:${to}`);
+  url.searchParams.set("per_page", String(limit));
+  url.searchParams.set("select", "id,display_name,publication_date,doi,abstract_inverted_index,is_retracted");
+  const headers: Record<string, string> = { "User-Agent": "SYMTRI/0.1 (https://symtri.com)" };
+  if (process.env.OPENALEX_API_KEY) headers.Authorization = `Bearer ${process.env.OPENALEX_API_KEY}`;
+  const response = await request(url.toString(), headers, Boolean(slot));
+  const data: unknown = await response.json();
+  const items = data && typeof data === "object" && "results" in data ? data.results : null;
+  if (!Array.isArray(items)) throw new Error("Invalid OpenAlex works response");
+  const events = items.map(normalizeOpenAlex).filter((event): event is SignalEvent => event !== null);
+  if (!events.length) throw new Error("OpenAlex returned no usable journal articles");
+  return events;
 }
 
 export async function fetchHackerNewsForIngestion(): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {

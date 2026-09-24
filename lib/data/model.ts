@@ -1,7 +1,7 @@
 import type { RegionActivity } from "./activity";
 import type { RegionRelationships } from "./activity";
 
-export type SourceId = "hacker-news" | "github" | "arxiv";
+export type SourceId = "hacker-news" | "github" | "arxiv" | "openalex";
 
 export type TopicMatch = {
   topicId: string;
@@ -25,6 +25,10 @@ export type SignalEvent = {
 export type RelatedSignal = Pick<SignalEvent, "id" | "source" | "title" | "url" | "summary" | "publishedAt" | "topics">;
 
 export type SourceStatus = Record<SourceId, "ok" | "partial" | "unavailable">;
+
+export function unavailableSources(): SourceStatus {
+  return { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable", openalex: "unavailable" };
+}
 
 export type SignalFeed = {
   observedAt: string;

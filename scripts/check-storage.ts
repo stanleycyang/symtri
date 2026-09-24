@@ -83,6 +83,8 @@ async function main() {
   await sql.unsafe(recentRelationshipsMigration);
   const snapshotRelationshipsMigration = await readFile(new URL("../supabase/migrations/20260924013000_snapshot_relationships_backfill.sql", import.meta.url), "utf8");
   await sql.unsafe(snapshotRelationshipsMigration);
+  const openAlexMigration = await readFile(new URL("../supabase/migrations/20260924014000_openalex_source.sql", import.meta.url), "utf8");
+  await sql.unsafe(openAlexMigration);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
   assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
@@ -105,10 +107,16 @@ async function main() {
   };
   const feed: SignalFeed = {
     observedAt: new Date().toISOString(), events: [event],
-    sources: { "hacker-news": "unavailable", github: "ok", arxiv: "unavailable" },
+    sources: { "hacker-news": "unavailable", github: "ok", arxiv: "unavailable", openalex: "unavailable" },
     partial: true, scope: "sample",
   };
   try {
+    const journalArticle: SignalEvent = { ...event, id: `openalex:${externalId}-journal`, source: "openalex",
+      externalId: `${externalId}-journal`, title: "Journal study of AI agents", url: `https://doi.org/10.1234/${externalId}` };
+    assert.equal(await persistSignals({ ...feed, events: [journalArticle] }), 1);
+    assert.equal(await persistSignals({ ...feed, events: [journalArticle] }), 0);
+    assert.equal((await sql`select source from signal_observations where source = 'openalex' and external_id = ${journalArticle.externalId}`)[0]?.source, "openalex");
+    await sql`delete from signal_events where id = ${journalArticle.id}`;
     const repository: SignalEvent = { ...event, id: `github:${externalId}-shared-page`, externalId: `${externalId}-shared-page`,
       url: `https://github.com/symtri/${externalId}/shared-page`, title: "Agent toolkit repository", summary: "A repository for agent tools", importance: 80 };
     const discussion: SignalEvent = { ...repository, id: `hacker-news:${externalId}-shared-page`, source: "hacker-news",
@@ -449,7 +457,7 @@ async function main() {
     event.title = "Snapshot updated";
     await persistSnapshot(feed);
     const twoSourceFeed: SignalFeed = {
-      ...feed, sources: { "hacker-news": "ok", github: "ok", arxiv: "unavailable" },
+      ...feed, sources: { "hacker-news": "ok", github: "ok", arxiv: "unavailable", openalex: "unavailable" },
     };
     event.title = "Two-source snapshot";
     await persistSnapshot(twoSourceFeed);
@@ -457,14 +465,14 @@ async function main() {
     await persistSnapshot(feed);
     assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
     event.title = "Swapped-source retry";
-    await persistSnapshot({ ...feed, sources: { "hacker-news": "ok", github: "unavailable", arxiv: "ok" } });
+    await persistSnapshot({ ...feed, sources: { "hacker-news": "ok", github: "unavailable", arxiv: "ok", openalex: "unavailable" } });
     assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
     event.title = "Partial-source retry";
-    await persistSnapshot({ ...twoSourceFeed, sources: { "hacker-news": "ok", github: "partial", arxiv: "unavailable" } });
+    await persistSnapshot({ ...twoSourceFeed, sources: { "hacker-news": "ok", github: "partial", arxiv: "unavailable", openalex: "unavailable" } });
     assert.equal((await getSnapshotFeed(secondDay))?.events[0].title, "Two-source snapshot");
     const completeFeed: SignalFeed = {
       ...feed, partial: false,
-      sources: { "hacker-news": "ok", github: "ok", arxiv: "ok" },
+      sources: { "hacker-news": "ok", github: "ok", arxiv: "ok", openalex: "unavailable" },
     };
     event.title = "Complete snapshot";
     await persistSnapshot(completeFeed);

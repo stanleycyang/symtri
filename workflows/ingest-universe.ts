@@ -3,7 +3,7 @@ import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
 import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveCount, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
-import type { SignalFeed } from "@/lib/data/model";
+import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 
 async function begin(slot: string): Promise<boolean> {
   "use step";
@@ -18,9 +18,9 @@ async function begin(slot: string): Promise<boolean> {
   return true;
 }
 
-async function fetchSources(): Promise<SignalFeed> {
+async function fetchSources(slot: string): Promise<SignalFeed> {
   "use step";
-  const feed = await getSignalFeed({ includeUnclassified: true, forIngestion: true });
+  const feed = await getSignalFeed({ includeUnclassified: true, forIngestion: true, slot });
   if (Object.values(feed.sources).every((status) => status === "unavailable")) {
     throw new Error("All sources unavailable");
   }
@@ -48,7 +48,7 @@ async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: stri
   const pending = await getPendingEmbeddingEvents();
   const embedded = await persistEmbeddings({
     observedAt: new Date().toISOString(), events: pending, scope: "archive", partial: false,
-    sources: { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" },
+    sources: unavailableSources(),
   }, embedTexts);
   return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
 }
@@ -64,7 +64,7 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
   if (!await begin(slot)) return { status: "partial", error: "Ingestion slot already used or another run is active" };
   let result: IngestionResult = { status: "failed" };
   try {
-    const feed = await fetchSources();
+    const feed = await fetchSources(slot);
     const stored = await storeFeed(slot, feed);
     const embedding = { embedded: 0, embeddingStatus: "unavailable" };
     try {

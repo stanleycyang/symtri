@@ -13,7 +13,7 @@ const agents = event("agents", "A coding agent for repositories", "ai", "ai-agen
 const nuclear = event("nuclear", "Small nuclear reactors for data centers", "energy", "energy-nuclear");
 const feed: SignalFeed = {
   observedAt, events: [agents, nuclear],
-  sources: { "hacker-news": "ok", github: "ok", arxiv: "ok" }, partial: false, scope: "sample",
+  sources: { "hacker-news": "ok", github: "ok", arxiv: "ok", openalex: "unavailable" }, partial: false, scope: "sample",
 };
 
 test("an agents question navigates to its thread with real evidence", () => {

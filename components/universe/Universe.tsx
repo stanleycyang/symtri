@@ -213,7 +213,7 @@ function ChildNode({ position, name, color, active, onClick }: { position: Vec3;
 }
 
 function SignalMote({ position, source, color, active, onClick }: { position: Vec3; source: string; color: string; active: boolean; onClick: () => void }) {
-  const short = source === "Hacker News" ? "HN" : source === "GitHub" ? "GH" : "ARX";
+  const short = source === "Hacker News" ? "HN" : source === "GitHub" ? "GH" : source === "OpenAlex" ? "OA" : "ARX";
   return <group position={position}>
     <mesh raycast={() => null}>
       <octahedronGeometry args={[active ? .18 : .12, 0]} />
