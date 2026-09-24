@@ -20,6 +20,8 @@ Keep `/api/signals` responses uncached when classification or feed display logic
 
 When changing classification, bump `CLASSIFIER_VERSION` in `lib/data/classify.ts`. The hourly workflow reclassifies up to 500 stored signals per run when it has their original classification input. Verify the affected archive signals and knowledge graph after ingestion; older GitHub and arXiv rows from before classification inputs were stored still need a fresh source observation or targeted backfill.
 
+Archive reads apply the current classifier to stale rows with saved inputs, so removed false matches disappear from the map before the next hourly write. New matches and cumulative knowledge graph links still need the next ingestion run; verify them after the backlog clears.
+
 Before Vercel deployment work, run `vercel whoami` and check whether `.vercel` links the intended project and team. CLI sign-in does not guarantee project creation access. If project creation returns a 402 fair-use block, stop retries and ask the owner to resolve the block or name an authorized, unblocked team before connecting GitHub. Verify the local build and configuration before requesting missing account access.
 
 In Vercel functions, OIDC arrives through the request context/header, not reliably through `process.env.VERCEL_OIDC_TOKEN`. For AI Gateway, let the AI SDK read it and verify a model response in production before declaring Gateway active.

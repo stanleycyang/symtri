@@ -13,6 +13,15 @@ function embeddingCandidates(events: SignalEvent[]) {
   return events.map((event) => ({ id: event.id, hash: embeddingInputHash(signalEmbeddingText(event)) }));
 }
 
+function currentTopics(row: { topics?: unknown; classifier_version?: unknown; classification_input?: unknown }): SignalEvent["topics"] {
+  const stored = row.topics as SignalEvent["topics"];
+  if (typeof row.classifier_version !== "number" || row.classifier_version >= CLASSIFIER_VERSION || !row.classification_input) return stored;
+  const input = row.classification_input as { title?: unknown; summary?: unknown; categories?: unknown };
+  if (typeof input.title !== "string" || typeof input.summary !== "string") return stored;
+  const categories = Array.isArray(input.categories) ? input.categories.filter((value): value is string => typeof value === "string") : [];
+  return classifySignal(input.title, input.summary, categories);
+}
+
 function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is required for persistent signals");
@@ -201,7 +210,7 @@ export async function hasCurrentSignalEmbeddings(events: SignalEvent[]): Promise
 export async function getStoredFeed(): Promise<SignalFeed | null> {
   const sql = database();
   const rows = await sql`
-    select id, source, external_id, title, url, summary, published_at, importance, topics
+    select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
     from signal_events where published_at >= now() - interval '14 days' and jsonb_array_length(topics) > 0
     order by published_at desc limit 300
   `;
@@ -210,8 +219,9 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
     id: row.id, source: row.source, externalId: row.external_id,
     title: row.title, url: row.url, summary: row.summary,
     publishedAt: new Date(row.published_at).toISOString(),
-    importance: row.importance, topics: row.topics,
-  }));
+    importance: row.importance, topics: currentTopics(row),
+  })).filter((event) => event.topics.length > 0);
+  if (!events.length) return null;
   const sources: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };
   return { observedAt: new Date().toISOString(), events, sources, partial: true, scope: "archive" };
 }
@@ -225,18 +235,22 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
       : [{ topicId: reference.id }];
     for (const filter of filters) {
       const rows = await sql`
-        select id, source, external_id, title, url, summary, published_at, importance, topics
+        select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
         from signal_events
         where published_at >= now() - interval '14 days'
           and topics @> ${sql.json([filter])}::jsonb
         order by published_at desc limit 40
       `;
-      for (const row of rows) found.set(row.id, {
-        id: row.id, source: row.source, externalId: row.external_id,
-        title: row.title, url: row.url, summary: row.summary,
-        publishedAt: new Date(row.published_at).toISOString(),
-        importance: row.importance, topics: row.topics,
-      });
+      for (const row of rows) {
+        const current = currentTopics(row);
+        if (!current.some((match) => match.topicId === filter.topicId && (!filter.subtopicId || match.subtopicId === filter.subtopicId))) continue;
+        found.set(row.id, {
+          id: row.id, source: row.source, externalId: row.external_id,
+          title: row.title, url: row.url, summary: row.summary,
+          publishedAt: new Date(row.published_at).toISOString(),
+          importance: row.importance, topics: current,
+        });
+      }
     }
   }
   return [...found.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));

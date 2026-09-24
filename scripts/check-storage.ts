@@ -21,6 +21,7 @@ const unclassifiedId = `github:${externalId}-unclassified`;
 const relatedId = `github:${externalId}-related`;
 const foreignId = `github:${externalId}-foreign`;
 const quantumId = `arxiv:${externalId}-quantum`;
+const cosmicId = `arxiv:${externalId}-cosmic`;
 const archiveId = `github:${externalId}-archive`;
 const crowdPrefix = `github:${externalId}-crowd-`;
 const knowledgePrefix = `github:${externalId}-knowledge-`;
@@ -127,6 +128,7 @@ async function main() {
       classificationInput: { title: "Simulation of a Battery Cell on Quantum Computers", summary: "Quantum research", categories: ["quant-ph"] } };
     await persistSignals({ ...feed, events: [quantum] });
     await sql`update signal_events set classifier_version = 0 where id = ${quantumId}`;
+    assert.equal((await getStoredFeed())?.events.find((item) => item.id === quantumId)?.topics[0].topicId, "science");
     assert.equal(await refreshStoredClassifications(), 1);
     const reclassified = (await sql`select topics, classification_input, classifier_version from signal_events where id = ${quantumId}`)[0];
     assert.equal(reclassified.topics[0].topicId, "science");
@@ -135,6 +137,15 @@ async function main() {
     assert.equal(reclassified.classifier_version, CLASSIFIER_VERSION);
     assert.equal(await refreshStoredClassifications(), 0);
     await sql`delete from signal_events where id = ${quantumId}`;
+    const cosmic: SignalEvent = { ...event, id: cosmicId, source: "arxiv", externalId: `${externalId}-cosmic`,
+      title: "Holographic dark energy in cosmology", url: `https://arxiv.org/abs/${externalId}-cosmic`,
+      summary: "A study of spacetime and gravity", topics: [{ topicId: "energy", subtopicId: null, relevance: .5 }],
+      classificationInput: { title: "Holographic dark energy in cosmology", summary: "A study of spacetime and gravity", categories: ["astro-ph.CO"] } };
+    await persistSignals({ ...feed, events: [cosmic] });
+    await sql`update signal_events set classifier_version = 0 where id = ${cosmicId}`;
+    assert.ok(!(await getStoredFeed())?.events.find((item) => item.id === cosmicId)?.topics.some((match) => match.topicId === "energy"));
+    assert.ok(!(await getRecentTopicEvents([{ id: "energy", childId: null }])).some((item) => item.id === cosmicId));
+    await sql`delete from signal_events where id = ${cosmicId}`;
     await rebuildKnowledgeGraph();
     assert.equal((await getKnowledgeGraph())?.regionCounts.ai, 1);
     assert.equal(await hasCurrentSignalEmbeddings(feed.events), false);
@@ -299,7 +310,7 @@ async function main() {
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     console.log("Postgres migrations, API table protection, signal upsert, topic lookup beyond the map cap, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
-    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${archiveId})`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
