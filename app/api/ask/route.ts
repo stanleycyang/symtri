@@ -2,10 +2,9 @@ import { answerKnowledgeQuestion, answerQuestion, questionTopics, shouldSearchKn
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { canSummarize, summarizeAnswer } from "@/lib/ai/summarize";
-import { getSignalFeed } from "@/lib/data/feed";
+import { getCurrentFeed } from "@/lib/data/current";
 import { canonicalSignalUrl, signalContentKey } from "@/lib/data/normalize";
-import { rollingFeed } from "@/lib/data/rolling";
-import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
+import { findSemanticSignals, getRecentTopicEvents, getSnapshotFeed, hasCurrentSignalEmbeddings, searchKnowledge } from "@/lib/data/storage";
 import type { SignalFeed } from "@/lib/data/model";
 
 export const runtime = "nodejs";
@@ -50,13 +49,7 @@ export async function POST(request: Request) {
     }
     let feed = day && process.env.DATABASE_URL ? await getSnapshotFeed(day) : null;
     if (day && !feed) return new Response("Snapshot not found", { status: 404 });
-    if (!feed) {
-      feed = await getSignalFeed();
-      if (process.env.DATABASE_URL) {
-        try { feed = rollingFeed(feed, await getStoredFeed(), 0); }
-        catch (error) { console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error"); }
-      }
-    }
+    if (!feed) feed = await getCurrentFeed();
     if (!day && process.env.DATABASE_URL) {
       const references = questionTopics(trimmed);
       if (references.length) {

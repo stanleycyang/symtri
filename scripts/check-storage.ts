@@ -8,6 +8,7 @@ import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
+import { POST as askSymtri } from "../app/api/ask/route";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -239,6 +240,24 @@ async function main() {
       assert.ok(Date.now() - Date.parse(publicFeed.observedAt) < 10_000);
       assert.ok(publicFeed.events.some((item) => item.id === id));
       assert.equal(publicFeed.sources.github, "ok");
+      const gatewayKey = process.env.AI_GATEWAY_API_KEY;
+      const vercelFlag = process.env.VERCEL;
+      process.env.AI_GATEWAY_API_KEY = "";
+      process.env.VERCEL = "";
+      try {
+        const answer = await askSymtri(new Request("http://localhost/api/ask", {
+          method: "POST", body: JSON.stringify({ question: "What's happening with AI agents?" }),
+        }));
+        assert.equal(answer.status, 200);
+        const result = await answer.json();
+        assert.equal(result.scope, "rolling");
+        assert.ok(result.events.some((item: SignalEvent) => item.id === id));
+      } finally {
+        if (gatewayKey === undefined) delete process.env.AI_GATEWAY_API_KEY;
+        else process.env.AI_GATEWAY_API_KEY = gatewayKey;
+        if (vercelFlag === undefined) delete process.env.VERCEL;
+        else process.env.VERCEL = vercelFlag;
+      }
     } finally { globalThis.fetch = originalFetch; }
     assert.equal(status.classificationBacklog, 0);
     assert.equal(status.embeddingBacklog, 1);
@@ -324,7 +343,7 @@ async function main() {
     assert.equal(oldRank[0].count, 35);
     assert.equal((await searchKnowledge("Quantum meadow", null))[0]?.event.id, freshKnowledgeId);
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
-    console.log("Postgres migrations, API table protection, signal upsert, archive-backed public feed, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
+    console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
