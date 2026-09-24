@@ -1,22 +1,34 @@
 import { getSignalFeed } from "@/lib/data/feed";
-import { getArchiveCount, getKnowledgeGraph, getSemanticRelationships, getStoredFeed } from "@/lib/data/storage";
-import { rollingFeed } from "@/lib/data/rolling";
+import { getArchiveCount, getKnowledgeGraph, getLatestIngestionFeedMetadata, getSemanticRelationships, getStoredFeed } from "@/lib/data/storage";
+import type { SignalFeed } from "@/lib/data/model";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const feed = await getSignalFeed();
-  const unavailable = Object.values(feed.sources).every((status) => status === "unavailable");
-  let result = feed;
+  let result: SignalFeed;
   if (process.env.DATABASE_URL) {
     try {
-      const archive = await getStoredFeed();
       const archiveCount = await getArchiveCount();
-      result = rollingFeed(feed, archive, archiveCount);
+      if (archiveCount) {
+        const archive = await getStoredFeed();
+        if (!archive?.events.length) throw new Error("No recent classified signals in archive");
+        const latest = await getLatestIngestionFeedMetadata();
+        const stale = !latest || Date.now() - Date.parse(latest.observedAt) > 3 * 60 * 60 * 1000;
+        result = {
+          ...archive, ...latest, observedAt: new Date().toISOString(), archiveCount,
+          partial: stale || latest?.partial || false,
+          scope: stale ? "archive" : "rolling",
+        };
+      } else {
+        result = await getSignalFeed();
+      }
     }
-    catch (error) { console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error"); }
-  }
+    catch (error) {
+      console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error");
+      return Response.json({ error: "Signal archive unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+  } else result = await getSignalFeed();
   if (process.env.DATABASE_URL && result.events.length) {
     try {
       const semanticRelationships = await getSemanticRelationships();
@@ -34,7 +46,7 @@ export async function GET() {
     }
   }
   return Response.json(result, {
-    status: unavailable && result === feed ? 503 : 200,
+    status: !result.events.length && Object.values(result.sources).every((status) => status === "unavailable") ? 503 : 200,
     headers: { "Cache-Control": "no-store" },
   });
 }

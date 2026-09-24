@@ -392,6 +392,25 @@ export async function getIngestionStatus() {
   };
 }
 
+export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed, "observedAt" | "sources" | "partial"> | null> {
+  const rows = await database()<{
+    completed_at: Date;
+    source_status: SourceStatus;
+  }[]>`
+    select completed_at, source_status
+    from ingestion_runs
+    where completed_at is not null and status in ('complete', 'partial')
+    order by completed_at desc limit 1
+  `;
+  const latest = rows[0];
+  if (!latest) return null;
+  return {
+    observedAt: new Date(latest.completed_at).toISOString(),
+    sources: latest.source_status,
+    partial: latest.source_status["hacker-news"] !== "ok" || latest.source_status.github !== "ok" || latest.source_status.arxiv !== "ok",
+  };
+}
+
 export async function searchKnowledge(query: string, vector: number[] | null): Promise<{ event: SignalEvent; similarity: number | null }[]> {
   if (vector && (vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) throw new Error("Invalid query embedding");
   const sql = database();

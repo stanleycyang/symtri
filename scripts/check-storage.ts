@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
+import { GET as getPublicSignals } from "../app/api/signals/route";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -224,6 +225,21 @@ async function main() {
     const status = await getIngestionStatus();
     assert.equal(status.lastRun?.status, "complete");
     assert.equal(status.lastRun?.fetched, 1);
+    const latestFeed = await getLatestIngestionFeedMetadata();
+    assert.equal(latestFeed?.sources.github, "ok");
+    assert.equal(latestFeed?.partial, feed.partial);
+    assert.ok(Date.parse(latestFeed!.observedAt) <= Date.now());
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => { throw new Error("Public feed contacted a source"); };
+    try {
+      const response = await getPublicSignals();
+      assert.equal(response.status, 200);
+      const publicFeed = await response.json() as SignalFeed;
+      assert.equal(publicFeed.scope, "rolling");
+      assert.ok(Date.now() - Date.parse(publicFeed.observedAt) < 10_000);
+      assert.ok(publicFeed.events.some((item) => item.id === id));
+      assert.equal(publicFeed.sources.github, "ok");
+    } finally { globalThis.fetch = originalFetch; }
     assert.equal(status.classificationBacklog, 0);
     assert.equal(status.embeddingBacklog, 1);
     await releaseIngestionLease(runId);
@@ -308,7 +324,7 @@ async function main() {
     assert.equal(oldRank[0].count, 35);
     assert.equal((await searchKnowledge("Quantum meadow", null))[0]?.event.id, freshKnowledgeId);
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
-    console.log("Postgres migrations, API table protection, signal upsert, topic lookup beyond the map cap, semantic retrieval, relationships, and snapshot preservation passed");
+    console.log("Postgres migrations, API table protection, signal upsert, archive-backed public feed, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
