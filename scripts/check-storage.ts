@@ -402,6 +402,30 @@ async function main() {
     } finally { globalThis.fetch = originalFetch; }
     assert.equal(status.classificationBacklog, 0);
     assert.equal(status.embeddingBacklog, 1);
+    const embeddingRows = Array.from({ length: 205 }, (_, index) => ({
+      id: `${crowdPrefix}embed-${index}`, external_id: `${externalId}-embed-${index}`,
+      title: `Distinct research signal ${index}`, url: `https://github.com/symtri/${externalId}-embed-${index}`,
+      summary: `Embedding queue item ${index}`,
+    }));
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      select id, 'github', external_id, title, url, summary, now(), 30, '[]'::jsonb
+      from jsonb_to_recordset(${sql.json(embeddingRows)}::jsonb) as incoming
+        (id text, external_id text, title text, url text, summary text)
+    `;
+    let embeddingBatches = 0;
+    let pendingEmbeddings = await getPendingEmbeddingEvents();
+    assert.equal(pendingEmbeddings.length, 200);
+    while (pendingEmbeddings.length && embeddingBatches < 3) {
+      await persistEmbeddings({ ...feed, events: pendingEmbeddings }, fakeEmbedder);
+      embeddingBatches++;
+      pendingEmbeddings = await getPendingEmbeddingEvents();
+    }
+    assert.equal(embeddingBatches, 2);
+    assert.equal(pendingEmbeddings.length, 0);
+    assert.equal((await sql`select count(*)::int as count from signal_events
+      where id like ${`${crowdPrefix}embed-%`} and embedding is not null`)[0].count, 205);
+    await sql`delete from signal_events where id like ${`${crowdPrefix}embed-%`}`;
     await releaseIngestionLease(runId);
     assert.equal(await acquireIngestionLease(competingRunId), true);
     await releaseIngestionLease(competingRunId);
