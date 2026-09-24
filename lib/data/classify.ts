@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 8;
+export const CLASSIFIER_VERSION = 9;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -11,7 +11,7 @@ const topicTerms: Record<string, string[]> = {
   space: ["space", "satellite", "satellites", "rocket", "astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "orbital", "spacecraft", "nasa"],
   energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "tokamak", "stellarator", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
-  security: ["security", "cyber", "cyberattack", "cyberattacks", "phishing", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity", "hacked", "hacking", "supply-chain attack"],
+  security: ["security", "cyber", "cyberattack", "cyberattacks", "phishing", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "digital identity", "identity verification", "identity management", "identity theft", "authentication", "authorization", "access control", "hacked", "hacking", "supply-chain attack"],
   hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "sensor", "manufacturing", "uefi", "vga", "vr glasses", "microcontroller", "esp32", "raspberry pi", "laptop", "processor", "wearable"],
   startups: ["startup", "founder", "funding", "seed round", "product launch", "launch hn", "venture", "growth"],
   crypto: ["crypto", "bitcoin", "ethereum", "blockchain", "stablecoin", "web3", "onchain"],
@@ -46,6 +46,7 @@ const childTerms: Record<string, string[]> = {
   "markets-fintech": ["fintech", "payments"],
   "security-cybersecurity": ["cybersecurity", "cyberattack", "cyberattacks", "phishing", "breach"],
   "security-cryptography": ["cryptography", "encryption", "zero knowledge"],
+  "security-identity": ["digital identity", "identity verification", "identity management", "identity theft", "authentication", "authorization", "access control"],
   "hardware-semiconductors": ["semiconductor", "foundry"],
   "hardware-chips": ["chip", "gpu", "cpu"],
   "hardware-compute": ["compute", "accelerator"],
@@ -81,6 +82,10 @@ function astronomicalSense(text: string): string {
     .replace(/\bspace[ -](?:overhead|complexity|usage|efficiency|efficient|bound|requirements?)\b/gi, "");
 }
 
+function securitySense(text: string): string {
+  return text.replace(/\bsecurity[ -]council\b/gi, "");
+}
+
 export function classifySignal(title: string, summary: string, categories: string[] = []): TopicMatch[] {
   const scored = topics.map((topic) => {
     const terms = topicTerms[topic.id] ?? [];
@@ -91,8 +96,8 @@ export function classifySignal(title: string, summary: string, categories: strin
     if (physicalEnergy && !matched(`${title} ${summary}`, terms.filter((term) => term !== "energy"))) {
       return { topicId: topic.id, subtopicId: null, score: 0 };
     }
-    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : title, terms);
-    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : summary, terms);
+    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : topic.id === "security" ? securitySense(title) : title, terms);
+    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : topic.id === "security" ? securitySense(summary) : summary, terms);
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));
     const categoryWeight = topic.id === "space" && parentInCategory ? 8 : 6;
     let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? categoryWeight : 0);

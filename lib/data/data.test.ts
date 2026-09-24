@@ -66,6 +66,16 @@ test("cyberattack and phishing sources connect Security to adjacent topics", () 
   assert.ok(phishing.some((match) => match.subtopicId === "security-cybersecurity"));
 });
 
+test("political councils and biological identity do not create Security links", () => {
+  const council = classifySignal("Anthropic CEO warns UN Security Council on AI risks", "Hacker News discussion.");
+  assert.deepEqual(council.map((match) => match.topicId), ["ai"]);
+  assert.deepEqual(classifySignal("Sam Altman's remarks at the United Nations Security Council", "Hacker News discussion."), []);
+  const biology = classifySignal("Transcription-factor identity tokenization for genomic language models", "DNA-binding factor identity tokens", ["q-bio.MN"]);
+  assert.ok(biology.some((match) => match.topicId === "science"));
+  assert.ok(!biology.some((match) => match.topicId === "security"));
+  assert.equal(classifySignal("Digital identity verification for AI agents", "Account authentication").find((match) => match.topicId === "security")?.subtopicId, "security-identity");
+});
+
 test("arXiv quantum subjects keep their physics location beside cross-domain topics", () => {
   const battery = classifySignal("Simulation of a Battery Cell on Quantum Computers: Reactions & Transport", "", ["quant-ph"]);
   assert.equal(battery[0]?.topicId, "science");

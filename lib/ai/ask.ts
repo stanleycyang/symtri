@@ -1,6 +1,7 @@
 import { regionActivity, regionRelationships, relationshipKey } from "../data/activity";
 import type { SignalEvent, SignalFeed } from "../data/model";
 import { knowledgeSearchQuery } from "../data/search";
+import { selectDistinctHeadlines } from "../data/select";
 import { topicEdges, topics } from "../universe";
 
 export type AskResult = {
@@ -84,9 +85,10 @@ function words(input: string): string[] {
 }
 
 export function questionTopics(question: string): { id: string; childId: string | null }[] {
+  const routingQuestion = question.replace(/\bsecurity[ -]council\b/gi, "");
   return topics.map((topic) => {
-    const regionPosition = firstMatch(question, regionAliases[topic.id] ?? [topic.name.toLowerCase()]);
-    const children = topic.children.map((child) => ({ id: child.id, position: firstMatch(question, subtopicAliases[child.id] ?? [child.name.toLowerCase()]) }));
+    const regionPosition = firstMatch(routingQuestion, regionAliases[topic.id] ?? [topic.name.toLowerCase()]);
+    const children = topic.children.map((child) => ({ id: child.id, position: firstMatch(routingQuestion, subtopicAliases[child.id] ?? [child.name.toLowerCase()]) }));
     const child = children.filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position)[0];
     return { id: topic.id, position: Math.min(regionPosition, child?.position ?? Infinity), childId: child?.id ?? null };
   }).filter((item) => Number.isFinite(item.position)).sort((a, b) => a.position - b.position).slice(0, 2)
@@ -117,7 +119,7 @@ function matchesSpecificWords(event: SignalEvent, terms: string[]): boolean {
 }
 
 export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[]): AskResult {
-  const selected = results.slice(0, 4);
+  const selected = selectDistinctHeadlines(results.map((item) => ({ ...item, title: item.event.title })), 4);
   const location = selected[0]?.event.topics.find((match) => match.relevance >= .67 && topics.some((topic) => topic.id === match.topicId));
   const region = location ? topics.find((topic) => topic.id === location.topicId)! : null;
   const child = region?.children.find((item) => item.id === location?.subtopicId);
@@ -179,11 +181,12 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
       const childId = detected.find((item) => item.id === id)?.childId;
       const regionEvents = ranked.filter((item) => item.topics.some((match) => match.topicId === id) && !selected.includes(item));
       const childEvents = childId ? regionEvents.filter((item) => item.topics.some((match) => match.subtopicId === childId)) : [];
-      const event = [...(childEvents.length ? childEvents : regionEvents)].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
+      const choices = [...(childEvents.length ? childEvents : regionEvents)].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+      const event = selectDistinctHeadlines(choices, 1, selected.map((item) => item.title))[0] ?? choices[0];
       if (event) selected.push(event);
     }
   } else {
-    for (const event of ranked) if (selected.length < 4 && !selected.includes(event)) selected.push(event);
+    selected.push(...selectDistinctHeadlines(ranked, 4));
   }
 
   const names = regionIds.map((id) => topics.find((topic) => topic.id === id)!.name);

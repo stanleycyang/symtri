@@ -90,6 +90,8 @@ For Gateway spending controls, check the active team's budgets with a current Ve
 
 When setting `CRON_SECRET` through the Vercel CLI, remove the final newline from piped input; Vercel rejects whitespace in the cron authorization header. For a new secret: `openssl rand -hex 32 | tr -d '\n' | vercel env add CRON_SECRET production --sensitive --scope testimonio`. Use `--force` only when replacing an existing value.
 
+Ask selects distinct headlines from its ranked evidence so alternate reports of one incident do not crowd out other updates. The archive still retains each unique article and its source attribution.
+
 The live sample and grounded Ask navigation work without Gateway access. The production database is the Supabase `testimonio/symtri` project in `us-east-1`, with the versioned migrations applied. Production snapshot history needs observations on multiple UTC dates before it can be compared across dates. Production Gateway calls have populated vectors and returned cited field notes; tune semantic edge weights and summary quality as more observations accumulate. The Vercel project is `testimonio/symtri`, connected to `stanleycyang/symtri` for deployments from Git pushes. Both `symtri.com` and `www.symtri.com` are assigned to it.
 
 Before production ingestion, confirm access to the intended Supabase project and confirm `DATABASE_URL` and `CRON_SECRET` are set in the Vercel project. If either is missing, finish database setup first; repeating ingestion commands will not resolve missing credentials. Never print secret values during these checks.

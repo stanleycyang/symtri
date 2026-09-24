@@ -125,7 +125,7 @@ test("semantic similarity reorders sources only within the identified region", (
   assert.equal(result.retrieval, "semantic-assisted");
 });
 
-test("recent equally relevant evidence leads an answer as the archive grows", () => {
+test("repeated headlines keep the newer source in an answer", () => {
   const old = { ...event("old-agents", "Coding agents for repositories", "ai", "ai-agents"),
     publishedAt: "2026-09-15T12:00:00.000Z", importance: 100,
     topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] };
@@ -133,7 +133,17 @@ test("recent equally relevant evidence leads an answer as the archive grows", ()
     publishedAt: "2026-09-22T11:00:00.000Z", importance: 20,
     topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] };
   const result = answerQuestion("What's happening with AI coding agents?", { ...feed, events: [old, recent] });
-  assert.deepEqual(result.events.map((item) => item.id), [recent.id, old.id]);
+  assert.deepEqual(result.events.map((item) => item.id), [recent.id]);
+});
+
+test("mapped and archive answers show distinct news instead of alternate headlines", () => {
+  const first = event("first-news", "OpenAI agent infiltrated Australian government website, PM says", "ai", "ai-agents");
+  const repeat = event("repeat-news", "OpenAI agent hacked Australian government website, PM says", "ai", "ai-agents");
+  const other = event("other-news", "New benchmark for detecting prompt injection in agents", "ai", "ai-agents");
+  const current = answerQuestion("What's happening with AI agents?", { ...feed, events: [first, repeat, other] });
+  assert.deepEqual(current.events.map((item) => item.id), [other.id, first.id]);
+  const archive = answerKnowledgeQuestion("Australian government AI", [first, repeat, other].map((item) => ({ event: item, similarity: null })));
+  assert.deepEqual(archive.events.map((item) => item.id), [first.id, other.id]);
 });
 
 test("a specific older source can outrank a newer broad source", () => {
@@ -157,6 +167,9 @@ test("unmapped subjects use the knowledge archive without inventing a map locati
   assert.equal(shouldSearchKnowledge("Don't we require emotions for doing research?"), true);
   assert.deepEqual(questionTopics("What is new in AI research?"), [{ id: "ai", childId: "ai-research" }]);
   assert.deepEqual(questionTopics("Nokia Design Archive"), []);
+  assert.deepEqual(questionTopics("What did the UN Security Council say?"), []);
+  assert.equal(shouldSearchKnowledge("What did the UN Security Council say?"), true);
+  assert.deepEqual(questionTopics("What is happening with AI security?"), [{ id: "ai", childId: null }, { id: "security", childId: null }]);
   assert.equal(shouldSearchKnowledge("Nokia Design Archive"), true);
   assert.deepEqual(questionTopics("What is new in startup design?"), [{ id: "startups", childId: "startups-design" }]);
   for (const question of ["What is new in population growth?", "What is new in product packaging?", "What is new in computer networks?"]) {
