@@ -79,11 +79,16 @@ test("an open question selects the most active observed region", () => {
   assert.ok(["ai", "energy"].includes(result.regionIds[0]));
 });
 
-test("a thread without exact evidence labels broader region sources", () => {
+test("a thread without exact evidence does not cite unrelated parent-region sources", () => {
   const result = answerQuestion("What is happening with AI robotics?", feed);
   assert.equal(result.subtopicId, "ai-robotics");
-  assert.match(result.summary, /No sampled signal matches Robotics exactly/);
-  assert.equal(result.events[0].id, agents.id);
+  assert.match(result.summary, /No sampled signal matches Robotics right now/);
+  assert.equal(result.evidenceCount, 0);
+  assert.deepEqual(result.events, []);
+  const climate = event("biotech", "Claude discovers a new enzyme", "science", "science-biotechnology");
+  const climateResult = answerQuestion("What is new in climate science?", { ...feed, events: [climate] });
+  assert.equal(climateResult.subtopicId, "science-climate-science");
+  assert.deepEqual(climateResult.events, []);
 });
 
 test("semantic similarity reorders sources only within the identified region", () => {
@@ -100,18 +105,22 @@ test("semantic similarity reorders sources only within the identified region", (
 
 test("recent equally relevant evidence leads an answer as the archive grows", () => {
   const old = { ...event("old-agents", "Coding agents for repositories", "ai", "ai-agents"),
-    publishedAt: "2026-09-15T12:00:00.000Z", importance: 100 };
+    publishedAt: "2026-09-15T12:00:00.000Z", importance: 100,
+    topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] };
   const recent = { ...event("recent-agents", "Coding agents for repositories", "ai", "ai-agents"),
-    publishedAt: "2026-09-22T11:00:00.000Z", importance: 20 };
+    publishedAt: "2026-09-22T11:00:00.000Z", importance: 20,
+    topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] };
   const result = answerQuestion("What's happening with AI coding agents?", { ...feed, events: [old, recent] });
   assert.deepEqual(result.events.map((item) => item.id), [recent.id, old.id]);
 });
 
 test("a specific older source can outrank a newer broad source", () => {
   const specific = { ...event("specific", "Coding agents for repositories", "ai", "ai-agents"),
-    publishedAt: "2026-09-15T12:00:00.000Z", importance: 20 };
+    publishedAt: "2026-09-15T12:00:00.000Z", importance: 20,
+    topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] };
   const broad = { ...event("broad", "Agents for repositories", "ai", "ai-agents"),
-    publishedAt: "2026-09-22T11:00:00.000Z", importance: 20 };
+    publishedAt: "2026-09-22T11:00:00.000Z", importance: 20,
+    topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] };
   const result = answerQuestion("What's happening with AI coding agents?", { ...feed, events: [broad, specific] });
   assert.equal(result.events[0].id, specific.id);
 });

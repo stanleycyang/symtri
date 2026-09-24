@@ -127,7 +127,7 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
   const queryWords = words(question);
   const matching = feed.events.filter((event) => event.topics.some((match) => regionIds.includes(match.topicId)));
   const scoped = subtopicId ? matching.filter((event) => event.topics.some((match) => match.subtopicId === subtopicId)) : matching;
-  const candidates = scoped.length ? scoped : matching;
+  const candidates = subtopicId ? scoped : matching;
   const semanticScores = new Map(semanticMatches.filter((match) => Number.isFinite(match.similarity)).map((match) => [match.id, Math.max(0, Math.min(1, match.similarity))]));
   const observedAt = Date.parse(feed.observedAt);
   const score = (event: SignalEvent) => {
@@ -172,8 +172,8 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
       : missingRegions.length
         ? `No sampled signal connects ${names[0]} and ${names[1]}. ${missingRegions.map((id) => topics.find((topic) => topic.id === id)!.name).join(" and ")} ${missingRegions.length === 1 ? "has" : "have"} no source in this sample${candidates.length ? "; the links below are from the other region" : ""}.`
       : `The map links ${names[0]} and ${names[1]}, but this sample has no signal classified to both. The sources below show each region separately.`;
-  } else if (subtopicId && !scoped.length && candidates.length) {
-    summary = `No sampled signal matches ${childName} exactly. These broader ${names[0]} sources may help you explore the region.`;
+  } else if (subtopicId && !scoped.length && matching.length) {
+    summary = `No sampled signal matches ${childName} ${feed.scope === "history" ? "in this snapshot" : "right now"}. The map shows broader ${names[0]} activity, but it does not establish an update on this thread.`;
   } else if (candidates.length) {
     summary = `${candidates.length} sampled signal${candidates.length === 1 ? " matches" : "s match"} ${childName ?? names[0]}. One leading source is “${selected[0].title}” (${selected[0].source === "hacker-news" ? "Hacker News" : selected[0].source === "arxiv" ? "arXiv" : "GitHub"}).`;
   } else {
