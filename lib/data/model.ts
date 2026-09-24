@@ -16,6 +16,7 @@ export type SignalEvent = {
   publishedAt: string;
   importance: number;
   topics: TopicMatch[];
+  classificationInput?: { title: string; summary: string; categories: string[] };
 };
 
 export type RelatedSignal = Pick<SignalEvent, "id" | "source" | "title" | "url" | "summary" | "publishedAt" | "topics">;

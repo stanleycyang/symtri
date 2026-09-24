@@ -3,6 +3,7 @@ import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_
 import { embeddingModelId } from "../ai/embed";
 import { topicEdges, topics } from "../universe";
 import { relationshipKey } from "./activity";
+import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
 
 let connection: ReturnType<typeof postgres> | undefined;
@@ -30,25 +31,28 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
     id: event.id, source: event.source, external_id: event.externalId,
     title: event.title, url: event.url, summary: event.summary,
     published_at: event.publishedAt, importance: event.importance, topics: event.topics,
+    classification_input: event.classificationInput ?? { title: event.title, summary: event.summary, categories: [] },
   }));
   await sql`
     update signal_events as target set
       title = incoming.title, summary = incoming.summary,
       importance = incoming.importance, topics = incoming.topics,
+      classification_input = incoming.classification_input,
+      classifier_version = ${CLASSIFIER_VERSION},
       embedding = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding end,
       embedding_input_hash = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding_input_hash end,
       embedding_model = case when target.title is distinct from incoming.title or target.summary is distinct from incoming.summary then null else target.embedding_model end
     from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
-      (id text, title text, summary text, importance double precision, topics jsonb)
+      (id text, title text, summary text, importance double precision, topics jsonb, classification_input jsonb)
     where target.id = incoming.id
   `;
   const inserted = await sql`
     insert into signal_events
-      (id, source, external_id, title, url, summary, published_at, importance, topics)
-    select id, source, external_id, title, url, summary, published_at::timestamptz, importance, topics
+      (id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version)
+    select id, source, external_id, title, url, summary, published_at::timestamptz, importance, topics, classification_input, ${CLASSIFIER_VERSION}
     from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
       (id text, source text, external_id text, title text, url text, summary text,
-       published_at text, importance double precision, topics jsonb)
+       published_at text, importance double precision, topics jsonb, classification_input jsonb)
     on conflict do nothing returning id
   `;
   await sql`
@@ -62,6 +66,27 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
       signal_id = excluded.signal_id, observed_url = excluded.observed_url, last_seen_at = now()
   `;
   return inserted.length;
+}
+
+export async function refreshStoredClassifications(limit = 500): Promise<number> {
+  const sql = database();
+  const rows = await sql`
+    select id, classification_input
+    from signal_events
+    where classifier_version < ${CLASSIFIER_VERSION} and classification_input is not null
+    order by published_at desc limit ${limit}
+  `;
+  if (!rows.length) return 0;
+  const updates = rows.map((row) => {
+    const input = row.classification_input as { title: string; summary: string; categories: string[] };
+    return { id: row.id as string, topics: classifySignal(input.title, input.summary, input.categories) };
+  });
+  await sql`
+    update signal_events as target set topics = incoming.topics, classifier_version = ${CLASSIFIER_VERSION}
+    from jsonb_to_recordset(${sql.json(updates)}::jsonb) as incoming(id text, topics jsonb)
+    where target.id = incoming.id and target.classifier_version < ${CLASSIFIER_VERSION}
+  `;
+  return updates.length;
 }
 
 export async function persistEmbeddings(feed: SignalFeed, embedder: (inputs: string[]) => Promise<number[][]>): Promise<number> {

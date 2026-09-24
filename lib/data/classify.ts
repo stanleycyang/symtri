@@ -1,6 +1,9 @@
 import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
+// Bump this when the rules below change so stored signals are reclassified.
+export const CLASSIFIER_VERSION = 1;
+
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
   software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "browsers", "sdk", "vscode", "vs code", "kafka", "nixos", "http", "debugger", "terminal", "tailscale"],

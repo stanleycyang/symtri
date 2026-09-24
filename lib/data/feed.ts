@@ -5,7 +5,13 @@ import type { SignalEvent, SignalFeed, SourceId, SourceStatus } from "./model";
 export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEvent[] {
   return deduplicateSignals(events.filter((event) => event.topics.length > 0))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((event) => {
+      if (!event.classificationInput) return event;
+      const visible = { ...event };
+      delete visible.classificationInput;
+      return visible;
+    });
 }
 
 export async function getSignalFeed(options: { includeUnclassified?: boolean; forIngestion?: boolean } = {}): Promise<SignalFeed> {

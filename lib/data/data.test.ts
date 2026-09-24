@@ -96,6 +96,8 @@ test("feed selection keeps mapped signals before applying the cap or deduplicati
   const second = normalizeGitHub({ id: 73, full_name: "example/database", created_at: "2026-09-21T12:00:00Z", html_url: "https://github.com/example/database", description: "Open source database", stargazers_count: 20, fork: false })!;
   const input = [unmapped, mapped, second];
   assert.deepEqual(selectFeedEvents(input, 2).map((event) => event.id), [mapped.id, second.id]);
+  assert.ok(mapped.classificationInput);
+  assert.equal(selectFeedEvents(input, 2)[0].classificationInput, undefined);
   assert.equal(input.length, 3);
 });
 

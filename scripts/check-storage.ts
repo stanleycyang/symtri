@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -19,6 +19,7 @@ const id = `github:${externalId}`;
 const unclassifiedId = `github:${externalId}-unclassified`;
 const relatedId = `github:${externalId}-related`;
 const foreignId = `github:${externalId}-foreign`;
+const quantumId = `arxiv:${externalId}-quantum`;
 const archiveId = `github:${externalId}-archive`;
 const crowdPrefix = `github:${externalId}-crowd-`;
 const runId = randomUUID();
@@ -45,6 +46,8 @@ async function main() {
   await sql.unsafe(lookupMigration);
   const foreignAgentsMigration = await readFile(new URL("../supabase/migrations/20260924006000_foreign_agents.sql", import.meta.url), "utf8");
   await sql.unsafe(foreignAgentsMigration);
+  const classificationMigration = await readFile(new URL("../supabase/migrations/20260924007000_classification_refresh.sql", import.meta.url), "utf8");
+  await sql.unsafe(classificationMigration);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_topics_gin_idx'`)[0].count, 1);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
@@ -87,6 +90,20 @@ async function main() {
     await sql.unsafe(foreignAgentsMigration);
     assert.equal((await sql`select topics from signal_events where id = ${foreignId}`)[0].topics[0].subtopicId, null);
     await sql`delete from signal_events where id = ${foreignId}`;
+    const quantum: SignalEvent = { ...event, id: quantumId, source: "arxiv", externalId: `${externalId}-quantum`,
+      title: "Simulation of a Battery Cell on Quantum Computers", url: `https://arxiv.org/abs/${externalId}-quantum`,
+      summary: "Quantum research", topics: [{ topicId: "energy", subtopicId: "energy-battery-storage", relevance: .95 }],
+      classificationInput: { title: "Simulation of a Battery Cell on Quantum Computers", summary: "Quantum research", categories: ["quant-ph"] } };
+    await persistSignals({ ...feed, events: [quantum] });
+    await sql`update signal_events set classifier_version = 0 where id = ${quantumId}`;
+    assert.equal(await refreshStoredClassifications(), 1);
+    const reclassified = (await sql`select topics, classification_input, classifier_version from signal_events where id = ${quantumId}`)[0];
+    assert.equal(reclassified.topics[0].topicId, "science");
+    assert.equal(reclassified.topics[0].subtopicId, "science-physics");
+    assert.deepEqual(reclassified.classification_input.categories, ["quant-ph"]);
+    assert.equal(reclassified.classifier_version, 1);
+    assert.equal(await refreshStoredClassifications(), 0);
+    await sql`delete from signal_events where id = ${quantumId}`;
     await rebuildKnowledgeGraph();
     assert.equal((await getKnowledgeGraph())?.regionCounts.ai, 1);
     assert.equal(await hasCurrentSignalEmbeddings(feed.events), false);
@@ -218,7 +235,7 @@ async function main() {
     assert.equal(snapshot?.scope, "history");
     console.log("Postgres migrations, API table protection, signal upsert, topic lookup beyond the map cap, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
-    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${archiveId})`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId}, ${quantumId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;

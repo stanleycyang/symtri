@@ -22,7 +22,7 @@ export function normalizeHackerNews(input: unknown): SignalEvent | null {
   const score = number(item.score);
   const comments = number(item.descendants);
   const summary = short(clean(item.text) || "Hacker News discussion.");
-  return { id: `hacker-news:${externalId}`, source: "hacker-news", externalId, title, url: safeUrl(item.url, `https://news.ycombinator.com/item?id=${externalId}`), summary, publishedAt, importance: Math.min(100, Math.log1p(score + comments * 2) * 14), topics: classifySignal(title, summary) };
+  return { id: `hacker-news:${externalId}`, source: "hacker-news", externalId, title, url: safeUrl(item.url, `https://news.ycombinator.com/item?id=${externalId}`), summary, publishedAt, importance: Math.min(100, Math.log1p(score + comments * 2) * 14), topics: classifySignal(title, summary), classificationInput: { title, summary, categories: [] } };
 }
 
 export function normalizeGitHub(input: unknown): SignalEvent | null {
@@ -37,7 +37,8 @@ export function normalizeGitHub(input: unknown): SignalEvent | null {
   const tags = Array.isArray(item.topics) ? item.topics.filter((tag): tag is string => typeof tag === "string").join(" ") : "";
   const summary = short(description || `Open-source repository${text(item.language) ? ` in ${text(item.language)}` : ""}.`);
   const stars = number(item.stargazers_count);
-  return { id: `github:${externalId}`, source: "github", externalId, title, url, summary, publishedAt, importance: Math.min(100, Math.log1p(stars + number(item.forks_count) * 2) * 13), topics: classifySignal(`${title} ${tags}`, `${summary} ${text(item.language)}`) };
+  const classificationInput = { title: `${title} ${tags}`, summary: `${summary} ${text(item.language)}`, categories: [] };
+  return { id: `github:${externalId}`, source: "github", externalId, title, url, summary, publishedAt, importance: Math.min(100, Math.log1p(stars + number(item.forks_count) * 2) * 13), topics: classifySignal(classificationInput.title, classificationInput.summary), classificationInput };
 }
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@", removeNSPrefix: true, trimValues: true });
@@ -55,7 +56,7 @@ export function normalizeArxivFeed(xml: string): SignalEvent[] {
     const summary = short(clean(entry.summary), 600);
     const rawCategories = entry.category ? (Array.isArray(entry.category) ? entry.category : [entry.category]) : [];
     const categories = rawCategories.map((category) => text(record(category)?.["@term"])).filter(Boolean);
-    return [{ id: `arxiv:${externalId}`, source: "arxiv", externalId, title, url: `https://arxiv.org/abs/${encodeURIComponent(externalId)}`, summary, publishedAt, importance: 25, topics: classifySignal(title, summary, categories) }];
+    return [{ id: `arxiv:${externalId}`, source: "arxiv", externalId, title, url: `https://arxiv.org/abs/${encodeURIComponent(externalId)}`, summary, publishedAt, importance: 25, topics: classifySignal(title, summary, categories), classificationInput: { title, summary, categories } }];
   });
 }
 
