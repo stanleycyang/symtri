@@ -277,7 +277,9 @@ export async function getArchiveCount(): Promise<number> {
 
 // Calculate trends from every classified signal in the 14-day window. The
 // public map deliberately renders only 300 signals, which can cover far less
-// than two days once ingestion has accumulated enough unique content.
+// than two days once ingestion has accumulated enough unique content. The
+// first-seen allowance includes records stored just after a snapshot's fetch
+// timestamp while excluding records discovered on later hourly runs.
 export async function getArchiveActivity(at = new Date()): Promise<Record<string, RegionActivity>> {
   const rows = await database()<{
     topic_id: string; count: number; score: number; recent: number; previous: number;
@@ -290,6 +292,7 @@ export async function getArchiveActivity(at = new Date()): Promise<Record<string
       cross join lateral jsonb_array_elements(event.topics) as match(value)
       where event.published_at between ${at.toISOString()}::timestamptz - interval '14 days'
         and ${at.toISOString()}::timestamptz + interval '1 hour'
+        and event.first_seen_at <= ${new Date(at.getTime() + 10 * 60 * 1000).toISOString()}::timestamptz
         and match.value ? 'topicId'
       group by event.id, event.published_at, event.importance, match.value->>'topicId'
     ), weighted as (
@@ -564,6 +567,22 @@ export async function persistSnapshot(feed: SignalFeed): Promise<void> {
       and jsonb_array_length(coalesce(signal_snapshots.feed->'events', '[]'::jsonb))
        <= jsonb_array_length(coalesce(excluded.feed->'events', '[]'::jsonb))
   `;
+}
+
+export async function backfillSnapshotActivity(limit = 14): Promise<number> {
+  const sql = database();
+  const rows = await sql<{ day: string; captured_at: Date }[]>`
+    select day::text as day, captured_at from signal_snapshots
+    where feed->'activity' is null order by day desc limit ${limit}
+  `;
+  for (const row of rows) {
+    const activity = await getArchiveActivity(new Date(row.captured_at));
+    await sql`
+      update signal_snapshots set feed = jsonb_set(feed, '{activity}', ${sql.json(activity)}::jsonb)
+      where day = ${row.day}::date and feed->'activity' is null
+    `;
+  }
+  return rows.length;
 }
 
 export async function getSnapshotDays(): Promise<SnapshotDay[]> {

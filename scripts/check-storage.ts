@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotActivity, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -408,6 +408,28 @@ async function main() {
     assert.equal(snapshot?.events.length, 2);
     assert.equal(snapshot?.partial, false);
     assert.equal(snapshot?.scope, "history");
+    const historicDay = "2099-01-04";
+    const historicId = `github:${externalId}-historic`;
+    const laterId = `github:${externalId}-historic-later`;
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, first_seen_at, importance, topics)
+      values
+        (${historicId}, 'github', ${`${externalId}-historic`}, 'Historical agent research',
+          ${`https://github.com/symtri/${externalId}-historic`}, 'An earlier observation',
+          '2099-01-04T11:00:00Z', '2099-01-04T12:02:00Z', 50,
+          ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }])}::jsonb),
+        (${laterId}, 'github', ${`${externalId}-historic-later`}, 'Later agent research',
+          ${`https://github.com/symtri/${externalId}-historic-later`}, 'Discovered on a later run',
+          '2099-01-04T11:00:00Z', '2099-01-04T13:00:00Z', 50,
+          ${sql.json([{ topicId: "ai", subtopicId: "ai-agents", relevance: 1 }])}::jsonb)
+    `;
+    await persistSnapshot({ ...feed, observedAt: `${historicDay}T12:00:00.000Z`, events: [{ ...event, id: historicId }] });
+    assert.equal((await getSnapshotFeed(historicDay))?.activity, undefined);
+    assert.ok(await backfillSnapshotActivity() >= 1);
+    assert.equal((await getSnapshotFeed(historicDay))?.activity?.ai.count, 1);
+    assert.equal(await backfillSnapshotActivity(), 0);
+    await sql`delete from signal_events where id in (${historicId}, ${laterId})`;
+    await sql`delete from signal_snapshots where day = ${historicDay}::date`;
     const oldKnowledge = Array.from({ length: 35 }, (_, index) => ({
       id: `${knowledgePrefix}${index}`, external_id: `${externalId}-knowledge-${index}`,
       title: `Quantum meadow quantum meadow specimen ${index}`, summary: `Quantum meadow observations ${index}`,
@@ -454,7 +476,7 @@ async function main() {
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
-    await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02', '2099-01-03')`;
+    await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02', '2099-01-03', '2099-01-04')`;
     await sql.end();
   }
 }
