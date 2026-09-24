@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 7;
+export const CLASSIFIER_VERSION = 8;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -11,7 +11,7 @@ const topicTerms: Record<string, string[]> = {
   space: ["space", "satellite", "satellites", "rocket", "astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "orbital", "spacecraft", "nasa"],
   energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "tokamak", "stellarator", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
-  security: ["security", "cyber", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity", "hacked", "hacking", "supply-chain attack"],
+  security: ["security", "cyber", "cyberattack", "cyberattacks", "phishing", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity", "hacked", "hacking", "supply-chain attack"],
   hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "sensor", "manufacturing", "uefi", "vga", "vr glasses", "microcontroller", "esp32", "raspberry pi", "laptop", "processor", "wearable"],
   startups: ["startup", "founder", "funding", "seed round", "product launch", "launch hn", "venture", "growth"],
   crypto: ["crypto", "bitcoin", "ethereum", "blockchain", "stablecoin", "web3", "onchain"],
@@ -44,7 +44,7 @@ const childTerms: Record<string, string[]> = {
   "energy-power-demand": ["power demand", "data center power"],
   "markets-venture-capital": ["venture capital", "vc funding"],
   "markets-fintech": ["fintech", "payments"],
-  "security-cybersecurity": ["cybersecurity", "cyberattack", "breach"],
+  "security-cybersecurity": ["cybersecurity", "cyberattack", "cyberattacks", "phishing", "breach"],
   "security-cryptography": ["cryptography", "encryption", "zero knowledge"],
   "hardware-semiconductors": ["semiconductor", "foundry"],
   "hardware-chips": ["chip", "gpu", "cpu"],

@@ -57,6 +57,15 @@ test("disk space and device activity do not create false map regions", () => {
     .some((match) => match.topicId === "hardware"));
 });
 
+test("cyberattack and phishing sources connect Security to adjacent topics", () => {
+  const attack = classifySignal("AI is making cyberattacks faster", "Hacker News discussion.");
+  assert.deepEqual(new Set(attack.map((match) => match.topicId)), new Set(["ai", "security"]));
+  assert.ok(attack.some((match) => match.subtopicId === "security-cybersecurity"));
+  const phishing = classifySignal("Phishing detection for fintech emails", "A digital lending research paper", ["q-fin.TR"]);
+  assert.deepEqual(new Set(phishing.map((match) => match.topicId)), new Set(["markets", "security"]));
+  assert.ok(phishing.some((match) => match.subtopicId === "security-cybersecurity"));
+});
+
 test("arXiv quantum subjects keep their physics location beside cross-domain topics", () => {
   const battery = classifySignal("Simulation of a Battery Cell on Quantum Computers: Reactions & Transport", "", ["quant-ph"]);
   assert.equal(battery[0]?.topicId, "science");
