@@ -87,14 +87,25 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
   return null;
 }
 
+function filamentCurve(from: Vec3, to: Vec3, bend: number): THREE.QuadraticBezierCurve3 {
+  const start = new THREE.Vector3(...from);
+  const end = new THREE.Vector3(...to);
+  const mid = start.clone().add(end).multiplyScalar(.5);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  // Bend sideways as well as in depth so relationships read as paths from the overview camera.
+  if (length > 0) {
+    mid.x -= dy / length * bend;
+    mid.y += dx / length * bend;
+  }
+  mid.z -= bend;
+  return new THREE.QuadraticBezierCurve3(start, mid, end);
+}
+
 function Filament({ from, to, color = "#7c8896", opacity = .16, bend = .8 }: { from: Vec3; to: Vec3; color?: string; opacity?: number; bend?: number }) {
   const line = useMemo(() => {
-    const start = new THREE.Vector3(...from);
-    const end = new THREE.Vector3(...to);
-    const mid = start.clone().add(end).multiplyScalar(.5);
-    mid.z -= bend;
-    const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-    return new THREE.BufferGeometry().setFromPoints(curve.getPoints(30));
+    return new THREE.BufferGeometry().setFromPoints(filamentCurve(from, to, bend).getPoints(30));
   }, [from, to, bend]);
   const material = useMemo(() => new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }), [color, opacity]);
   const object = useMemo(() => new THREE.Line(line, material), [line, material]);
@@ -288,11 +299,7 @@ function FlowSignals({ reducedMotion, edges }: { reducedMotion: boolean; edges: 
   const paths = useMemo(() => edges.map(([a, b]) => {
     const first = getTopic(a)!;
     const second = getTopic(b)!;
-    const start = new THREE.Vector3(...first.position);
-    const end = new THREE.Vector3(...second.position);
-    const mid = start.clone().add(end).multiplyScalar(.5);
-    mid.z -= 2.6;
-    return new THREE.QuadraticBezierCurve3(start, mid, end);
+    return filamentCurve(first.position, second.position, 2.6);
   }), [edges]);
   const perPath = 7;
   const geometry = useMemo(() => {
@@ -302,6 +309,7 @@ function FlowSignals({ reducedMotion, edges }: { reducedMotion: boolean; edges: 
   }, [paths]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   const points = useRef<THREE.Points>(null);
+  const point = useRef(new THREE.Vector3());
   useFrame(({ clock }) => {
     if (!points.current) return;
     const positions = points.current.geometry.attributes.position as THREE.BufferAttribute;
@@ -309,8 +317,8 @@ function FlowSignals({ reducedMotion, edges }: { reducedMotion: boolean; edges: 
     paths.forEach((path, pathIndex) => {
       for (let step = 0; step < perPath; step++) {
         const progress = (step / perPath + time * (.016 + pathIndex % 3 * .004)) % 1;
-        const point = path.getPoint(progress);
-        positions.setXYZ(pathIndex * perPath + step, point.x, point.y, point.z);
+        path.getPoint(progress, point.current);
+        positions.setXYZ(pathIndex * perPath + step, point.current.x, point.current.y, point.current.z);
       }
     });
     positions.needsUpdate = true;
@@ -362,6 +370,11 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
       .map((key) => key.split(":") as [string, string]);
     return [...topicEdges, ...emerging];
   }, [regionRelationships, archiveRelationships]);
+  const flowingEdges = useMemo(() => activeEdges.filter(([a, b]) => {
+    if (!regionRelationships && !archiveRelationships) return true;
+    const key = relationshipKey(a, b);
+    return (regionRelationships?.[key] ?? 0) > 0 || (archiveRelationships?.[key] ?? 0) > 0;
+  }), [activeEdges, regionRelationships, archiveRelationships]);
   const focused = getTopic(focusedId);
   const pathChildren = new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null));
   const pathPosition = (step: AskResult["pathSteps"][number]): Vec3 => {
@@ -396,7 +409,7 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
     <OrbitControls ref={controls} enableDamping dampingFactor={.055} enablePan={false} minDistance={9} maxDistance={compact ? 135 : 84} rotateSpeed={.43} zoomSpeed={.65} />
     <Dust count={compact ? 650 : 1500} reducedMotion={reducedMotion} />
     <IncomingSignals compact={compact} reducedMotion={reducedMotion} activeTopics={activeTopics} />
-    <FlowSignals reducedMotion={reducedMotion} edges={activeEdges} />
+    <FlowSignals reducedMotion={reducedMotion} edges={flowingEdges} />
     {activeEdges.map(([a, b]) => { const first = getTopic(a)!; const second = getTopic(b)!; const highlighted = hoveredId === a || hoveredId === b; const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === relationshipKey(a, b)); const key = relationshipKey(a, b); const count = regionRelationships?.[key] ?? 0; const archived = archiveRelationships?.[key] ?? 0; const similarity = semanticRelationships?.[key]; const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3)); const recentStrength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost; const strength = Math.max(recentStrength, archived ? Math.min(.24, .06 + Math.log1p(archived) * .045) : 0); return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId)?.color : undefined} opacity={inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04) : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength} bend={2.6} />; })}
     {askSteps.map((step, index) => index > 0 && step.subtopicId && askSteps[index - 1].subtopicId ? <Filament key={`ask-${index}`} from={pathPosition(askSteps[index - 1])} to={pathPosition(step)} color="#e6b988" opacity={.82} bend={.8} /> : null)}
     {activeTopics.map((topic) => <group key={topic.id}>
