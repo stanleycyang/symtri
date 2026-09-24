@@ -16,7 +16,10 @@ function database() {
   if (!url) throw new Error("DATABASE_URL is required for persistent signals");
   const hostname = new URL(url).hostname;
   const local = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
-  connection ??= postgres(url, { max: 1, prepare: false, ssl: local ? false : "require", connect_timeout: 5 });
+  connection ??= postgres(url, {
+    max: 1, prepare: false, ssl: local ? false : "require",
+    connect_timeout: 5, idle_timeout: 10, max_lifetime: 60,
+  });
   return connection;
 }
 
@@ -65,10 +68,8 @@ export async function persistEmbeddings(feed: SignalFeed, embedder: (inputs: str
   const sql = database();
   const eventInputs = feed.events.map((event) => ({ id: event.id, text: signalEmbeddingText(event) }));
   const topicInputs = topics.map((topic) => ({ id: topic.id, text: topicEmbeddingText(topic) }));
-  const [eventRows, topicRows] = await Promise.all([
-    eventInputs.length ? sql`select id, embedding_input_hash from signal_events where id in ${sql(eventInputs.map((item) => item.id))}` : Promise.resolve([]),
-    sql`select topic_id as id, embedding_input_hash from topic_embeddings`,
-  ]);
+  const eventRows = eventInputs.length ? await sql`select id, embedding_input_hash from signal_events where id in ${sql(eventInputs.map((item) => item.id))}` : [];
+  const topicRows = await sql`select topic_id as id, embedding_input_hash from topic_embeddings`;
   const eventHashes = new Map(eventRows.map((row) => [row.id as string, row.embedding_input_hash as string | null]));
   const topicHashes = new Map(topicRows.map((row) => [row.id as string, row.embedding_input_hash as string]));
   const pendingEvents = eventInputs.map((item) => ({ ...item, hash: embeddingInputHash(item.text) }))
@@ -288,13 +289,11 @@ export async function finishIngestionRun(runId: string, result: IngestionResult)
 
 export async function getIngestionStatus() {
   const sql = database();
-  const [runs, counts] = await Promise.all([
-    sql`select started_at, completed_at, status, source_status, fetched_count, mapped_count,
-      new_count, embedded_count, embedding_status from ingestion_runs order by started_at desc limit 1`,
-    sql`select count(*)::int as signals,
-      count(*) filter (where embedding is not null and embedding_model = ${embeddingModelId()})::int as vectors
-      from signal_events`,
-  ]);
+  const runs = await sql`select started_at, completed_at, status, source_status, fetched_count, mapped_count,
+    new_count, embedded_count, embedding_status from ingestion_runs order by started_at desc limit 1`;
+  const counts = await sql`select count(*)::int as signals,
+    count(*) filter (where embedding is not null and embedding_model = ${embeddingModelId()})::int as vectors
+    from signal_events`;
   const last = runs[0];
   return {
     signals: Number(counts[0].signals), vectors: Number(counts[0].vectors),
@@ -313,22 +312,20 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
   if (vector && (vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) throw new Error("Invalid query embedding");
   const sql = database();
   const literal = vector ? `[${vector.join(",")}]` : null;
-  const [lexical, semantic] = await Promise.all([
-    sql`
+  const lexical = await sql`
       select id, source, external_id, title, url, summary, published_at, importance, topics,
         ts_rank_cd(to_tsvector('english', title || ' ' || summary), websearch_to_tsquery('english', ${query})) as rank
       from signal_events
       where to_tsvector('english', title || ' ' || summary) @@ websearch_to_tsquery('english', ${query})
       order by rank desc, published_at desc limit 30
-    `,
-    literal ? sql`
+    `;
+  const semantic = literal ? await sql`
       select id, source, external_id, title, url, summary, published_at, importance, topics,
         1 - (embedding <=> ${literal}::vector(256)) as similarity
       from signal_events
       where embedding is not null and embedding_model = ${embeddingModelId()}
       order by embedding <=> ${literal}::vector(256) limit 30
-    ` : Promise.resolve([]),
-  ]);
+    ` : [];
   const scores = new Map<string, { row: (typeof lexical)[number]; score: number; similarity: number | null }>();
   for (const row of lexical) scores.set(row.id, { row, score: .6 + Math.min(.3, Number(row.rank)), similarity: null });
   for (const row of semantic) {

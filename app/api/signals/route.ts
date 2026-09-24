@@ -11,7 +11,8 @@ export async function GET() {
   let result = feed;
   if (process.env.DATABASE_URL) {
     try {
-      const [archive, archiveCount] = await Promise.all([getStoredFeed(), getArchiveCount()]);
+      const archive = await getStoredFeed();
+      const archiveCount = await getArchiveCount();
       result = rollingFeed(feed, archive, archiveCount);
     }
     catch (error) { console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error"); }
