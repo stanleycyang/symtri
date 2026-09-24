@@ -4,8 +4,8 @@ import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Billboard, OrbitControls } from "@react-three/drei";
 import { MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { getTopic, Topic, topicEdges, topics, Vec3 } from "@/lib/universe";
-import { relationshipKey, type RegionActivity, type RegionRelationships } from "@/lib/data/activity";
+import { getTopic, Topic, topics, Vec3 } from "@/lib/universe";
+import { attentionEdges, flowingAttentionEdges, relationshipKey, type RegionActivity, type RegionRelationships } from "@/lib/data/activity";
 import type { AskResult } from "@/lib/ai/ask";
 
 export type UniverseProps = {
@@ -362,19 +362,8 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
     const measured = regionActivity[topic.id];
     return { ...topic, activity: measured.visual, change: measured.momentum === "rising" ? 80 : 0, signals: measured.count };
   }) : topics, [regionActivity]);
-  const activeEdges = useMemo(() => {
-    if (!regionRelationships && !archiveRelationships) return topicEdges;
-    const base = new Set(topicEdges.map(([a, b]) => relationshipKey(a, b)));
-    const emerging = Object.keys({ ...archiveRelationships, ...regionRelationships })
-      .filter((key) => Math.max(archiveRelationships?.[key] ?? 0, regionRelationships?.[key] ?? 0) >= 2 && !base.has(key))
-      .map((key) => key.split(":") as [string, string]);
-    return [...topicEdges, ...emerging];
-  }, [regionRelationships, archiveRelationships]);
-  const flowingEdges = useMemo(() => activeEdges.filter(([a, b]) => {
-    if (!regionRelationships && !archiveRelationships) return true;
-    const key = relationshipKey(a, b);
-    return (regionRelationships?.[key] ?? 0) > 0 || (archiveRelationships?.[key] ?? 0) > 0;
-  }), [activeEdges, regionRelationships, archiveRelationships]);
+  const activeEdges = useMemo(() => attentionEdges(regionRelationships), [regionRelationships]);
+  const flowingEdges = useMemo(() => flowingAttentionEdges(activeEdges, regionRelationships), [activeEdges, regionRelationships]);
   const focused = getTopic(focusedId);
   const pathChildren = new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null));
   const pathPosition = (step: AskResult["pathSteps"][number]): Vec3 => {

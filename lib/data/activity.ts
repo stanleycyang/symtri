@@ -1,5 +1,5 @@
 import type { SignalEvent } from "./model";
-import { topics } from "../universe";
+import { topicEdges, topics } from "../universe";
 
 export type RegionActivity = {
   count: number;
@@ -14,6 +14,28 @@ export type RegionRelationships = Record<string, number>;
 
 export function relationshipKey(first: string, second: string): string {
   return [first, second].sort().join(":");
+}
+
+// Keep established routes in place while limiting new, data-led connections.
+// Older archive links remain available in the detail panel but do not animate
+// as current attention after their shared signals leave the rolling sample.
+export function attentionEdges(recent: RegionRelationships | null): [string, string][] {
+  if (!recent) return topicEdges;
+  const base = new Set(topicEdges.map(([first, second]) => relationshipKey(first, second)));
+  const known = new Set(topics.map((topic) => topic.id));
+  const emerging = Object.entries(recent)
+    .filter(([key, count]) => {
+      const [first, second] = key.split(":");
+      return count >= 2 && !base.has(key) && known.has(first) && known.has(second);
+    })
+    .sort(([firstKey, firstCount], [secondKey, secondCount]) => secondCount - firstCount || firstKey.localeCompare(secondKey))
+    .slice(0, 6)
+    .map(([key]) => key.split(":") as [string, string]);
+  return [...topicEdges, ...emerging];
+}
+
+export function flowingAttentionEdges(edges: [string, string][], recent: RegionRelationships | null): [string, string][] {
+  return recent ? edges.filter(([first, second]) => (recent[relationshipKey(first, second)] ?? 0) > 0) : edges;
 }
 
 // Co-classification is evidence that a sampled signal connects two regions.

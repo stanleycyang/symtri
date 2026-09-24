@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { regionActivity, regionRelationships } from "./activity";
+import { attentionEdges, flowingAttentionEdges, regionActivity, regionRelationships, relationshipKey } from "./activity";
 import type { SignalEvent } from "./model";
 
 const now = Date.parse("2026-09-22T12:00:00Z");
@@ -36,4 +36,17 @@ test("relationships count distinct shared signals and ignore repeated topic matc
   const relationships = regionRelationships([shared, second, event(3, "ai", 400)], now);
   assert.equal(relationships["ai:security"], 2);
   assert.equal(Object.keys(relationships).length, 1);
+});
+
+test("current attention limits emerging links and stops flow on archive-only routes", () => {
+  const recent = { "ai:markets": 6, "ai:security": 4, "hardware:markets": 3, "markets:security": 2, "crypto:science": 2,
+    "energy:security": 2, "crypto:software": 2, "ai:energy": 0 };
+  const edges = attentionEdges(recent);
+  const emerging = edges.filter(([first, second]) => !attentionEdges(null).some(([a, b]) => relationshipKey(a, b) === relationshipKey(first, second)));
+  assert.equal(emerging.length, 6);
+  assert.ok(emerging.some(([first, second]) => relationshipKey(first, second) === "ai:markets"));
+  assert.ok(!emerging.some(([first, second]) => relationshipKey(first, second) === "markets:security"));
+  const flowing = flowingAttentionEdges(edges, recent);
+  assert.ok(flowing.some(([first, second]) => relationshipKey(first, second) === "ai:markets"));
+  assert.ok(!flowing.some(([first, second]) => relationshipKey(first, second) === "ai:energy"));
 });
