@@ -11,6 +11,7 @@
     "test": "tsx --test lib/data/*.test.ts lib/ai/*.test.ts",
     "test:storage": "tsx scripts/check-storage.ts",
     "test:storage:local": "bash scripts/check-storage-local.sh",
+    "test:scale:local": "bash scripts/check-growth-scale-local.sh",
     "check:production": "node scripts/check-production.mjs",
     "growth:manage": "tsx scripts/manage-growth.ts"
   },

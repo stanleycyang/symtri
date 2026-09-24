@@ -28,6 +28,8 @@ npm run build
 
 After the hourly cron, run `npm run check:production` for a read-only check of the latest completed run, source coverage, vector backlog, full-window relationship counts, and available snapshot dates. Set `SYMTRI_REQUIRED_SOURCE=openalex SYMTRI_MIN_SIGNALS=1151` to require a newly added source to report healthy, appear in the overview, and grow the unique archive beyond a known baseline. It checks the newest two snapshots for historical samples, full-window activity, and relationship counts so the first real date comparison is covered automatically. It reports a pending classification refresh after a classifier deployment; public reads use the current rules while the next cron updates stored rows. The check makes no Gateway model calls. Set `SYMTRI_SITE_URL` to check another deployment.
 
+For a synthetic growth check, run `npm run test:scale:local` (20,000 signals) or `SYMTRI_SCALE_ROWS=50000 npm run test:scale:local`. It creates and removes an isolated loopback Postgres database, applies all migrations, and times the bounded feed, activity, child counts, topic page, and daily graph rollup paths. These local timings are a regression baseline, not a production latency guarantee.
+
 To prove a particular hourly run has finished, set `SYMTRI_MIN_COMPLETED_AT` to that hour's UTC timestamp, for example `SYMTRI_MIN_COMPLETED_AT=2026-09-24T16:00:00Z npm run check:production`. An older healthy run cannot satisfy this check.
 For the first live time-travel comparison, run `SYMTRI_MIN_SNAPSHOT_DAYS=2 npm run check:production` after the next UTC day's ingestion. The check then requires two saved daily snapshots and validates both samples, relationships, activity, and cumulative archive counts.
 

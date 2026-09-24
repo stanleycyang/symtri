@@ -139,7 +139,7 @@
 .archive-browser-toggle,.archive-browser-more{width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;color:var(--copper);font:10px var(--mono);letter-spacing:.13em;text-align:left}
 .archive-browser-toggle{display:flex;justify-content:space-between}
 .archive-browser-toggle:focus-visible,.archive-browser-more:focus-visible{outline:1px solid var(--copper);outline-offset:3px}
-.archive-browser-results{max-height:38svh;overflow:auto;border-bottom:1px solid var(--line)}
+.archive-browser-results{border-bottom:1px solid var(--line)}
 .archive-browser-results>button:not(.archive-browser-more){display:flex;flex-direction:column;gap:7px;width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--line);background:none;color:var(--white);text-align:left}
 .archive-browser-results>button small{color:#a5afb5;font:9px var(--mono);letter-spacing:.05em}
 .archive-browser-results>button strong{font-size:12px;font-weight:400;line-height:1.4}
