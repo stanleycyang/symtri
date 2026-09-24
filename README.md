@@ -1,10 +1,14 @@
 # SYMTRI
 
-**The Internet Is Thinking.** An interactive 3D map of technology attention.
+**The Internet Is Thinking.** [SYMTRI](https://symtri.com) is an open-source, source-linked map of technology research, projects, and discussion. Its hourly workflow adds distinct observations, builds connections between topics, and keeps the archive searchable as the source network grows.
 
-## Current state
+The map reflects the connected sources, not everything published on the internet. Every source card links to its origin; classification and AI summaries are aids to exploration, not independent verification of a claim.
 
-The universe has 10 stable regions, 66 subtopics, ambient and incoming signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, a cinematic entrance, and a region → subtopic → signal exploration path. The scene is atmospheric while the live feed loads, then uses observed counts from Hacker News, GitHub, arXiv, and OpenAlex. If a device cannot create a WebGL context, a lightweight region view still lets visitors explore topics, real sources, and Ask. Region panels expose recent signals that do not fit a named subtopic; topic panels show matching real signals with source links. Topics with no matching observations show an empty state; no example stories or fabricated counts appear.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), report vulnerabilities through [SECURITY.md](SECURITY.md), and review the [MIT license](LICENSE).
+
+## Explore the universe
+
+The universe starts with seeded regions and threads, then promotes new points from repeated source evidence. Its 3D view uses signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, and a region → thread → source exploration path. The scene is atmospheric while the live feed loads, then uses observed counts from Hacker News, GitHub, arXiv, and OpenAlex. If a device cannot create a WebGL context, a lightweight region view still lets visitors explore topics, real sources, and Ask. Region panels expose recent signals that do not fit a named subtopic; topic panels show matching real signals with source links. Topics with no matching observations show an empty state; no example stories or fabricated counts appear.
 
 ## Run locally
 
@@ -22,6 +26,7 @@ The social preview source is [design/social-card.svg](design/social-card.svg). A
 ```bash
 npm run typecheck
 npm run lint
+npm run audit:deps
 npm test
 npm run build
 ```
@@ -59,7 +64,7 @@ await new Promise((done) => {
 console.log({ fps: frameTimes.length / (frameTimes.reduce((sum, ms) => sum + ms, 0) / 1000), slowFrames: frameTimes.filter((ms) => ms > 33).length });
 ```
 
-## Implementation plan
+## Development roadmap
 
 1. **Universe and polish:** Keep the entrance and map visually coherent, tune camera paths and labels, check desktop and touch navigation, and measure frame rate on target hardware.
 2. **Real signals:** The four source adapters, normalization, classification, canonical URL deduplication, database, and hourly ingestion workflow are implemented. Continue broadening source coverage and checking classification quality.

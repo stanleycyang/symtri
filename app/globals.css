@@ -148,3 +148,9 @@
 .thread-pages{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;color:#a5afb5;font:9px var(--mono);letter-spacing:.08em}
 .thread-pages button{border:0;background:none;color:var(--copper);font:inherit;letter-spacing:inherit}
 .thread-pages button:disabled{color:#69717a;cursor:default}
+.entrance-bottom{gap:12px;flex-wrap:wrap}
+.entrance-bottom a,.github-link{color:#c8aa85;text-decoration:none;font:9px var(--mono);letter-spacing:.12em;white-space:nowrap}
+.entrance-bottom a:hover,.github-link:hover{color:#f5dcc0}
+.entrance-bottom a:focus-visible,.github-link:focus-visible{outline:1px solid var(--copper);outline-offset:5px}
+.github-link{display:inline-flex;align-items:center;min-height:44px;pointer-events:auto}
+@media(max-width:700px){.entrance-bottom{align-items:flex-start}.entrance-bottom a{font-size:8px}.topbar-actions{gap:9px}.github-link{font-size:8px}}
