@@ -32,11 +32,13 @@ async function main() {
   await sql.unsafe(graphMigration);
   const canonicalMigration = await readFile(new URL("../supabase/migrations/20260924002000_canonical_ingestion.sql", import.meta.url), "utf8");
   await sql.unsafe(canonicalMigration);
+  const observationsMigration = await readFile(new URL("../supabase/migrations/20260924003000_source_observations.sql", import.meta.url), "utf8");
+  await sql.unsafe(observationsMigration);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
-    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph')
+    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations')
   `;
-  assert.equal(protectedTables.length, 6);
+  assert.equal(protectedTables.length, 7);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
@@ -57,6 +59,7 @@ async function main() {
     const duplicate: SignalEvent = { ...event, id: `hacker-news:${externalId}`, source: "hacker-news", externalId, url: `${event.url}/?utm_source=hn`, title: "Duplicate item" };
     assert.equal(await persistSignals({ ...feed, events: [duplicate] }), 0);
     assert.equal((await sql`select count(*)::int as count from signal_events where canonical_url = ${`github.com/symtri/${externalId}`}`)[0].count, 1);
+    assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${id}`)[0].count, 2);
     const stored = await getStoredFeed();
     const result = stored?.events.find((item) => item.id === id);
     assert.equal(result?.title, "Updated title");

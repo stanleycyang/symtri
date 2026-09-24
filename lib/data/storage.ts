@@ -48,6 +48,16 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
        published_at text, importance double precision, topics jsonb)
     on conflict do nothing returning id
   `;
+  await sql`
+    insert into signal_observations (source, external_id, signal_id, observed_url)
+    select incoming.source, incoming.external_id, stored.id, incoming.url
+    from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
+      (source text, external_id text, url text)
+    join signal_events as stored on stored.canonical_url =
+      lower(regexp_replace(regexp_replace(split_part(split_part(incoming.url, '?', 1), '#', 1), '^https?://', ''), '/+$', ''))
+    on conflict (source, external_id) do update set
+      signal_id = excluded.signal_id, observed_url = excluded.observed_url, last_seen_at = now()
+  `;
   return inserted.length;
 }
 
