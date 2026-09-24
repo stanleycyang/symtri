@@ -403,6 +403,8 @@ async function main() {
         'Spectra reveal water vapor in a distant planetary atmosphere.', now(), 30, '[]'::jsonb)
     `;
     assert.equal((await searchKnowledge("What is new in exoplanet research?", null))[0]?.event.id, exoplanetKnowledgeId);
+    assert.equal((await searchKnowledge("What do we know about exoplanets?", null))[0]?.event.id, exoplanetKnowledgeId);
+    assert.equal((await searchKnowledge("What are people saying about exoplanets?", null))[0]?.event.id, exoplanetKnowledgeId);
     assert.equal((await searchKnowledge("What is new in tropical botany research?", null)).length, 0);
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");

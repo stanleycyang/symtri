@@ -5,7 +5,8 @@ const intentWords = new Set([
 ]);
 
 export function knowledgeSearchQuery(question: string): string {
-  const terms = question.toLowerCase().match(/[a-z0-9]+(?:[-'][a-z0-9]+)*/g) ?? [];
+  const subjectQuestion = question.replace(/^\s*(?:what do we know about|what are people saying about|tell me about)\s+/i, "");
+  const terms = subjectQuestion.toLowerCase().match(/[a-z0-9]+(?:[-'][a-z0-9]+)*/g) ?? [];
   const subject = terms.filter((term) => !intentWords.has(term));
   return (subject.length ? subject : terms).join(" ");
 }
