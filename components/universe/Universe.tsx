@@ -171,20 +171,28 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
   });
   return <group position={topic.position}>
     <sprite ref={glow} scale={[glowSize, glowSize, 1]} raycast={() => null}><spriteMaterial ref={glowMaterial} map={glowTexture} transparent opacity={muted ? .06 : hovered ? 1 : focused || emphasized ? .82 : .48 + topic.change / 650} depthWrite={false} blending={THREE.AdditiveBlending} /></sprite>
-    <mesh ref={core} scale={coreSize} onClick={(event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); if (event.delta <= 8) onFocus(topic.id); }} onPointerOver={(event) => { event.stopPropagation(); onHover(topic.id); document.body.style.cursor = "pointer"; }} onPointerOut={() => { onHover(null); document.body.style.cursor = "auto"; }}>
+    <mesh ref={core} scale={coreSize} raycast={() => null}>
       <sphereGeometry args={[1, 24, 16]} />
       <meshBasicMaterial color={topic.color} transparent opacity={muted ? .28 : 1} />
     </mesh>
+    <mesh onClick={(event: ThreeEvent<MouseEvent>) => { event.stopPropagation(); if (event.delta <= 8) onFocus(topic.id); }} onPointerOver={(event) => { event.stopPropagation(); onHover(topic.id); document.body.style.cursor = "pointer"; }} onPointerOut={() => { onHover(null); document.body.style.cursor = "auto"; }}>
+      <sphereGeometry args={[1.18, 16, 12]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
     <Billboard follow><mesh raycast={() => null}><ringGeometry args={[.86, .875, 64]} /><meshBasicMaterial color={topic.color} transparent opacity={muted ? .07 : hovered || emphasized ? .68 : .35} side={THREE.DoubleSide} /></mesh></Billboard>
-    {!muted && <group visible={showLabel} position={[0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : "AWAITING DATA"} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 4.9} /></group>}
+    {!muted && <group visible={showLabel} position={[!focused && topic.id === "startups" ? -1.5 : 0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : "AWAITING DATA"} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 7.5} /></group>}
   </group>;
 }
 
 function ChildNode({ position, name, color, active, onClick }: { position: Vec3; name: string; color: string; active: boolean; onClick: () => void }) {
   return <group position={position}>
-    <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+    <mesh raycast={() => null}>
       <sphereGeometry args={[.18, 14, 10]} />
       <meshBasicMaterial color={color} />
+    </mesh>
+    <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+      <sphereGeometry args={[.65, 12, 8]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
     <mesh raycast={() => null}><sphereGeometry args={[active ? .55 : .38, 12, 8]} /><meshBasicMaterial color={color} transparent opacity={active ? .13 : .055} depthWrite={false} /></mesh>
     <group position={[0, -.75, 0]}><Label title={name} color={active ? "#d5a878" : "#d6d9db"} size={2.8} /></group>
@@ -194,9 +202,13 @@ function ChildNode({ position, name, color, active, onClick }: { position: Vec3;
 function SignalMote({ position, source, color, active, onClick }: { position: Vec3; source: string; color: string; active: boolean; onClick: () => void }) {
   const short = source === "Hacker News" ? "HN" : source === "GitHub" ? "GH" : "ARX";
   return <group position={position}>
-    <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+    <mesh raycast={() => null}>
       <octahedronGeometry args={[active ? .18 : .12, 0]} />
       <meshBasicMaterial color={active ? "#f5e6d4" : color} />
+    </mesh>
+    <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+      <sphereGeometry args={[.48, 10, 8]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
     <group position={[0, -.35, 0]}><Label title={short} color="#b9c0c5" size={1.45} /></group>
   </group>;
