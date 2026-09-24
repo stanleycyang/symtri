@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AskSymtri from "@/components/AskSymtri";
 import type { AskResult } from "@/lib/ai/ask";
 import { getTopic, topics } from "@/lib/universe";
@@ -42,6 +42,7 @@ export default function Experience() {
   const [historicalFeed, setHistoricalFeed] = useState<{ day: string; feed: SignalFeed } | null>(null);
   const [historyError, setHistoryError] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const askTrigger = useRef<HTMLButtonElement>(null);
   const [askSteps, setAskSteps] = useState<AskResult["pathSteps"]>([]);
   const askPath = askSteps.map((step) => step.regionId).filter((id, index, ids) => index === 0 || id !== ids[index - 1]);
   const displayFeed = selectedDay && historicalFeed?.day === selectedDay ? historicalFeed.feed : liveFeed;
@@ -96,10 +97,13 @@ export default function Experience() {
     return () => query.removeEventListener("change", update);
   }, []);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setSignalId(null); setChildId(null); setFocusedId(null); setAskOpen(false); setAskSteps([]); } };
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") {
+      if (askOpen) { setAskOpen(false); setAskSteps([]); askTrigger.current?.focus(); return; }
+      setSignalId(null); setChildId(null); setFocusedId(null); setAskSteps([]);
+    } };
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("keydown", onKey); };
-  }, []);
+  }, [askOpen]);
   useEffect(() => {
     if (!entered) return;
     const controller = new AbortController();
@@ -194,8 +198,8 @@ export default function Experience() {
     </section>
 
     <div className="universe-ui" aria-hidden={!entered} inert={!entered}>
-      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "14-DAY SAMPLE" : displayFeed ? "SAMPLE ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div><div className="topbar-actions">{feedError && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { setAskOpen((open) => !open); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
-      {askOpen && <AskSymtri key={selectedDay ?? "now"} day={selectedDay} onClose={() => { setAskOpen(false); setAskSteps([]); }} onResult={followAnswer} onNavigate={(id, subtopicId) => { setFocusedId(id); setChildId(subtopicId); setSignalId(null); setHoveredId(null); }} />}
+      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "14-DAY SAMPLE" : displayFeed ? "SAMPLE ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div><div className="topbar-actions">{feedError && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button ref={askTrigger} type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { setAskOpen((open) => !open); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
+      {askOpen && <AskSymtri key={selectedDay ?? "now"} day={selectedDay} onClose={() => { setAskOpen(false); setAskSteps([]); askTrigger.current?.focus(); }} onResult={followAnswer} onNavigate={(id, subtopicId) => { setFocusedId(id); setChildId(subtopicId); setSignalId(null); setHoveredId(null); }} />}
       {!focus && <div className="scene-heading"><p className="eyebrow">{displayFeed ? sampleProvenance : "EXPLORE THE SIGNAL"}</p><h2>A map of what matters.</h2><p>Ideas gather. Connections form. Attention moves.</p>{feedError && !selectedDay && !liveFeed && <p className="feed-error-copy">Live observations could not load. Explore the map or retry the feed.</p>}{!selectedDay && liveFeed?.archiveCount ? <p className="archive-total">{liveFeed.archiveCount.toLocaleString()} UNIQUE SIGNALS OBSERVED SINCE LAUNCH</p> : null}{leadingRegion && leadingRegionActivity && leadingRegionActivity.count > 0 && <button type="button" className="scene-leader" onClick={() => chooseTopic(leadingRegion.id)}><span>MOST ACTIVE IN THIS SAMPLE</span><strong>{leadingRegion.name}</strong><b aria-hidden="true">↗</b></button>}</div>}
       <div className="breadcrumbs" aria-label="Current location"><button onClick={() => chooseTopic(null)}>UNIVERSE</button>{focus && <><span>/</span><button onClick={() => { setChildId(null); setSignalId(null); }}>{focus.short}</button></>}{child && <><span>/</span><span>{child.name.toUpperCase()}</span></>}</div>
 
