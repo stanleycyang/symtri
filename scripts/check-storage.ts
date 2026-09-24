@@ -73,6 +73,10 @@ async function main() {
   await sql.unsafe(uniqueContentMigration);
   const knowledgeSearchMigration = await readFile(new URL("../supabase/migrations/20260924009000_knowledge_search_index.sql", import.meta.url), "utf8");
   await sql.unsafe(knowledgeSearchMigration);
+  const queryIdentityMigration = await readFile(new URL("../supabase/migrations/20260924010000_query_identity.sql", import.meta.url), "utf8");
+  await sql.unsafe(queryIdentityMigration);
+  assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
+  assert.equal((await sql`select public.symtri_canonical_url('https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc') as url`)[0].url, "example.com/article?a=1&b=2");
   assert.equal((await sql`select count(*)::int as count from signal_events where id in (${legacyFirst}, ${legacySecond})`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from signal_observations where signal_id = ${legacyFirst}`)[0].count, 2);
   await sql`delete from signal_events where id = ${legacyFirst}`;
@@ -97,6 +101,17 @@ async function main() {
     partial: true, scope: "sample",
   };
   try {
+    const selfPostOne: SignalEvent = { ...event, id: `hacker-news:${externalId}-self-1`, source: "hacker-news",
+      externalId: `${externalId}-self-1`, title: "First distinct question", summary: "AI agent question one",
+      url: `https://news.ycombinator.com/item?id=${externalId}-1` };
+    const selfPostTwo: SignalEvent = { ...selfPostOne, id: `hacker-news:${externalId}-self-2`,
+      externalId: `${externalId}-self-2`, title: "Second distinct question", summary: "AI agent question two",
+      url: `https://news.ycombinator.com/item?id=${externalId}-2` };
+    assert.equal(await persistSignals({ ...feed, events: [selfPostOne, selfPostTwo] }), 2);
+    assert.equal((await sql`select count(*)::int as count from signal_events where id in (${selfPostOne.id}, ${selfPostTwo.id})`)[0].count, 2);
+    assert.deepEqual((await sql`select signal_id from signal_observations where external_id in (${selfPostOne.externalId}, ${selfPostTwo.externalId}) order by external_id`).map((row) => row.signal_id), [selfPostOne.id, selfPostTwo.id]);
+    assert.equal(await persistSignals({ ...feed, events: [selfPostOne, selfPostTwo] }), 0);
+    await sql`delete from signal_events where id in (${selfPostOne.id}, ${selfPostTwo.id})`;
     assert.equal(await persistSignals(feed), 1);
     assert.ok((await getPendingEmbeddingEvents()).some((item) => item.id === id));
     event.title = "Updated title";

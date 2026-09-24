@@ -85,7 +85,7 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
     from jsonb_to_recordset(${sql.json(rows)}::jsonb) as incoming
       (source text, external_id text, url text, title text, summary text)
     cross join lateral (select
-      lower(regexp_replace(regexp_replace(split_part(split_part(incoming.url, '?', 1), '#', 1), '^https?://', ''), '/+$', '')) as canonical_url,
+      public.symtri_canonical_url(incoming.url) as canonical_url,
       md5(lower(regexp_replace(btrim(incoming.title) || E'\n' || btrim(incoming.summary), '[[:space:]]+', ' ', 'g'))) as content_key
     ) as identity
     join lateral (

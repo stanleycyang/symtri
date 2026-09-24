@@ -135,6 +135,17 @@ test("deduplication keeps the stronger observation for the same URL", () => {
   assert.equal(canonicalSignalUrl("https://EXAMPLE.com/Agent/?ref=hn"), "example.com/agent");
 });
 
+test("deduplication preserves distinct query-identified documents", () => {
+  const first = normalizeHackerNews({ id: 47, type: "story", title: "First research question", time: 1780000000,
+    score: 10, text: "The first question concerns AI agents." })!;
+  const second = normalizeHackerNews({ id: 48, type: "story", title: "Second research question", time: 1780000000,
+    score: 10, text: "The second question concerns AI models." })!;
+  assert.equal(canonicalSignalUrl(first.url), "news.ycombinator.com/item?id=47");
+  assert.equal(canonicalSignalUrl(second.url), "news.ycombinator.com/item?id=48");
+  assert.deepEqual(deduplicateSignals([first, second]).map((item) => item.id).sort(), [first.id, second.id]);
+  assert.equal(canonicalSignalUrl("https://example.com/article?b=2&utm_source=hn&a=1&fbclid=abc"), "example.com/article?a=1&b=2");
+});
+
 test("deduplication keeps one copy of identical content across URLs", () => {
   const first = normalizeHackerNews({ id: 47, type: "story", title: "AI agent toolkit", time: 1780000000,
     score: 100, url: "https://original.example/agent" })!;
