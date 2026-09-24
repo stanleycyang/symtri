@@ -68,7 +68,20 @@ async function fetchHackerNewsSample(forIngestion: boolean): Promise<{ events: S
   return { events: output, status: unresolved ? "partial" : "ok" };
 }
 
-async function queryGitHub(sort: "stars" | "updated", fresh: boolean): Promise<SignalEvent[]> {
+async function githubRetryDelay(response: Response): Promise<number | null> {
+  if (response.status !== 403 && response.status !== 429) return null;
+  const retryAfter = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(retryAfter) && retryAfter > 0) return Math.ceil(retryAfter * 1000) + 1000;
+  if (response.headers.get("x-ratelimit-remaining") === "0") {
+    const reset = Number(response.headers.get("x-ratelimit-reset"));
+    if (Number.isFinite(reset) && reset > 0) return Math.max(1000, reset * 1000 - Date.now() + 1000);
+  }
+  const body: unknown = await response.clone().json().catch(() => null);
+  const message = body && typeof body === "object" && "message" in body ? String(body.message) : "";
+  return /(?:secondary )?rate limit|abuse detection/i.test(message) ? 60_000 : null;
+}
+
+async function queryGitHub(sort: "stars" | "updated", fresh: boolean, pause: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))): Promise<SignalEvent[]> {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const url = new URL("https://api.github.com/search/repositories");
   url.searchParams.set("q", `created:>=${since} stars:>=5 archived:false fork:false`);
@@ -77,7 +90,14 @@ async function queryGitHub(sort: "stars" | "updated", fresh: boolean): Promise<S
   url.searchParams.set("per_page", "50");
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "SYMTRI/0.1", "X-GitHub-Api-Version": "2026-03-10" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  const data: unknown = await (await request(url.toString(), headers, fresh)).json();
+  const load = () => fetch(url.toString(), { headers, ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: 900 } }), signal: AbortSignal.timeout(12000) });
+  let response = await load();
+  if (fresh) {
+    const delay = await githubRetryDelay(response);
+    if (delay !== null && delay <= 65_000) { await pause(delay); response = await load(); }
+  }
+  if (!response.ok) throw new Error(`Source returned HTTP ${response.status}`);
+  const data: unknown = await response.json();
   const items = data && typeof data === "object" && "items" in data ? data.items : null;
   if (!Array.isArray(items)) throw new Error("Invalid GitHub search response");
   return items.map(normalizeGitHub).filter((event): event is SignalEvent => event !== null);
@@ -87,10 +107,10 @@ export async function fetchGitHub(forIngestion = false): Promise<SignalEvent[]> 
   return forIngestion ? (await fetchGitHubForIngestion()).events : queryGitHub("stars", false);
 }
 
-export async function fetchGitHubForIngestion(): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {
-  const popular = await queryGitHub("stars", true);
+export async function fetchGitHubForIngestion(pause: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {
+  const popular = await queryGitHub("stars", true, pause);
   try {
-    const recent = await queryGitHub("updated", true);
+    const recent = await queryGitHub("updated", true, pause);
     return { events: [...new Map([...popular, ...recent].map((event) => [event.id, event])).values()], status: "ok" };
   } catch (error) {
     console.warn("SYMTRI GitHub recent search unavailable", error instanceof Error ? error.message : "unknown error");

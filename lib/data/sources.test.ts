@@ -130,6 +130,39 @@ test("GitHub keeps popular repositories but reports a missing recent search", as
   }
 });
 
+test("GitHub waits for a search rate-limit reset and recovers once", async () => {
+  const originalFetch = globalThis.fetch;
+  const attempts: string[] = [];
+  const pauses: number[] = [];
+  const repo = (id: number) => ({ id, full_name: `example/repo-${id}`, created_at: new Date().toISOString(), html_url: `https://github.com/example/repo-${id}`, description: "AI agent tools", stargazers_count: 10, fork: false });
+  globalThis.fetch = async (input) => {
+    const sort = new URL(String(input)).searchParams.get("sort") ?? "";
+    attempts.push(sort);
+    if (sort === "stars" && attempts.length === 1) return Response.json({ message: "API rate limit exceeded" }, {
+      status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 5) },
+    });
+    return Response.json({ items: [repo(sort === "stars" ? 41 : 42)] });
+  };
+  try {
+    const result = await fetchGitHubForIngestion(async (milliseconds) => { pauses.push(milliseconds); });
+    assert.equal(result.status, "ok");
+    assert.deepEqual(result.events.map((event) => event.externalId), ["41", "42"]);
+    assert.deepEqual(attempts, ["stars", "stars", "updated"]);
+    assert.equal(pauses.length, 1);
+    assert.ok(pauses[0] >= 1000 && pauses[0] <= 6000);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("GitHub does not retry an unrelated forbidden response", async () => {
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = async () => { attempts++; return Response.json({ message: "Resource not accessible" }, { status: 403 }); };
+  try {
+    await assert.rejects(fetchGitHubForIngestion(async () => { throw new Error("Unexpected pause"); }), /HTTP 403/);
+    assert.equal(attempts, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("hourly Hacker News retries failed items and reports any remaining gaps", async () => {
   const originalFetch = globalThis.fetch;
   const attempts = new Map<number, number>();
