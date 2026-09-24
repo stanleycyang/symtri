@@ -100,7 +100,7 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
   return inserted.length;
 }
 
-export async function refreshStoredClassifications(limit = 500): Promise<number> {
+export async function refreshStoredClassifications(limit = 1000): Promise<number> {
   const sql = database();
   const rows = await sql`
     select id, classification_input

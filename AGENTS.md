@@ -20,7 +20,7 @@ When a screen or panel is hidden after interaction, make its controls inert and 
 
 Keep `/api/signals` responses uncached when classification or feed display logic changes; upstream source fetches may retain a short revalidation window. Verify the rendered panel against the current classifier after such edits.
 
-When changing classification, bump `CLASSIFIER_VERSION` in `lib/data/classify.ts`. The hourly workflow reclassifies up to 500 stored signals per run when it has their original classification input. Verify the affected archive signals and knowledge graph after ingestion; older GitHub and arXiv rows from before classification inputs were stored still need a fresh source observation or targeted backfill.
+When changing classification, bump `CLASSIFIER_VERSION` in `lib/data/classify.ts`. The hourly workflow reclassifies up to 1,000 stored signals per run when it has their original classification input. Verify the affected archive signals and knowledge graph after ingestion; older GitHub and arXiv rows from before classification inputs were stored still need a fresh source observation or targeted backfill.
 
 Archive reads apply the current classifier to stale rows with saved inputs, so removed false matches disappear from the map before the next hourly write. New matches and cumulative knowledge graph links still need the next ingestion run; verify them after the backlog clears.
 

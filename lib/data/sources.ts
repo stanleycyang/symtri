@@ -103,6 +103,7 @@ const arxivIngestionQueries = [
   { query: "cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO", limit: 45 },
   { query: "cat:cs.CR OR cat:cs.SE OR cat:cs.NI", limit: 25 },
   { query: "cat:q-bio.BM OR cat:q-bio.MN OR cat:q-bio.GN OR cat:quant-ph", limit: 25 },
+  { query: "cat:physics.ao-ph", limit: 25 },
   { query: "cat:astro-ph.CO OR cat:astro-ph.EP OR cat:astro-ph.IM", limit: 15 },
   { query: "cat:q-fin.TR OR cat:q-fin.ST OR cat:q-fin.EC OR cat:q-fin.CP", limit: 10 },
   { query: "cat:physics.plasm-ph AND (ti:fusion OR ti:tokamak OR ti:stellarator)", limit: 25, titlePattern: /\b(?:fusion|tokamak|stellarator)s?\b/i },

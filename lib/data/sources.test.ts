@@ -23,6 +23,7 @@ test("hourly source sampling finds new items without widening the public sample"
       const query = params.get("search_query") ?? "";
       const paper = query.includes("physics.plasm-ph")
         ? ["6", "Fusion confinement in a tokamak", "physics.plasm-ph"]
+        : query.includes("physics.ao-ph") ? ["7", "Climate models for atmospheric prediction", "physics.ao-ph"]
         : params.get("max_results") === "55" || query.includes("q-fin.")
         ? ["5", "Liquidity in limit order books", "q-fin.TR"]
         : query.includes("astro-ph") ? ["4", "A new satellite observation", "astro-ph.CO"]
@@ -51,14 +52,15 @@ test("hourly source sampling finds new items without widening the public sample"
     assert.deepEqual((await fetchGitHub(true)).map((event) => event.externalId), ["10", "11"]);
     const papers = await fetchArxiv(true, async (milliseconds) => { pauses.push(milliseconds); });
     assert.deepEqual(new Set(papers.map((event) => event.topics[0]?.topicId)), new Set(["ai", "security", "science", "space", "markets", "energy"]));
+    assert.equal(papers.find((paper) => paper.title.includes("Climate models"))?.topics[0]?.subtopicId, "science-climate-science");
     assert.equal(papers.find((paper) => paper.title.includes("tokamak"))?.topics[0]?.subtopicId, "energy-fusion");
     assert.equal(papers.some((paper) => paper.title === "Unrelated plasma transport"), false);
     assert.equal(requests.filter((url) => url.endsWith("/item/2.json")).length, 1);
     assert.equal(requests.some((url) => url.endsWith("/newstories.json")), true);
     assert.ok(requestOptions.every(({ cache, revalidate }) => cache === "no-store" && revalidate === undefined));
     assert.equal(requests.some((url) => url.includes("sort=updated")), true);
-    assert.equal(requests.filter((url) => url.includes("export.arxiv.org/api/query")).length, 6);
-    assert.deepEqual(pauses, [3000, 3000, 3000, 3000, 3000]);
+    assert.equal(requests.filter((url) => url.includes("export.arxiv.org/api/query")).length, 7);
+    assert.deepEqual(pauses, [3000, 3000, 3000, 3000, 3000, 3000]);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -79,8 +81,8 @@ test("arXiv retains successful groups and reports reduced source coverage", asyn
   try {
     const result = await fetchArxivForIngestion(async () => {});
     assert.equal(result.status, "partial");
-    assert.equal(result.events.length, 5);
-    assert.equal(requested.length, 6);
+    assert.equal(result.events.length, 6);
+    assert.equal(requested.length, 7);
     failAll = true;
     await assert.rejects(fetchArxivForIngestion(async () => {}), /no usable papers/);
   } finally {

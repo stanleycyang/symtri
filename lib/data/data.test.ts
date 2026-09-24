@@ -66,6 +66,15 @@ test("fusion research maps to the Energy thread without treating generic plasma 
   assert.ok(!classifySignal("Plasma transport in stellar atmospheres", "Solar wind", ["physics.plasm-ph"]).some((match) => match.topicId === "energy"));
 });
 
+test("atmospheric research reaches Climate Science without labeling every ocean paper as climate", () => {
+  const climate = classifySignal("Toward GPU-Resident Climate Models", "A study of atmospheric simulation", ["physics.ao-ph"]);
+  assert.equal(climate[0]?.topicId, "science");
+  assert.equal(climate[0]?.subtopicId, "science-climate-science");
+  const ocean = classifySignal("Blinded evaluation of oceanic sound source locations", "Acoustic localization", ["physics.ao-ph"]);
+  assert.ok(ocean.some((match) => match.topicId === "science"));
+  assert.ok(!ocean.some((match) => match.subtopicId === "science-climate-science"));
+});
+
 test("specific story titles map to regions without inferring unrelated ones", () => {
   assert.equal(classifySignal("Obscura: VPN that cannot log your activity", "Hacker News discussion")[0]?.topicId, "security");
   assert.equal(classifySignal("GPT-6 Sol performance analysis", "Hacker News discussion")[0]?.topicId, "ai");

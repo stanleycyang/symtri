@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 5;
+export const CLASSIFIER_VERSION = 6;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -33,7 +33,7 @@ const childTerms: Record<string, string[]> = {
   "science-biotechnology": ["biotech", "protein", "genome", "crispr"],
   "science-neuroscience": ["brain", "neuroscience", "neuron"],
   "science-physics": ["physics", "quantum", "qubit", "entanglement"],
-  "science-climate-science": ["climate", "carbon", "warming"],
+  "science-climate-science": ["climate", "carbon", "warming", "weather", "atmospheric", "precipitation", "hydrology", "hydrological", "enso", "tropical cyclone", "oceanographic", "ocean circulation", "atlantic overturning"],
   "space-launch-systems": ["rocket", "launch vehicle"],
   "space-satellites": ["satellite"],
   "space-astronomy": ["astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "telescope", "galaxy"],
