@@ -5,6 +5,7 @@ import { topicEdges, topics } from "../universe";
 import { relationshipKey } from "./activity";
 import { CLASSIFIER_VERSION, classifySignal } from "./classify";
 import { selectDistinctHeadlines } from "./select";
+import { knowledgeSearchQuery } from "./search";
 import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
 import type { RelatedSignal, SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
 
@@ -427,9 +428,10 @@ export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed,
 export async function searchKnowledge(query: string, vector: number[] | null): Promise<{ event: SignalEvent; similarity: number | null }[]> {
   if (vector && (vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) throw new Error("Invalid query embedding");
   const sql = database();
+  const lexicalQuery = knowledgeSearchQuery(query);
   const literal = vector ? `[${vector.join(",")}]` : null;
   const lexical = await sql`
-      with request as (select websearch_to_tsquery('english', ${query}) as terms),
+      with request as (select websearch_to_tsquery('english', ${lexicalQuery}) as terms),
       ranked as (
         select id, source, external_id, title, url, summary, published_at, importance, topics,
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank

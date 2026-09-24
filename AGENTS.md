@@ -47,6 +47,7 @@ Likewise, keep popular GitHub repositories if the recent-update search fails, bu
 
 Serve `/api/signals` and mapped Ask questions from the persisted hourly archive once it contains signals. Per-visitor Hacker News, GitHub, and arXiv fetches multiply source traffic and make exploration depend on those APIs; keep direct source fetches only for an empty archive or a local database-free preview. Verify both routes with `npm run test:storage:local`.
 For archive-only Ask questions, require meaningful vector similarity and keep indexed text matches ahead of vector-only neighbors. Weak nearest neighbors caused unrelated stories to be presented as relevant sources; retain the negative retrieval case in `scripts/check-storage.ts`.
+Strip generic recency and publication words from archive lexical queries so a question such as "What is new in exoplanet research?" can find a paper about exoplanets. Keep substantive subject terms conjunctive and verify an unrelated subject still returns no evidence in the local Postgres check.
 When adding Ask thread aliases, use phrases that identify the map context for generic child names such as design, growth, product, and networks. Test both the intended route and an unrelated question containing the generic word; false map routing hides the full knowledge archive.
 For an Ask question naming a specific map thread, keep that map location but do not cite unrelated parent-region stories when the thread has no matching source. Verify a real empty thread, such as Climate Science, returns no filler sources.
 

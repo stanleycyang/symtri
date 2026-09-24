@@ -395,6 +395,15 @@ async function main() {
     `;
     assert.equal(oldRank[0].count, 35);
     assert.equal((await searchKnowledge("Quantum meadow", null))[0]?.event.id, freshKnowledgeId);
+    const exoplanetKnowledgeId = `${knowledgePrefix}exoplanet`;
+    await sql`
+      insert into signal_events (id, source, external_id, title, url, summary, published_at, importance, topics)
+      values (${exoplanetKnowledgeId}, 'arxiv', ${`${externalId}-knowledge-exoplanet`},
+        'Exoplanet atmospheres observed with JWST', ${`https://arxiv.org/abs/${externalId}-knowledge-exoplanet`},
+        'Spectra reveal water vapor in a distant planetary atmosphere.', now(), 30, '[]'::jsonb)
+    `;
+    assert.equal((await searchKnowledge("What is new in exoplanet research?", null))[0]?.event.id, exoplanetKnowledgeId);
+    assert.equal((await searchKnowledge("What is new in tropical botany research?", null)).length, 0);
     await sql`delete from signal_events where id like ${`${knowledgePrefix}%`}`;
     console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
   } finally {
