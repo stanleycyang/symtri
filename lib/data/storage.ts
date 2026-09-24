@@ -304,7 +304,7 @@ export async function acquireIngestionLease(runId: string): Promise<boolean> {
     insert into ingestion_lease (name, run_id, expires_at)
     values ('main', ${runId}, now() + interval '45 minutes')
     on conflict (name) do update set run_id = excluded.run_id, expires_at = excluded.expires_at
-    where ingestion_lease.expires_at < now()
+    where ingestion_lease.expires_at < now() or ingestion_lease.run_id = excluded.run_id
     returning name
   `;
   return rows.length === 1;
@@ -314,9 +314,11 @@ export async function releaseIngestionLease(runId: string): Promise<void> {
   await database()`delete from ingestion_lease where name = 'main' and run_id = ${runId}`;
 }
 
-export async function startIngestionRun(runId: string): Promise<void> {
-  await database()`insert into ingestion_runs (id, status) values (${runId}, 'running')
-    on conflict (id) do update set status = 'running' where ingestion_runs.status = 'queued'`;
+export async function startIngestionRun(runId: string): Promise<boolean> {
+  const rows = await database()`insert into ingestion_runs (id, status) values (${runId}, 'running')
+    on conflict (id) do update set status = 'running' where ingestion_runs.status in ('queued', 'running')
+    returning id`;
+  return rows.length === 1;
 }
 
 export async function claimIngestionSlot(slot: string): Promise<boolean> {

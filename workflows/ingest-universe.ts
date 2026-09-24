@@ -8,7 +8,12 @@ import type { SignalFeed } from "@/lib/data/model";
 async function begin(slot: string): Promise<boolean> {
   "use step";
   if (!await acquireIngestionLease(slot)) return false;
-  try { await startIngestionRun(slot); }
+  try {
+    if (!await startIngestionRun(slot)) {
+      await releaseIngestionLease(slot);
+      return false;
+    }
+  }
   catch (error) { await releaseIngestionLease(slot); throw error; }
   return true;
 }
@@ -52,7 +57,7 @@ async function finish(slot: string, result: IngestionResult): Promise<void> {
 
 export async function ingestUniverse(slot: string): Promise<IngestionResult> {
   "use workflow";
-  if (!await begin(slot)) return { status: "partial", error: "Another ingestion is running" };
+  if (!await begin(slot)) return { status: "partial", error: "Ingestion slot already used or another run is active" };
   let result: IngestionResult = { status: "failed" };
   try {
     const feed = await fetchSources();

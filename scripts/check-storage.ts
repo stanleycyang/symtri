@@ -196,6 +196,7 @@ async function main() {
     const refreshed = await sql`select embedding_input_hash from signal_events where id = ${id}`;
     assert.notEqual(refreshed[0].embedding_input_hash, embedded[0].embedding_input_hash);
     assert.equal(await acquireIngestionLease(runId), true);
+    assert.equal(await acquireIngestionLease(runId), true);
     assert.equal(await acquireIngestionLease(competingRunId), false);
     const slot = `hour:${randomUUID()}`;
     assert.equal(await claimIngestionSlot(slot), true);
@@ -203,9 +204,11 @@ async function main() {
     await releaseQueuedIngestionSlot(slot);
     assert.equal(await claimIngestionSlot(slot), true);
     await releaseQueuedIngestionSlot(slot);
-    await startIngestionRun(runId);
+    assert.equal(await startIngestionRun(runId), true);
+    assert.equal(await startIngestionRun(runId), true);
     assert.ok(await countNewSignalsForRun(runId) >= 0);
     await finishIngestionRun(runId, { status: "complete", sources: feed.sources, fetched: 1, mapped: 1, added: 1, embedded: 1, embeddingStatus: "ok" });
+    assert.equal(await startIngestionRun(runId), false);
     const status = await getIngestionStatus();
     assert.equal(status.lastRun?.status, "complete");
     assert.equal(status.lastRun?.fetched, 1);
