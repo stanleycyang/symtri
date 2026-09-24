@@ -62,3 +62,4 @@
 .universe-fallback-focus strong{z-index:1;color:#e6e7e6;font:500 22px var(--display);letter-spacing:-.04em}
 .universe-fallback-focus small{z-index:1;color:#a3a9ad;font:8px var(--mono);letter-spacing:.15em}
 @media(max-width:700px){.universe-fallback-focus{left:50%;top:28%;width:160px;height:160px}.universe-fallback-focus span{width:125px;height:125px}.universe-fallback-focus strong{font-size:19px}}
+.scene-heading .feed-freshness{margin-top:6px;color:#8e9ca8;font:8px var(--mono);letter-spacing:.14em}

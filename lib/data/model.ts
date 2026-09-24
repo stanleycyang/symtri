@@ -28,6 +28,7 @@ export type SourceStatus = Record<SourceId, "ok" | "partial" | "unavailable">;
 
 export type SignalFeed = {
   observedAt: string;
+  lastIngestedAt?: string;
   events: SignalEvent[];
   sources: SourceStatus;
   partial: boolean;

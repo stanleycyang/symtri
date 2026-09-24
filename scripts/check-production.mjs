@@ -26,6 +26,9 @@ try {
   if (status.signals < 1 || status.vectors < 1 || status.embeddingBacklog !== 0) {
     throw new Error("Signal or vector coverage is incomplete");
   }
+  if (signals.lastIngestedAt !== run.completedAt) {
+    throw new Error("Public feed does not expose the latest completed ingest time");
+  }
   if (!Array.isArray(history.days) || history.days.length < 1) throw new Error("No daily snapshot is available");
   if (!signals.relationships || typeof signals.relationships !== "object") {
     throw new Error("Full-window live relationships are unavailable");

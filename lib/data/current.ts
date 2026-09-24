@@ -13,6 +13,7 @@ export async function getCurrentFeed(): Promise<SignalFeed> {
   const stale = !latest || Date.now() - Date.parse(latest.observedAt) > 3 * 60 * 60 * 1000;
   return {
     ...archive, ...latest, observedAt: new Date().toISOString(), archiveCount,
+    lastIngestedAt: latest?.observedAt,
     activity: stale ? undefined : latest?.activity,
     partial: stale || latest?.partial || false,
     scope: stale ? "archive" : "rolling",
