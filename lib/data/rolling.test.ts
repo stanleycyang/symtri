@@ -53,3 +53,13 @@ test("rolling view retains archive during a source outage and caps map payload",
   assert.equal(result.events.length, 300);
   assert.equal(result.archiveCount, 350);
 });
+
+test("daily snapshot keeps a journal paper after 300 newer timestamped posts", () => {
+  const newer = Array.from({ length: 300 }, (_, index) => event(`recent-${index}`, "2026-09-24T16:00:00.000Z"));
+  const journal: SignalEvent = { ...event("openalex:W77", "2026-09-24T00:00:00.000Z"),
+    source: "openalex", externalId: "W77", url: "https://doi.org/10.1234/w77" };
+  const result = rollingFeed(feed(newer, "sample"), feed([journal], "archive"), 301);
+  assert.equal(result.events.length, 300);
+  assert.ok(result.events.some((item) => item.id === journal.id));
+  assert.equal(result.events.filter((item) => item.source === "github").length, 299);
+});
