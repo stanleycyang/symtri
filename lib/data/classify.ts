@@ -2,14 +2,14 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 4;
+export const CLASSIFIER_VERSION = 5;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
   software: ["developer", "programming", "database", "open source", "web framework", "compiler", "typescript", "javascript", "python", "rust", "linux", "cloud", "react", "postgres", "browser", "browsers", "sdk", "vscode", "vs code", "kafka", "nixos", "http", "debugger", "terminal", "tailscale"],
   science: ["biology", "biotech", "genome", "protein", "physics", "neuroscience", "mathematics", "medicine", "clinical", "crispr", "enzyme", "vaccine", "mrna", "dna", "quantum computing", "quantum computer", "quantum computers", "quantum software", "quantum algorithm", "quantum circuit", "quantum machine learning", "qubit", "qubits", "entanglement"],
   space: ["space", "satellite", "satellites", "rocket", "astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "orbital", "spacecraft", "nasa"],
-  energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "geothermal", "electricity"],
+  energy: ["energy", "nuclear", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic", "power grid", "battery", "fusion", "tokamak", "stellarator", "geothermal", "electricity"],
   markets: ["market", "economy", "finance", "fintech", "venture capital", "trade", "investment", "commerce"],
   security: ["security", "cyber", "vulnerability", "malware", "privacy", "vpn", "encryption", "cryptography", "identity", "hacked", "hacking", "supply-chain attack"],
   hardware: ["hardware", "chip", "semiconductor", "gpu", "cpu", "compute", "device", "sensor", "manufacturing", "uefi", "vga", "vr glasses"],
@@ -38,6 +38,7 @@ const childTerms: Record<string, string[]> = {
   "space-satellites": ["satellite"],
   "space-astronomy": ["astronomy", "astronomical", "astronomers", "astrophysics", "cosmology", "telescope", "galaxy"],
   "energy-nuclear": ["nuclear", "reactor", "smr"],
+  "energy-fusion": ["fusion", "tokamak", "stellarator"],
   "energy-solar": ["solar energy", "solar power", "solar panel", "solar panels", "solar cell", "solar cells", "photovoltaic"],
   "energy-battery-storage": ["battery", "storage"],
   "energy-power-demand": ["power demand", "data center power"],

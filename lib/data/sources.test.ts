@@ -21,13 +21,18 @@ test("hourly source sampling finds new items without widening the public sample"
     if (url.includes("export.arxiv.org/api/query")) {
       const params = new URL(url).searchParams;
       const query = params.get("search_query") ?? "";
-      const paper = params.get("max_results") === "55" || query.includes("q-fin.")
+      const paper = query.includes("physics.plasm-ph")
+        ? ["6", "Fusion confinement in a tokamak", "physics.plasm-ph"]
+        : params.get("max_results") === "55" || query.includes("q-fin.")
         ? ["5", "Liquidity in limit order books", "q-fin.TR"]
         : query.includes("astro-ph") ? ["4", "A new satellite observation", "astro-ph.CO"]
         : query.includes("q-bio") ? ["3", "Protein folding in cells", "q-bio.MN"]
         : query.includes("cs.CR") ? ["2", "Cybersecurity study", "cs.CR"]
         : ["1", "AI agent systems", "cs.AI"];
-      return new Response(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>https://arxiv.org/abs/2609.1234${paper[0]}v1</id><title>${paper[1]}</title><summary>A recent study.</summary><published>${new Date().toISOString()}</published><category term="${paper[2]}" /></entry></feed>`);
+      const broadMatch = query.includes("physics.plasm-ph")
+        ? `<entry><id>https://arxiv.org/abs/2609.12347v1</id><title>Unrelated plasma transport</title><summary>Fusion is mentioned in passing.</summary><published>${new Date().toISOString()}</published><category term="physics.plasm-ph" /></entry>`
+        : "";
+      return new Response(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><entry><id>https://arxiv.org/abs/2609.1234${paper[0]}v1</id><title>${paper[1]}</title><summary>A recent study.</summary><published>${new Date().toISOString()}</published><category term="${paper[2]}" /></entry>${broadMatch}</feed>`);
     }
     throw new Error(`Unexpected source request: ${url}`);
   };
@@ -45,13 +50,15 @@ test("hourly source sampling finds new items without widening the public sample"
     assert.deepEqual((await fetchHackerNews(true)).map((event) => event.externalId), ["1", "2", "3"]);
     assert.deepEqual((await fetchGitHub(true)).map((event) => event.externalId), ["10", "11"]);
     const papers = await fetchArxiv(true, async (milliseconds) => { pauses.push(milliseconds); });
-    assert.deepEqual(new Set(papers.map((event) => event.topics[0]?.topicId)), new Set(["ai", "security", "science", "space", "markets"]));
+    assert.deepEqual(new Set(papers.map((event) => event.topics[0]?.topicId)), new Set(["ai", "security", "science", "space", "markets", "energy"]));
+    assert.equal(papers.find((paper) => paper.title.includes("tokamak"))?.topics[0]?.subtopicId, "energy-fusion");
+    assert.equal(papers.some((paper) => paper.title === "Unrelated plasma transport"), false);
     assert.equal(requests.filter((url) => url.endsWith("/item/2.json")).length, 1);
     assert.equal(requests.some((url) => url.endsWith("/newstories.json")), true);
     assert.ok(requestOptions.every(({ cache, revalidate }) => cache === "no-store" && revalidate === undefined));
     assert.equal(requests.some((url) => url.includes("sort=updated")), true);
-    assert.equal(requests.filter((url) => url.includes("export.arxiv.org/api/query")).length, 5);
-    assert.deepEqual(pauses, [3000, 3000, 3000, 3000]);
+    assert.equal(requests.filter((url) => url.includes("export.arxiv.org/api/query")).length, 6);
+    assert.deepEqual(pauses, [3000, 3000, 3000, 3000, 3000]);
   } finally {
     globalThis.fetch = originalFetch;
   }
