@@ -192,7 +192,7 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
     <Billboard follow><mesh raycast={() => null}><ringGeometry args={[.86, .875, 64]} /><meshBasicMaterial color={topic.color} transparent opacity={muted ? .07 : hovered || emphasized ? .68 : .35} side={THREE.DoubleSide} /></mesh></Billboard>
-    {!muted && <group visible={showLabel} position={[!focused && topic.id === "startups" ? -1.5 : 0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : "AWAITING DATA"} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 7.5} /></group>}
+    {!muted && <group visible={showLabel} position={[!focused && topic.id === "startups" ? -3.5 : 0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : "AWAITING DATA"} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 7.5} /></group>}
   </group>;
 }
 
