@@ -12,6 +12,8 @@ test("classification prefers a specific thread and leaves unrelated stories unma
   assert.deepEqual(classifySignal("Umbrella insurance via your personal agent", "Hacker News discussion"), []);
   assert.equal(classifySignal("Sparse attention for language models", "We also mention agent use", ["cs.AI"])[0]?.subtopicId, "ai-language-models");
   assert.equal(classifySignal("Sparse attention architecture", "Agents use this model", ["cs.AI"])[0]?.subtopicId, null);
+  assert.equal(classifySignal("Feds Target AI Critics as Foreign Agents", "Hacker News discussion")[0]?.subtopicId, null);
+  assert.equal(classifySignal("AI agents operating as foreign agents", "Hacker News discussion")[0]?.subtopicId, "ai-agents");
 });
 
 test("solar wind research does not create a false energy connection", () => {

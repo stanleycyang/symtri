@@ -17,6 +17,7 @@ const externalId = `storage-check-${randomUUID()}`;
 const id = `github:${externalId}`;
 const unclassifiedId = `github:${externalId}-unclassified`;
 const relatedId = `github:${externalId}-related`;
+const foreignId = `github:${externalId}-foreign`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
 
@@ -39,6 +40,8 @@ async function main() {
   await sql.unsafe(backfillMigration);
   const lookupMigration = await readFile(new URL("../supabase/migrations/20260924005000_topic_lookup.sql", import.meta.url), "utf8");
   await sql.unsafe(lookupMigration);
+  const foreignAgentsMigration = await readFile(new URL("../supabase/migrations/20260924006000_foreign_agents.sql", import.meta.url), "utf8");
+  await sql.unsafe(foreignAgentsMigration);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_topics_gin_idx'`)[0].count, 1);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
@@ -74,6 +77,13 @@ async function main() {
     await persistSignals({ ...feed, events: [unclassified] });
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === unclassifiedId));
     assert.equal((await searchKnowledge("Urban gardening", null))[0]?.event.id, unclassifiedId);
+    const foreign: SignalEvent = { ...event, id: foreignId, externalId: `${externalId}-foreign`,
+      title: "AI critics called foreign agents", url: `${event.url}/foreign`,
+      topics: [{ topicId: "ai", subtopicId: "ai-agents", relevance: .9 }] };
+    await persistSignals({ ...feed, events: [foreign] });
+    await sql.unsafe(foreignAgentsMigration);
+    assert.equal((await sql`select topics from signal_events where id = ${foreignId}`)[0].topics[0].subtopicId, null);
+    await sql`delete from signal_events where id = ${foreignId}`;
     await rebuildKnowledgeGraph();
     assert.equal((await getKnowledgeGraph())?.regionCounts.ai, 1);
     assert.equal(await hasCurrentSignalEmbeddings(feed.events), false);
@@ -181,7 +191,7 @@ async function main() {
     assert.equal(snapshot?.scope, "history");
     console.log("Postgres migrations, API table protection, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
   } finally {
-    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId})`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${foreignId})`;
     await sql`delete from ingestion_runs where id = ${runId}`;
     await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;

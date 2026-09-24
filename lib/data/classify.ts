@@ -80,7 +80,8 @@ export function classifySignal(title: string, summary: string, categories: strin
     let bestChild: { id: string; score: number } | null = null;
     for (const child of topic.children) {
       const childAliases = childTerms[child.id] ?? [child.name.toLowerCase()];
-      const titleMatch = strongestTerm(title, childAliases);
+      const childTitle = child.id === "ai-agents" ? title.replace(/\bforeign agents?\b/gi, "") : title;
+      const titleMatch = strongestTerm(childTitle, childAliases);
       const childScore = titleMatch ? 5 + Math.min(3, titleMatch / 5) : 0;
       if (childScore > (bestChild?.score ?? 0)) bestChild = { id: child.id, score: childScore };
     }
