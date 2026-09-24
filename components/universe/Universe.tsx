@@ -56,7 +56,7 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
       toTarget.set(topic.position[0] + (compact ? 0 : 3), topic.position[1] - (compact ? 4 : 0), topic.position[2]);
       toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 5, compact ? 0 : 4, compact ? 43 : 27));
     } else {
-      toPosition.set(compact ? 0 : 7, compact ? 0 : 5, compact ? 103 : 56);
+      toPosition.set(compact ? 0 : 7, compact ? 0 : 5, compact ? 103 : 48);
     }
     if (askOverlay && topic) {
       const offset = child ? 6 : 10;
