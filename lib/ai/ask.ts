@@ -134,11 +134,15 @@ export function answerQuestion(question: string, feed: SignalFeed, semanticMatch
   if (regionIds.length === 2) {
     if (sharedEvents[0]) selected.push(sharedEvents[0]);
     for (const id of regionIds) {
-      const event = ranked.find((item) => item.topics.some((match) => match.topicId === id) && !selected.includes(item));
+      const childId = detected.find((item) => item.id === id)?.childId;
+      const regionEvents = ranked.filter((item) => item.topics.some((match) => match.topicId === id) && !selected.includes(item));
+      const childEvents = childId ? regionEvents.filter((item) => item.topics.some((match) => match.subtopicId === childId)) : [];
+      const event = [...(childEvents.length ? childEvents : regionEvents)].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))[0];
       if (event) selected.push(event);
     }
+  } else {
+    for (const event of ranked) if (selected.length < 4 && !selected.includes(event)) selected.push(event);
   }
-  for (const event of ranked) if (selected.length < 4 && !selected.includes(event)) selected.push(event);
 
   const names = regionIds.map((id) => topics.find((topic) => topic.id === id)!.name);
   const missingRegions = regionIds.filter((id) => !matching.some((event) => event.topics.some((match) => match.topicId === id)));

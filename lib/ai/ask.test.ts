@@ -64,6 +64,15 @@ test("a cross-region answer names a region absent from the current sample", () =
   assert.deepEqual(result.events.map((item) => item.id), [agents.id]);
 });
 
+test("a cross-region answer shows one recent source per side without filler", () => {
+  const oldAi = { ...agents, publishedAt: "2026-09-20T12:00:00.000Z" };
+  const recentAi = { ...event("recent-ai", "New coding agent", "ai", "ai-agents"), publishedAt: "2026-09-22T11:00:00.000Z" };
+  const extraEnergy = { ...event("solar", "Solar array update", "energy", "energy-solar"), publishedAt: "2026-09-22T11:30:00.000Z" };
+  const result = answerQuestion("What connects nuclear energy and AI?", { ...feed, events: [oldAi, recentAi, nuclear, extraEnergy] });
+  assert.deepEqual(result.events.map((item) => item.id), [nuclear.id, recentAi.id]);
+  assert.equal(result.events.length, 2);
+});
+
 test("an open question selects the most active observed region", () => {
   const result = answerQuestion("What is drawing attention?", feed);
   assert.equal(result.regionIds.length, 1);
