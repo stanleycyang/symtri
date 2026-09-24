@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test lib/data/*.test.ts lib/ai/*.test.ts",
     "test:storage": "tsx scripts/check-storage.ts",
-    "test:storage:local": "bash scripts/check-storage-local.sh"
+    "test:storage:local": "bash scripts/check-storage-local.sh",
+    "check:production": "node scripts/check-production.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
