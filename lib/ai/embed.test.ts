@@ -15,7 +15,7 @@ test("gateway embeddings batch inputs and preserve response order", async () => 
   const vectors = await embedTexts(Array.from({ length: 65 }, (_, index) => `Signal ${index}`), model);
   assert.deepEqual(sizes, [64, 1]);
   assert.deepEqual(vectors.map((vector) => vector[0]), Array.from({ length: 65 }, (_, index) => index));
-  assert.equal(model.doEmbedCalls[0].providerOptions?.google?.outputDimensionality, EMBEDDING_DIMENSIONS);
+  assert.equal(model.doEmbedCalls[0].providerOptions?.openai?.dimensions, EMBEDDING_DIMENSIONS);
 });
 
 test("embedding input hashes change when content changes and malformed vectors fail", async () => {
@@ -25,11 +25,11 @@ test("embedding input hashes change when content changes and malformed vectors f
   const originalHash = embeddingInputHash("same");
   const original = process.env.SYMTRI_EMBEDDING_MODEL;
   try {
-    process.env.SYMTRI_EMBEDDING_MODEL = "openai/text-embedding-3-small";
+    process.env.SYMTRI_EMBEDDING_MODEL = "google/gemini-embedding-001";
     assert.notEqual(originalHash, embeddingInputHash("same"));
-    const openaiModel = new MockEmbeddingModelV4({ doEmbed: { embeddings: [Array(EMBEDDING_DIMENSIONS).fill(0)], warnings: [] } });
-    await embedTexts(["test"], openaiModel);
-    assert.equal(openaiModel.doEmbedCalls[0].providerOptions?.openai?.dimensions, EMBEDDING_DIMENSIONS);
+    const googleModel = new MockEmbeddingModelV4({ doEmbed: { embeddings: [Array(EMBEDDING_DIMENSIONS).fill(0)], warnings: [] } });
+    await embedTexts(["test"], googleModel);
+    assert.equal(googleModel.doEmbedCalls[0].providerOptions?.google?.outputDimensionality, EMBEDDING_DIMENSIONS);
   } finally {
     if (original === undefined) delete process.env.SYMTRI_EMBEDDING_MODEL;
     else process.env.SYMTRI_EMBEDDING_MODEL = original;

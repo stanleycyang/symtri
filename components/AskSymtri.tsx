@@ -47,7 +47,7 @@ export default function AskSymtri({ day, onClose, onResult, onNavigate }: Props)
   };
 
   return <section className="ask-panel" aria-label="Ask Symtri">
-    <div className="ask-panel-top"><span>ASK SYMTRI <i /> {day ? "HISTORICAL SAMPLE" : "CURRENT SAMPLE"}</span><button type="button" onClick={onClose} aria-label="Close Ask Symtri">×</button></div>
+    <div className="ask-panel-top"><span>ASK SYMTRI <i /> {day ? "HISTORICAL SAMPLE" : result?.scope === "knowledge" ? "KNOWLEDGE ARCHIVE" : "CURRENT SAMPLE"}</span><button type="button" onClick={onClose} aria-label="Close Ask Symtri">×</button></div>
     <form onSubmit={(event) => { event.preventDefault(); void ask(question); }}>
       <label htmlFor="symtri-question">Where should we look?</label>
       <div className="ask-input-row"><input ref={input} id="symtri-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What's happening with AI agents?" maxLength={240} /><button type="submit" disabled={busy || question.trim().length < 3} aria-label="Ask Symtri">↗</button></div>
@@ -58,9 +58,8 @@ export default function AskSymtri({ day, onClose, onResult, onNavigate }: Props)
     {result && <div className="ask-result" aria-live="polite">
       {result.summaryKind === "model" && <span className="ask-summary-label">SOURCE SYNTHESIS</span>}
       <p className="ask-summary">{result.summary}</p>
-      <span className="ask-path-label">{result.regionIds.length > 1 ? "CONCEPTUAL MAP ROUTE" : "MAP LOCATION"}</span>
-      <div className="ask-path" aria-label="Highlighted map path">{result.pathSteps.map((step, index) => <span key={`${step.regionId}:${step.subtopicId ?? "region"}`}>{index > 0 && <b>↗</b>}<button type="button" onClick={() => onNavigate(step.regionId, step.subtopicId)}>{step.label.toUpperCase()}</button></span>)}</div>
-      {result.events.length > 0 && <div className="ask-sources"><span>{result.retrieval === "semantic-assisted" ? "RANKED BY MEANING · SAMPLE" : "FROM THE SAMPLE"}</span>{result.events.map((event) => <a key={event.id} href={event.url} target="_blank" rel="noopener noreferrer"><small>{sourceNames[event.source]}{result.citedEventIds.includes(event.id) && " · CITED"}</small>{event.title}<b>↗</b></a>)}</div>}
+      {result.pathSteps.length > 0 && <><span className="ask-path-label">{result.regionIds.length > 1 ? "CONCEPTUAL MAP ROUTE" : "MAP LOCATION"}</span><div className="ask-path" aria-label="Highlighted map path">{result.pathSteps.map((step, index) => <span key={`${step.regionId}:${step.subtopicId ?? "region"}`}>{index > 0 && <b>↗</b>}<button type="button" onClick={() => onNavigate(step.regionId, step.subtopicId)}>{step.label.toUpperCase()}</button></span>)}</div></>}
+      {result.events.length > 0 && <div className="ask-sources"><span>{result.scope === "knowledge" ? "FROM THE KNOWLEDGE ARCHIVE" : result.retrieval === "semantic-assisted" ? "RANKED BY MEANING · SAMPLE" : "FROM THE SAMPLE"}</span>{result.events.map((event) => <a key={event.id} href={event.url} target="_blank" rel="noopener noreferrer"><small>{sourceNames[event.source]}{result.citedEventIds.includes(event.id) && " · CITED"}</small>{event.title}<b>↗</b></a>)}</div>}
     </div>}
   </section>;
 }

@@ -8,7 +8,7 @@ export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEven
     .slice(0, limit);
 }
 
-export async function getSignalFeed(): Promise<SignalFeed> {
+export async function getSignalFeed(options: { includeUnclassified?: boolean } = {}): Promise<SignalFeed> {
   const sources: [SourceId, () => Promise<SignalEvent[]>][] = [
     ["hacker-news", fetchHackerNews], ["github", fetchGitHub], ["arxiv", fetchArxiv],
   ];
@@ -22,7 +22,9 @@ export async function getSignalFeed(): Promise<SignalFeed> {
   });
   return {
     observedAt: new Date().toISOString(),
-    events: selectFeedEvents(events),
+    events: options.includeUnclassified
+      ? deduplicateSignals(events).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+      : selectFeedEvents(events),
     sources: status,
     partial: Object.values(status).some((value) => value !== "ok"),
     scope: "sample",

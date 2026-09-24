@@ -21,7 +21,7 @@ export function normalizeHackerNews(input: unknown): SignalEvent | null {
   if (!title || !publishedAt || externalId === "0") return null;
   const score = number(item.score);
   const comments = number(item.descendants);
-  const summary = short(clean(item.text) || `Hacker News discussion · ${score} points · ${comments} comments.`);
+  const summary = short(clean(item.text) || "Hacker News discussion.");
   return { id: `hacker-news:${externalId}`, source: "hacker-news", externalId, title, url: safeUrl(item.url, `https://news.ycombinator.com/item?id=${externalId}`), summary, publishedAt, importance: Math.min(100, Math.log1p(score + comments * 2) * 14), topics: classifySignal(title, summary) };
 }
 

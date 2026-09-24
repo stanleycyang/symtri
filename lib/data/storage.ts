@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_DIMENSIONS } from "../ai/embed";
+import { embeddingModelId } from "../ai/embed";
 import { topicEdges, topics } from "../universe";
 import { relationshipKey } from "./activity";
 import type { SignalEvent, SignalFeed, SnapshotDay, SourceStatus } from "./model";
@@ -36,7 +37,10 @@ export async function persistSignals(feed: SignalFeed): Promise<number> {
        published_at text, importance double precision, topics jsonb)
     on conflict (id) do update set
       title = excluded.title, url = excluded.url, summary = excluded.summary,
-      importance = excluded.importance, topics = excluded.topics
+      importance = excluded.importance, topics = excluded.topics,
+      embedding = case when signal_events.title is distinct from excluded.title or signal_events.summary is distinct from excluded.summary then null else signal_events.embedding end,
+      embedding_input_hash = case when signal_events.title is distinct from excluded.title or signal_events.summary is distinct from excluded.summary then null else signal_events.embedding_input_hash end,
+      embedding_model = case when signal_events.title is distinct from excluded.title or signal_events.summary is distinct from excluded.summary then null else signal_events.embedding_model end
   `;
   return rows.length;
 }
@@ -57,25 +61,32 @@ export async function persistEmbeddings(feed: SignalFeed, embedder: (inputs: str
     .filter((item) => topicHashes.get(item.id) !== item.hash);
   const pending = [...pendingEvents, ...pendingTopics];
   if (!pending.length) return 0;
-  const vectors = await embedder(pending.map((item) => item.text));
-  if (vectors.length !== pending.length || vectors.some((vector) => vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) {
-    throw new Error("Embedder returned invalid vectors");
+  let embedded = 0;
+  for (let offset = 0; offset < pending.length; offset += 64) {
+    const batch = pending.slice(offset, offset + 64);
+    const vectors = await embedder(batch.map((item) => item.text));
+    if (vectors.length !== batch.length || vectors.some((vector) => vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) {
+      throw new Error("Embedder returned invalid vectors");
+    }
+    const eventUpdates = batch.flatMap((item, index) => offset + index < pendingEvents.length
+      ? [{ id: item.id, hash: item.hash, embedding: `[${vectors[index].join(",")}]` }] : []);
+    const topicUpdates = batch.flatMap((item, index) => offset + index >= pendingEvents.length
+      ? [{ id: item.id, hash: item.hash, embedding: `[${vectors[index].join(",")}]` }] : []);
+    if (eventUpdates.length) await sql`
+      update signal_events as target set embedding = incoming.embedding::vector(256), embedding_input_hash = incoming.hash, embedding_model = ${embeddingModelId()}
+      from jsonb_to_recordset(${sql.json(eventUpdates)}::jsonb) as incoming(id text, hash text, embedding text)
+      where target.id = incoming.id
+    `;
+    if (topicUpdates.length) await sql`
+      insert into topic_embeddings (topic_id, embedding, embedding_input_hash)
+      select id, embedding::vector(256), hash
+      from jsonb_to_recordset(${sql.json(topicUpdates)}::jsonb) as incoming(id text, hash text, embedding text)
+      on conflict (topic_id) do update set embedding = excluded.embedding,
+        embedding_input_hash = excluded.embedding_input_hash, updated_at = now()
+    `;
+    embedded += batch.length;
   }
-  const eventUpdates = pendingEvents.map((item, index) => ({ id: item.id, hash: item.hash, embedding: `[${vectors[index].join(",")}]` }));
-  const topicUpdates = pendingTopics.map((item, index) => ({ id: item.id, hash: item.hash, embedding: `[${vectors[pendingEvents.length + index].join(",")}]` }));
-  if (eventUpdates.length) await sql`
-    update signal_events as target set embedding = incoming.embedding::vector(256), embedding_input_hash = incoming.hash
-    from jsonb_to_recordset(${sql.json(eventUpdates)}::jsonb) as incoming(id text, hash text, embedding text)
-    where target.id = incoming.id
-  `;
-  if (topicUpdates.length) await sql`
-    insert into topic_embeddings (topic_id, embedding, embedding_input_hash)
-    select id, embedding::vector(256), hash
-    from jsonb_to_recordset(${sql.json(topicUpdates)}::jsonb) as incoming(id text, hash text, embedding text)
-    on conflict (topic_id) do update set embedding = excluded.embedding,
-      embedding_input_hash = excluded.embedding_input_hash, updated_at = now()
-  `;
-  return pending.length;
+  return embedded;
 }
 
 export async function getSemanticRelationships(): Promise<Record<string, number>> {
@@ -135,7 +146,7 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
   const sql = database();
   const rows = await sql`
     select id, source, external_id, title, url, summary, published_at, importance, topics
-    from signal_events where published_at >= now() - interval '14 days'
+    from signal_events where published_at >= now() - interval '14 days' and jsonb_array_length(topics) > 0
     order by published_at desc limit 300
   `;
   if (!rows.length) return null;
@@ -152,6 +163,151 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
 export async function getArchiveCount(): Promise<number> {
   const rows = await database()`select count(*)::int as count from signal_events`;
   return Number(rows[0].count);
+}
+
+export async function rebuildKnowledgeGraph(): Promise<void> {
+  await database()`
+    with matches as (
+      select distinct event.id, match.value->>'topicId' as topic_id
+      from signal_events as event
+      cross join lateral jsonb_array_elements(event.topics) as match(value)
+      where match.value ? 'topicId'
+    ), region_totals as (
+      select topic_id, count(*)::int as signals from matches group by topic_id
+    ), link_totals as (
+      select first.topic_id || ':' || second.topic_id as link, count(*)::int as signals
+      from matches as first join matches as second
+        on first.id = second.id and first.topic_id < second.topic_id
+      group by first.topic_id, second.topic_id
+    )
+    insert into knowledge_graph (id, updated_at, region_counts, relationships)
+    select 'current', now(),
+      coalesce((select jsonb_object_agg(topic_id, signals) from region_totals), '{}'::jsonb),
+      coalesce((select jsonb_object_agg(link, signals) from link_totals), '{}'::jsonb)
+    on conflict (id) do update set updated_at = excluded.updated_at,
+      region_counts = excluded.region_counts, relationships = excluded.relationships
+  `;
+}
+
+export async function getKnowledgeGraph(): Promise<SignalFeed["knowledgeGraph"] | null> {
+  const rows = await database()`select updated_at, region_counts, relationships from knowledge_graph where id = 'current'`;
+  if (!rows.length) return null;
+  return { updatedAt: new Date(rows[0].updated_at).toISOString(), regionCounts: rows[0].region_counts, relationships: rows[0].relationships };
+}
+
+export async function getPendingEmbeddingEvents(limit = 200): Promise<SignalEvent[]> {
+  const rows = await database()`
+    select id, source, external_id, title, url, summary, published_at, importance, topics
+    from signal_events
+    where embedding is null or embedding_model is distinct from ${embeddingModelId()}
+    order by first_seen_at, id limit ${limit}
+  `;
+  return rows.map((row) => ({
+    id: row.id, source: row.source, externalId: row.external_id,
+    title: row.title, url: row.url, summary: row.summary,
+    publishedAt: new Date(row.published_at).toISOString(), importance: row.importance, topics: row.topics,
+  }));
+}
+
+export async function acquireIngestionLease(runId: string): Promise<boolean> {
+  const rows = await database()`
+    insert into ingestion_lease (name, run_id, expires_at)
+    values ('main', ${runId}, now() + interval '3 minutes')
+    on conflict (name) do update set run_id = excluded.run_id, expires_at = excluded.expires_at
+    where ingestion_lease.expires_at < now()
+    returning name
+  `;
+  return rows.length === 1;
+}
+
+export async function releaseIngestionLease(runId: string): Promise<void> {
+  await database()`delete from ingestion_lease where name = 'main' and run_id = ${runId}`;
+}
+
+export async function startIngestionRun(runId: string): Promise<void> {
+  await database()`insert into ingestion_runs (id, status) values (${runId}, 'running')`;
+}
+
+export type IngestionResult = {
+  status: "complete" | "partial" | "failed";
+  sources?: SourceStatus;
+  fetched?: number;
+  mapped?: number;
+  added?: number;
+  embedded?: number;
+  embeddingStatus?: string;
+  error?: string;
+};
+
+export async function finishIngestionRun(runId: string, result: IngestionResult): Promise<void> {
+  await database()`
+    update ingestion_runs set completed_at = now(), status = ${result.status},
+      source_status = ${database().json(result.sources ?? {})}::jsonb,
+      fetched_count = ${result.fetched ?? 0}, mapped_count = ${result.mapped ?? 0},
+      new_count = ${result.added ?? 0}, embedded_count = ${result.embedded ?? 0},
+      embedding_status = ${result.embeddingStatus ?? "unavailable"}, error = ${result.error ?? null}
+    where id = ${runId}
+  `;
+}
+
+export async function getIngestionStatus() {
+  const sql = database();
+  const [runs, counts] = await Promise.all([
+    sql`select started_at, completed_at, status, source_status, fetched_count, mapped_count,
+      new_count, embedded_count, embedding_status from ingestion_runs order by started_at desc limit 1`,
+    sql`select count(*)::int as signals,
+      count(*) filter (where embedding is not null and embedding_model = ${embeddingModelId()})::int as vectors
+      from signal_events`,
+  ]);
+  const last = runs[0];
+  return {
+    signals: Number(counts[0].signals), vectors: Number(counts[0].vectors),
+    lastRun: last ? {
+      startedAt: new Date(last.started_at).toISOString(),
+      completedAt: last.completed_at ? new Date(last.completed_at).toISOString() : null,
+      status: last.status, sources: last.source_status,
+      fetched: last.fetched_count, mapped: last.mapped_count,
+      added: last.new_count, embedded: last.embedded_count,
+      embeddingStatus: last.embedding_status,
+    } : null,
+  };
+}
+
+export async function searchKnowledge(query: string, vector: number[] | null): Promise<{ event: SignalEvent; similarity: number | null }[]> {
+  if (vector && (vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) throw new Error("Invalid query embedding");
+  const sql = database();
+  const literal = vector ? `[${vector.join(",")}]` : null;
+  const [lexical, semantic] = await Promise.all([
+    sql`
+      select id, source, external_id, title, url, summary, published_at, importance, topics,
+        ts_rank_cd(to_tsvector('english', title || ' ' || summary), websearch_to_tsquery('english', ${query})) as rank
+      from signal_events
+      where to_tsvector('english', title || ' ' || summary) @@ websearch_to_tsquery('english', ${query})
+      order by rank desc, published_at desc limit 30
+    `,
+    literal ? sql`
+      select id, source, external_id, title, url, summary, published_at, importance, topics,
+        1 - (embedding <=> ${literal}::vector(256)) as similarity
+      from signal_events
+      where embedding is not null and embedding_model = ${embeddingModelId()}
+      order by embedding <=> ${literal}::vector(256) limit 30
+    ` : Promise.resolve([]),
+  ]);
+  const scores = new Map<string, { row: (typeof lexical)[number]; score: number; similarity: number | null }>();
+  for (const row of lexical) scores.set(row.id, { row, score: .6 + Math.min(.3, Number(row.rank)), similarity: null });
+  for (const row of semantic) {
+    const similarity = Number(row.similarity);
+    if (!Number.isFinite(similarity) || similarity < .25) continue;
+    const previous = scores.get(row.id);
+    scores.set(row.id, { row, score: (previous?.score ?? 0) + similarity, similarity });
+  }
+  return [...scores.values()].sort((a, b) => b.score - a.score || b.row.published_at.getTime() - a.row.published_at.getTime())
+    .slice(0, 6).map(({ row, similarity }) => ({
+      similarity,
+      event: { id: row.id, source: row.source, externalId: row.external_id, title: row.title,
+        url: row.url, summary: row.summary, publishedAt: new Date(row.published_at).toISOString(),
+        importance: row.importance, topics: row.topics },
+    }));
 }
 
 export async function persistSnapshot(feed: SignalFeed): Promise<void> {

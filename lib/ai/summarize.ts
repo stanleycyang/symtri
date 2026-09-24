@@ -11,7 +11,8 @@ export function summaryModelId(): string {
 }
 
 export function canSummarize(answer: AskResult, feed: SignalFeed): boolean {
-  if (answer.regionIds.length !== 1 || !answer.events.length) return false;
+  if (answer.regionIds.length > 1 || !answer.events.length) return false;
+  if (answer.regionIds.length === 0) return true;
   if (!answer.subtopicId) return true;
   return answer.events.some(({ id }) => feed.events.some((event) => event.id === id && event.topics.some((match) => match.subtopicId === answer.subtopicId)));
 }

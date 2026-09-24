@@ -11,7 +11,6 @@ import type { AskResult } from "@/lib/ai/ask";
 export type UniverseProps = {
   entered: boolean;
   askOpen: boolean;
-  allowSimulatedSignals: boolean;
   focusedId: string | null;
   selectedChildId: string | null;
   selectedSignalId: string | null;
@@ -19,6 +18,7 @@ export type UniverseProps = {
   signalMarkers: { id: string; source: string }[];
   regionActivity: Record<string, RegionActivity> | null;
   regionRelationships: RegionRelationships | null;
+  archiveRelationships: RegionRelationships | null;
   semanticRelationships: Record<string, number> | null;
   askPathIds: string[];
   askSteps: AskResult["pathSteps"];
@@ -176,7 +176,7 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
       <meshBasicMaterial color={topic.color} transparent opacity={muted ? .28 : 1} />
     </mesh>
     <Billboard follow><mesh raycast={() => null}><ringGeometry args={[.86, .875, 64]} /><meshBasicMaterial color={topic.color} transparent opacity={muted ? .07 : hovered || emphasized ? .68 : .35} side={THREE.DoubleSide} /></mesh></Billboard>
-    {!muted && <group visible={showLabel} position={[0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : `${topic.signals.toLocaleString()} SIM.`} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 4.9} /></group>}
+    {!muted && <group visible={showLabel} position={[0, -1.5, 0]}><Label title={topic.short} subtitle={measured ? `${topic.signals} OBSERVED` : "AWAITING DATA"} color={focused ? "#f4e2cc" : "#e3e4e1"} size={compact ? 7.2 : focused ? 5.1 : 4.9} /></group>}
   </group>;
 }
 
@@ -335,7 +335,7 @@ function SignalCloud({ topic, reducedMotion }: { topic: Topic; reducedMotion: bo
   return <points ref={points} position={topic.position} geometry={geometry} raycast={() => null}><pointsMaterial ref={material} color={topic.color} size={.035} transparent opacity={Math.min(.58, .33 + topic.change / 1000)} sizeAttenuation depthWrite={false} /></points>;
 }
 
-function World({ entered, askOpen, allowSimulatedSignals, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, regionRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact }: UniverseProps & { compact: boolean }) {
+function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact }: UniverseProps & { compact: boolean }) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
   const { camera } = useThree();
   const activeTopics = useMemo(() => regionActivity ? topics.map((topic) => {
@@ -343,13 +343,13 @@ function World({ entered, askOpen, allowSimulatedSignals, focusedId, selectedChi
     return { ...topic, activity: measured.visual, change: measured.momentum === "rising" ? 80 : 0, signals: measured.count };
   }) : topics, [regionActivity]);
   const activeEdges = useMemo(() => {
-    if (!regionRelationships) return topicEdges;
+    if (!regionRelationships && !archiveRelationships) return topicEdges;
     const base = new Set(topicEdges.map(([a, b]) => relationshipKey(a, b)));
-    const emerging = Object.entries(regionRelationships)
-      .filter(([key, count]) => count >= 2 && !base.has(key))
-      .map(([key]) => key.split(":") as [string, string]);
+    const emerging = Object.keys({ ...archiveRelationships, ...regionRelationships })
+      .filter((key) => Math.max(archiveRelationships?.[key] ?? 0, regionRelationships?.[key] ?? 0) >= 2 && !base.has(key))
+      .map((key) => key.split(":") as [string, string]);
     return [...topicEdges, ...emerging];
-  }, [regionRelationships]);
+  }, [regionRelationships, archiveRelationships]);
   const focused = getTopic(focusedId);
   const pathChildren = new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null));
   const pathPosition = (step: AskResult["pathSteps"][number]): Vec3 => {
@@ -385,7 +385,7 @@ function World({ entered, askOpen, allowSimulatedSignals, focusedId, selectedChi
     <Dust count={compact ? 650 : 1500} reducedMotion={reducedMotion} />
     <IncomingSignals compact={compact} reducedMotion={reducedMotion} activeTopics={activeTopics} />
     <FlowSignals reducedMotion={reducedMotion} edges={activeEdges} />
-    {activeEdges.map(([a, b]) => { const first = getTopic(a)!; const second = getTopic(b)!; const highlighted = hoveredId === a || hoveredId === b; const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === relationshipKey(a, b)); const key = relationshipKey(a, b); const count = regionRelationships?.[key] ?? 0; const similarity = semanticRelationships?.[key]; const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3)); const strength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost; return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId)?.color : undefined} opacity={inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04) : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength} bend={2.6} />; })}
+    {activeEdges.map(([a, b]) => { const first = getTopic(a)!; const second = getTopic(b)!; const highlighted = hoveredId === a || hoveredId === b; const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === relationshipKey(a, b)); const key = relationshipKey(a, b); const count = regionRelationships?.[key] ?? 0; const archived = archiveRelationships?.[key] ?? 0; const similarity = semanticRelationships?.[key]; const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3)); const recentStrength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost; const strength = Math.max(recentStrength, archived ? Math.min(.24, .06 + Math.log1p(archived) * .045) : 0); return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId)?.color : undefined} opacity={inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04) : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength} bend={2.6} />; })}
     {askSteps.map((step, index) => index > 0 && step.subtopicId && askSteps[index - 1].subtopicId ? <Filament key={`ask-${index}`} from={pathPosition(askSteps[index - 1])} to={pathPosition(step)} color="#e6b988" opacity={.82} bend={.8} /> : null)}
     {activeTopics.map((topic) => <group key={topic.id}>
       <SignalCloud topic={topic} reducedMotion={reducedMotion} />
@@ -393,7 +393,7 @@ function World({ entered, askOpen, allowSimulatedSignals, focusedId, selectedChi
       {topic.children.filter((child) => revealId === topic.id || pathChildren.has(child.id)).map((child) => <group key={child.id}>
         <Filament from={topic.position} to={child.position} color={pathChildren.has(child.id) ? "#e6b988" : topic.color} opacity={pathChildren.has(child.id) ? .55 : .21} bend={.45} />
         <ChildNode position={child.position} name={child.name} color={topic.color} active={selectedChildId === child.id || pathChildren.has(child.id)} onClick={() => { if (focusedId !== topic.id) onFocus(topic.id); onChild(child.id); }} />
-        {revealSignals && selectedChildId === child.id && (signalMarkers.length ? signalMarkers : allowSimulatedSignals ? child.events : []).map((signal, index) => {
+        {revealSignals && selectedChildId === child.id && signalMarkers.map((signal, index) => {
           const angle = index * Math.PI * 2 / 3 + .5;
           const signalPosition: Vec3 = [child.position[0] + Math.cos(angle) * 1.85, child.position[1] + Math.sin(angle) * 1.6, child.position[2] + .5];
           return <group key={signal.id}><Filament from={child.position} to={signalPosition} color={topic.color} opacity={.22} bend={.15} /><SignalMote position={signalPosition} source={signal.source} color={topic.color} active={selectedSignalId === signal.id} onClick={() => onSignal(signal.id)} /></group>;

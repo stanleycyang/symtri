@@ -1,5 +1,5 @@
 import { getSignalFeed } from "@/lib/data/feed";
-import { getArchiveCount, getSemanticRelationships, getStoredFeed } from "@/lib/data/storage";
+import { getArchiveCount, getKnowledgeGraph, getSemanticRelationships, getStoredFeed } from "@/lib/data/storage";
 import { rollingFeed } from "@/lib/data/rolling";
 
 export const runtime = "nodejs";
@@ -22,6 +22,14 @@ export async function GET() {
       if (Object.keys(semanticRelationships).length) result = { ...result, semanticRelationships };
     } catch (error) {
       console.warn("SYMTRI semantic relationships unavailable", error instanceof Error ? error.message : "unknown error");
+    }
+  }
+  if (process.env.DATABASE_URL) {
+    try {
+      const knowledgeGraph = await getKnowledgeGraph();
+      if (knowledgeGraph) result = { ...result, knowledgeGraph };
+    } catch (error) {
+      console.warn("SYMTRI knowledge graph unavailable", error instanceof Error ? error.message : "unknown error");
     }
   }
   return Response.json(result, {

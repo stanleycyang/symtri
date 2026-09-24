@@ -3,7 +3,7 @@ import { embedMany, gateway, type EmbeddingModel } from "ai";
 import type { SignalEvent } from "../data/model";
 import type { Topic } from "../universe";
 
-export const DEFAULT_EMBEDDING_MODEL = "google/gemini-embedding-001";
+export const DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 256;
 const BATCH_SIZE = 64;
 

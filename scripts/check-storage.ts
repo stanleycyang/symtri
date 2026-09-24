@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { findSemanticSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot } from "../lib/data/storage";
+import { acquireIngestionLease, findSemanticSignals, finishIngestionRun, getIngestionStatus, getKnowledgeGraph, getPendingEmbeddingEvents, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, hasCurrentSignalEmbeddings, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, releaseIngestionLease, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 
@@ -15,6 +15,9 @@ process.env.DATABASE_URL = testUrl;
 const sql = postgres(testUrl, { max: 1, prepare: false, ssl: false });
 const externalId = `storage-check-${randomUUID()}`;
 const id = `github:${externalId}`;
+const unclassifiedId = `github:${externalId}-unclassified`;
+const runId = randomUUID();
+const competingRunId = randomUUID();
 
 async function main() {
   const migration = await readFile(new URL("../db/001_signals.sql", import.meta.url), "utf8");
@@ -23,11 +26,15 @@ async function main() {
   await sql.unsafe(vectorMigration);
   const accessMigration = await readFile(new URL("../db/003_lock_down_api.sql", import.meta.url), "utf8");
   await sql.unsafe(accessMigration);
+  const ingestionMigration = await readFile(new URL("../supabase/migrations/20260924000000_ingestion.sql", import.meta.url), "utf8");
+  await sql.unsafe(ingestionMigration);
+  const graphMigration = await readFile(new URL("../supabase/migrations/20260924001000_knowledge_graph.sql", import.meta.url), "utf8");
+  await sql.unsafe(graphMigration);
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
-    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings')
+    where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph')
   `;
-  assert.equal(protectedTables.length, 3);
+  assert.equal(protectedTables.length, 6);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
@@ -42,15 +49,23 @@ async function main() {
   };
   try {
     assert.equal(await persistSignals(feed), 1);
+    assert.ok((await getPendingEmbeddingEvents()).some((item) => item.id === id));
     event.title = "Updated title";
     assert.equal(await persistSignals(feed), 1);
     const stored = await getStoredFeed();
     const result = stored?.events.find((item) => item.id === id);
     assert.equal(result?.title, "Updated title");
     assert.deepEqual(result?.topics, event.topics);
+    const unclassified: SignalEvent = { ...event, id: unclassifiedId, externalId: `${externalId}-unclassified`, title: "Urban gardening", summary: "Growing city vegetables", topics: [] };
+    await persistSignals({ ...feed, events: [unclassified] });
+    assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === unclassifiedId));
+    assert.equal((await searchKnowledge("Urban gardening", null))[0]?.event.id, unclassifiedId);
+    await rebuildKnowledgeGraph();
+    assert.equal((await getKnowledgeGraph())?.regionCounts.ai, 1);
     assert.equal(await hasCurrentSignalEmbeddings(feed.events), false);
     const fakeEmbedder = async (inputs: string[]) => inputs.map((_, index) => [index + 1, ...Array(EMBEDDING_DIMENSIONS - 1).fill(0)]);
     assert.ok(await persistEmbeddings(feed, fakeEmbedder) >= 1);
+    assert.ok(!(await getPendingEmbeddingEvents()).some((item) => item.id === id));
     assert.equal(await persistEmbeddings(feed, fakeEmbedder), 0);
     const semanticRelationships = await getSemanticRelationships();
     assert.ok(Number.isFinite(semanticRelationships["ai:energy"]));
@@ -72,8 +87,20 @@ async function main() {
     assert.equal(await persistEmbeddings(feed, fakeEmbedder), 1);
     assert.equal(await hasCurrentSignalEmbeddings(feed.events), true);
     assert.equal((await findSemanticSignals(queryVector, feed.events))[0]?.id, id);
+    assert.equal((await searchKnowledge("Storage roundtrip", null))[0]?.event.id, id);
+    assert.equal((await searchKnowledge("AI agent work", queryVector))[0]?.event.id, id);
     const refreshed = await sql`select embedding_input_hash from signal_events where id = ${id}`;
     assert.notEqual(refreshed[0].embedding_input_hash, embedded[0].embedding_input_hash);
+    assert.equal(await acquireIngestionLease(runId), true);
+    assert.equal(await acquireIngestionLease(competingRunId), false);
+    await startIngestionRun(runId);
+    await finishIngestionRun(runId, { status: "complete", sources: feed.sources, fetched: 1, mapped: 1, added: 1, embedded: 1, embeddingStatus: "ok" });
+    const status = await getIngestionStatus();
+    assert.equal(status.lastRun?.status, "complete");
+    assert.equal(status.lastRun?.fetched, 1);
+    await releaseIngestionLease(runId);
+    assert.equal(await acquireIngestionLease(competingRunId), true);
+    await releaseIngestionLease(competingRunId);
     const rows = await sql`select count(*)::int as count from signal_events where id = ${id}`;
     assert.equal(rows[0].count, 1);
     const firstDay = "2099-01-01";
@@ -119,7 +146,9 @@ async function main() {
     assert.equal(snapshot?.scope, "history");
     console.log("Postgres migrations, API table protection, signal upsert, embedding cache, semantic retrieval, relationships, and snapshot coverage preservation passed");
   } finally {
-    await sql`delete from signal_events where id = ${id}`;
+    await sql`delete from signal_events where id in (${id}, ${unclassifiedId})`;
+    await sql`delete from ingestion_runs where id = ${runId}`;
+    await sql`delete from ingestion_lease where run_id in (${runId}, ${competingRunId})`;
     await sql`delete from signal_snapshots where day in ('2099-01-01', '2099-01-02')`;
     await sql.end();
   }

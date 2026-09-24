@@ -70,8 +70,27 @@ function findPath(start: string, end: string): string[] {
 }
 
 function words(input: string): string[] {
-  const stop = new Set(["what", "whats", "with", "about", "happening", "today", "this", "that", "where", "which", "between", "connects", "the", "and", "are", "how"]);
+  const stop = new Set(["what", "whats", "with", "about", "happening", "today", "this", "that", "where", "which", "between", "connects", "the", "and", "are", "how", "drawing", "attention"]);
   return input.toLowerCase().match(/[a-z0-9]+/g)?.filter((word) => word.length > 2 && !stop.has(word)) ?? [];
+}
+
+export function shouldSearchKnowledge(question: string): boolean {
+  if (!words(question).length) return false;
+  return !topics.some((topic) => Number.isFinite(firstMatch(question, regionAliases[topic.id] ?? [topic.name.toLowerCase()]))
+    || topic.children.some((child) => Number.isFinite(firstMatch(question, subtopicAliases[child.id] ?? [child.name.toLowerCase()]))));
+}
+
+export function answerKnowledgeQuestion(question: string, results: { event: SignalEvent; similarity: number | null }[]): AskResult {
+  const selected = results.slice(0, 4);
+  return {
+    question,
+    summary: selected.length ? `The knowledge archive has ${results.length} source${results.length === 1 ? "" : "s"} related to this question. The closest sources are linked below; this sample does not establish a broad trend.` : "No indexed source matches this question yet. The universe is still growing from its connected sources.",
+    regionIds: [], pathIds: [], pathSteps: [], subtopicId: null,
+    evidenceCount: results.length, observedAt: new Date().toISOString(), scope: "knowledge",
+    retrieval: selected.some((item) => item.similarity !== null) ? "semantic-assisted" : "terms",
+    summaryKind: "sample", citedEventIds: [],
+    events: selected.map(({ event }) => ({ id: event.id, source: event.source, title: event.title, url: event.url, publishedAt: event.publishedAt })),
+  };
 }
 
 export function answerQuestion(question: string, feed: SignalFeed, semanticMatches: { id: string; similarity: number }[] = []): AskResult {
