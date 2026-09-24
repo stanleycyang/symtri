@@ -16,6 +16,8 @@ Camera presets should animate only when location changes. Do not steer the camer
 
 React Three Fiber can emit `onClick` after a drag. Gate scene navigation by the event's pointer travel (`event.delta`), then verify that dragging empty space or a node keeps the current focus while a deliberate empty click returns outward.
 
+When a screen or panel is hidden after interaction, make its controls inert and return keyboard focus to the control that opened it. Verify Tab and Escape in the production browser; `aria-hidden` alone left focus inside the departing entrance, and closing Ask dropped focus to the page body.
+
 Keep `/api/signals` responses uncached when classification or feed display logic changes; upstream source fetches may retain a short revalidation window. Verify the rendered panel against the current classifier after such edits.
 
 When changing classification, bump `CLASSIFIER_VERSION` in `lib/data/classify.ts`. The hourly workflow reclassifies up to 500 stored signals per run when it has their original classification input. Verify the affected archive signals and knowledge graph after ingestion; older GitHub and arXiv rows from before classification inputs were stored still need a fresh source observation or targeted backfill.
