@@ -42,31 +42,33 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
   return output;
 }
 
-export async function fetchGitHub(forIngestion = false): Promise<SignalEvent[]> {
+async function queryGitHub(sort: "stars" | "updated", fresh: boolean): Promise<SignalEvent[]> {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const url = new URL("https://api.github.com/search/repositories");
   url.searchParams.set("q", `created:>=${since} stars:>=5 archived:false fork:false`);
-  url.searchParams.set("sort", "stars");
+  url.searchParams.set("sort", sort);
   url.searchParams.set("order", "desc");
   url.searchParams.set("per_page", "50");
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "SYMTRI/0.1", "X-GitHub-Api-Version": "2026-03-10" };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  async function search(searchUrl: URL): Promise<SignalEvent[]> {
-    const data: unknown = await (await request(searchUrl.toString(), headers, forIngestion)).json();
-    const items = data && typeof data === "object" && "items" in data ? data.items : null;
-    if (!Array.isArray(items)) throw new Error("Invalid GitHub search response");
-    return items.map(normalizeGitHub).filter((event): event is SignalEvent => event !== null);
-  }
-  const popular = await search(url);
-  if (!forIngestion) return popular;
+  const data: unknown = await (await request(url.toString(), headers, fresh)).json();
+  const items = data && typeof data === "object" && "items" in data ? data.items : null;
+  if (!Array.isArray(items)) throw new Error("Invalid GitHub search response");
+  return items.map(normalizeGitHub).filter((event): event is SignalEvent => event !== null);
+}
+
+export async function fetchGitHub(forIngestion = false): Promise<SignalEvent[]> {
+  return forIngestion ? (await fetchGitHubForIngestion()).events : queryGitHub("stars", false);
+}
+
+export async function fetchGitHubForIngestion(): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {
+  const popular = await queryGitHub("stars", true);
   try {
-    const recentUrl = new URL(url);
-    recentUrl.searchParams.set("sort", "updated");
-    const recent = await search(recentUrl);
-    return [...new Map([...popular, ...recent].map((event) => [event.id, event])).values()];
+    const recent = await queryGitHub("updated", true);
+    return { events: [...new Map([...popular, ...recent].map((event) => [event.id, event])).values()], status: "ok" };
   } catch (error) {
     console.warn("SYMTRI GitHub recent search unavailable", error instanceof Error ? error.message : "unknown error");
-    return popular;
+    return { events: popular, status: "partial" };
   }
 }
 

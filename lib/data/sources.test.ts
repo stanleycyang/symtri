@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchHackerNews } from "./sources";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews } from "./sources";
 
 test("hourly source sampling finds new items without widening the public sample", async () => {
   const originalFetch = globalThis.fetch;
@@ -83,6 +83,22 @@ test("arXiv retains successful groups and reports reduced source coverage", asyn
     assert.equal(requested.length, 6);
     failAll = true;
     await assert.rejects(fetchArxivForIngestion(async () => {}), /no usable papers/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("GitHub keeps popular repositories but reports a missing recent search", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const sort = new URL(String(input)).searchParams.get("sort");
+    if (sort === "updated") return new Response("Unavailable", { status: 503 });
+    return Response.json({ items: [{ id: 42, full_name: "example/fusion-kit", created_at: new Date().toISOString(), html_url: "https://github.com/example/fusion-kit", description: "Fusion research tools", stargazers_count: 10, fork: false }] });
+  };
+  try {
+    const result = await fetchGitHubForIngestion();
+    assert.equal(result.status, "partial");
+    assert.deepEqual(result.events.map((event) => event.externalId), ["42"]);
   } finally {
     globalThis.fetch = originalFetch;
   }

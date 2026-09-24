@@ -36,6 +36,7 @@ Hourly Workflow source fetches must use `cache: "no-store"`. A 15-minute `next.r
 Keep a bounded replay window for Hacker News new stories so a missed or stale hourly run can recover them; storage deduplicates replayed events. Verify the window reaches stories older than the first hour without making the source step unbounded.
 An ingestion run should report Hacker News unavailable when its newest-story list fails or its newest usable story is stale. A healthy top-story response alone does not prove the hourly feed is fresh.
 Keep successful arXiv query groups when another group fails. Report the source as partial rather than claiming full coverage or discarding fetched papers; an all-group failure remains unavailable.
+Likewise, keep popular GitHub repositories if the recent-update search fails, but mark GitHub partial so the run does not claim complete coverage.
 
 Serve `/api/signals` and mapped Ask questions from the persisted hourly archive once it contains signals. Per-visitor Hacker News, GitHub, and arXiv fetches multiply source traffic and make exploration depend on those APIs; keep direct source fetches only for an empty archive or a local database-free preview. Verify both routes with `npm run test:storage:local`.
 
