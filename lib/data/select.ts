@@ -24,12 +24,15 @@ export function selectFocusedSignals(visible: SignalEvent[], archive: SignalEven
 }
 
 export function selectDistinctHeadlines<T extends { title: string }>(items: T[], limit: number, excludedTitles: string[] = []): T[] {
-  const terms = (title: string) => new Set(title.toLowerCase().match(/[a-z0-9]+/g) ?? []);
+  const filler = new Set(["a", "an", "and", "as", "at", "by", "for", "from", "in", "into", "is", "of", "on", "says", "the", "to", "with"]);
+  const terms = (title: string) => new Set((title.toLowerCase().match(/[a-z0-9]+/g) ?? [])
+    .filter((word) => word.length > 2 && !filler.has(word))
+    .map((word) => word.length > 4 && word.endsWith("s") && !word.endsWith("ss") ? word.slice(0, -1) : word));
   const similar = (first: string, second: string) => {
     const a = terms(first);
     const b = terms(second);
     const shared = [...a].filter((term) => b.has(term)).length;
-    return shared >= 3 && shared / Math.min(a.size, b.size) >= .8 && shared / (a.size + b.size - shared) >= .6;
+    return shared >= 3 && shared / Math.min(a.size, b.size) >= .5 && shared / (a.size + b.size - shared) >= .3;
   };
   const chosen: T[] = [];
   for (const item of items) {

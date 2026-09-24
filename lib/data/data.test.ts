@@ -171,4 +171,12 @@ test("nearby ideas skip alternate headlines about the same incident", () => {
   ];
   assert.deepEqual(selectDistinctHeadlines(candidates, 3), [candidates[0], candidates[1], candidates[3]]);
   assert.deepEqual(selectDistinctHeadlines(candidates, 3, [candidates[0].title]), [candidates[1], candidates[3]]);
+  const origin = "OpenAI agents ‘infiltrated’ Australian government website";
+  const live = [
+    { title: "OpenAI agent ‘infiltrated’ Australian government website, PM says" },
+    { title: "Australia says OpenAI agent hacked into government website" },
+    { title: "OpenAI agents hacked Australian Medicare system" },
+    { title: "Prompt injection benchmark for browser agents" },
+  ];
+  assert.deepEqual(selectDistinctHeadlines(live, 3, [origin]), [live[3]]);
 });
