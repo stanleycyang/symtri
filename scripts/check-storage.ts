@@ -6,6 +6,7 @@ import { acquireIngestionLease, claimIngestionSlot, countNewSignalsForRun, findS
 import { EMBEDDING_DIMENSIONS } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
+import { CLASSIFIER_VERSION } from "../lib/data/classify";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -131,7 +132,7 @@ async function main() {
     assert.equal(reclassified.topics[0].topicId, "science");
     assert.equal(reclassified.topics[0].subtopicId, "science-physics");
     assert.deepEqual(reclassified.classification_input.categories, ["quant-ph"]);
-    assert.equal(reclassified.classifier_version, 1);
+    assert.equal(reclassified.classifier_version, CLASSIFIER_VERSION);
     assert.equal(await refreshStoredClassifications(), 0);
     await sql`delete from signal_events where id = ${quantumId}`;
     await rebuildKnowledgeGraph();

@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 1;
+export const CLASSIFIER_VERSION = 2;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -77,6 +77,13 @@ function strongestTerm(text: string, terms: string[]) { return terms.filter((ter
 export function classifySignal(title: string, summary: string, categories: string[] = []): TopicMatch[] {
   const scored = topics.map((topic) => {
     const terms = topicTerms[topic.id] ?? [];
+    const physicalEnergy = topic.id === "energy" && (
+      /\b(?:dark|vacuum|holographic) energy\b/i.test(`${title} ${summary}`)
+      || categories.some((category) => category.startsWith("astro-ph") || category === "gr-qc" || category === "hep-th")
+    );
+    if (physicalEnergy && !matched(`${title} ${summary}`, terms.filter((term) => term !== "energy"))) {
+      return { topicId: topic.id, subtopicId: null, score: 0 };
+    }
     const parentInTitle = matched(title, terms);
     const parentInSummary = matched(summary, terms);
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));

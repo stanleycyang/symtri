@@ -25,6 +25,16 @@ test("solar wind research does not create a false energy connection", () => {
   assert.ok(classifySignal("Solar panels built over irrigation canals", "Hacker News discussion").some((match) => match.topicId === "energy" && match.subtopicId === "energy-solar"));
 });
 
+test("cosmology dark energy stays in space without an applied energy link", () => {
+  const cosmology = classifySignal(
+    "Entropy applications in cosmology: spacetime thermodynamics, holographic dark energy and entropic gravity",
+    "A review of quantum gravity and cosmology", ["astro-ph.CO", "gr-qc"]);
+  assert.ok(cosmology.some((match) => match.topicId === "space"));
+  assert.ok(!cosmology.some((match) => match.topicId === "energy"));
+  assert.ok(classifySignal("New solar power satellites", "Photovoltaic energy generation", ["astro-ph.IM"])
+    .some((match) => match.topicId === "energy"));
+});
+
 test("arXiv quantum subjects keep their physics location beside cross-domain topics", () => {
   const battery = classifySignal("Simulation of a Battery Cell on Quantum Computers: Reactions & Transport", "", ["quant-ph"]);
   assert.equal(battery[0]?.topicId, "science");
