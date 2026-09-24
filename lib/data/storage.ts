@@ -450,7 +450,8 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
       order by embedding <=> ${literal}::vector(256) limit 30
     ` : [];
   const scores = new Map<string, { row: (typeof lexical)[number]; score: number; similarity: number | null }>();
-  for (const row of lexical) scores.set(row.id, { row, score: .6 + Math.min(.3, Number(row.rank)), similarity: null });
+  // An indexed text match should outrank a vector-only neighbor, even when the neighbor is newer.
+  for (const row of lexical) scores.set(row.id, { row, score: 1.5 + Math.min(.3, Number(row.rank)), similarity: null });
   for (const row of semantic) {
     const similarity = Number(row.similarity);
     if (!Number.isFinite(similarity) || similarity < .25) continue;

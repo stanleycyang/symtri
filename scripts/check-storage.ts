@@ -207,6 +207,7 @@ async function main() {
     assert.equal((await findSemanticSignals(queryVector, feed.events))[0]?.id, id);
     assert.equal((await searchKnowledge("Storage roundtrip", null))[0]?.event.id, id);
     assert.equal((await searchKnowledge("AI agent work", queryVector))[0]?.event.id, id);
+    assert.equal((await searchKnowledge("Urban gardening", queryVector))[0]?.event.id, unclassifiedId);
     const refreshed = await sql`select embedding_input_hash from signal_events where id = ${id}`;
     assert.notEqual(refreshed[0].embedding_input_hash, embedded[0].embedding_input_hash);
     assert.equal(await acquireIngestionLease(runId), true);
