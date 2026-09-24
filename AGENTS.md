@@ -41,6 +41,7 @@ Keep successful arXiv query groups when another group fails. Report the source a
 Likewise, keep popular GitHub repositories if the recent-update search fails, but mark GitHub partial so the run does not claim complete coverage.
 
 Serve `/api/signals` and mapped Ask questions from the persisted hourly archive once it contains signals. Per-visitor Hacker News, GitHub, and arXiv fetches multiply source traffic and make exploration depend on those APIs; keep direct source fetches only for an empty archive or a local database-free preview. Verify both routes with `npm run test:storage:local`.
+For archive-only Ask questions, require meaningful vector similarity and keep indexed text matches ahead of vector-only neighbors. Weak nearest neighbors caused unrelated stories to be presented as relevant sources; retain the negative retrieval case in `scripts/check-storage.ts`.
 
 The overview caps its event payload. A focused region or thread fetches recent matching archive events through `/api/topic`; keep those detail results distinct from the capped map activity calculation, and verify a niche source remains reachable beyond the overview cap.
 

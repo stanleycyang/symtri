@@ -454,7 +454,7 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
   for (const row of lexical) scores.set(row.id, { row, score: 1.5 + Math.min(.3, Number(row.rank)), similarity: null });
   for (const row of semantic) {
     const similarity = Number(row.similarity);
-    if (!Number.isFinite(similarity) || similarity < .25) continue;
+    if (!Number.isFinite(similarity) || similarity < .55) continue;
     const previous = scores.get(row.id);
     scores.set(row.id, { row, score: (previous?.score ?? 0) + similarity, similarity });
   }

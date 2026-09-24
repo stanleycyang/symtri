@@ -208,6 +208,8 @@ async function main() {
     assert.equal((await searchKnowledge("Storage roundtrip", null))[0]?.event.id, id);
     assert.equal((await searchKnowledge("AI agent work", queryVector))[0]?.event.id, id);
     assert.equal((await searchKnowledge("Urban gardening", queryVector))[0]?.event.id, unclassifiedId);
+    const weakVector = [.3, Math.sqrt(1 - .3 ** 2), ...Array(EMBEDDING_DIMENSIONS - 2).fill(0)];
+    assert.deepEqual(await searchKnowledge("Ancient pyramids", weakVector), []);
     const refreshed = await sql`select embedding_input_hash from signal_events where id = ${id}`;
     assert.notEqual(refreshed[0].embedding_input_hash, embedded[0].embedding_input_hash);
     assert.equal(await acquireIngestionLease(runId), true);
