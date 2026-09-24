@@ -8,9 +8,11 @@ export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEven
     .slice(0, limit);
 }
 
-export async function getSignalFeed(options: { includeUnclassified?: boolean } = {}): Promise<SignalFeed> {
+export async function getSignalFeed(options: { includeUnclassified?: boolean; forIngestion?: boolean } = {}): Promise<SignalFeed> {
   const sources: [SourceId, () => Promise<SignalEvent[]>][] = [
-    ["hacker-news", fetchHackerNews], ["github", fetchGitHub], ["arxiv", fetchArxiv],
+    ["hacker-news", () => fetchHackerNews(options.forIngestion)],
+    ["github", () => fetchGitHub(options.forIngestion)],
+    ["arxiv", fetchArxiv],
   ];
   const results = await Promise.allSettled(sources.map(([, fetchSource]) => fetchSource()));
   const status: SourceStatus = { "hacker-news": "unavailable", github: "unavailable", arxiv: "unavailable" };

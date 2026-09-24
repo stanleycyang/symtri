@@ -14,7 +14,7 @@ async function begin(slot: string): Promise<boolean> {
 
 async function fetchSources(): Promise<SignalFeed> {
   "use step";
-  const feed = await getSignalFeed({ includeUnclassified: true });
+  const feed = await getSignalFeed({ includeUnclassified: true, forIngestion: true });
   if (Object.values(feed.sources).every((status) => status === "unavailable")) {
     throw new Error("All sources unavailable");
   }
