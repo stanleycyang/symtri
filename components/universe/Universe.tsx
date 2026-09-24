@@ -41,8 +41,9 @@ type CameraMove = {
 };
 
 function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact, askOverlay, controls }: { entered: boolean; focusedId: string | null; selectedChildId: string | null; reducedMotion: boolean; compact: boolean; askOverlay: boolean; controls: MutableRefObject<React.ComponentRef<typeof OrbitControls> | null> }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const move = useRef<CameraMove | null>(null);
+  const panelConstrained = !compact && size.width <= 1000;
 
   useEffect(() => {
     const topic = getTopic(focusedId);
@@ -50,10 +51,10 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
     const toTarget = new THREE.Vector3();
     const toPosition = new THREE.Vector3();
     if (child) {
-      toTarget.set(child.position[0] + (compact ? 0 : 2.2), child.position[1] - (compact ? 2.5 : 0), child.position[2]);
+      toTarget.set(child.position[0] + (compact ? 0 : panelConstrained ? 7 : 2.2), child.position[1] - (compact ? 2.5 : 0), child.position[2]);
       toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 3, compact ? 0 : 2, compact ? 27 : 15));
     } else if (topic) {
-      toTarget.set(topic.position[0] + (compact ? 0 : 3), topic.position[1] - (compact ? 4 : 0), topic.position[2]);
+      toTarget.set(topic.position[0] + (compact ? 0 : panelConstrained ? 8 : 3), topic.position[1] - (compact ? 4 : 0), topic.position[2]);
       toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 5, compact ? 0 : 4, compact ? 43 : 27));
     } else {
       toPosition.set(compact ? 0 : 7, compact ? 0 : 5, compact ? 103 : 48);
@@ -72,7 +73,7 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
       elapsed: 0,
       duration: reducedMotion ? 0 : !entered ? 1 : topic ? 1.7 : 2.2,
     };
-  }, [askOverlay, camera, compact, controls, entered, focusedId, selectedChildId, reducedMotion]);
+  }, [askOverlay, camera, compact, controls, entered, focusedId, panelConstrained, selectedChildId, reducedMotion]);
 
   useFrame((_, delta) => {
     const current = move.current;
