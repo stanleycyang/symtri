@@ -20,4 +20,5 @@
 
 - Confirm scheduled backup timestamps and retention in the linked Supabase project's **Database > Backups** page before major schema changes and periodically thereafter. A backup listing proves backups were scheduled; a restore drill is needed to prove restore time and application recovery.
 - Supabase Pro provides daily scheduled backups with a seven-day retention window. Point-in-time recovery is a separate paid add-on and may also require a larger compute tier. Enable it only after the owner approves the current cost. See [Supabase's backup documentation](https://supabase.com/docs/guides/platform/backups) for current plan terms.
+- The current production choice is to keep the included daily backups and leave paid point-in-time recovery disabled.
 - For a restore drill, restore a backup into a separate project, apply any later migrations, set a temporary deployment's `DATABASE_URL` to that restored project, and verify status, signals, history, topic pagination, and Ask. Never point the production alias at the drill database.
