@@ -36,6 +36,7 @@ For ingestion changes, test the canonical URL uniqueness and hourly slot claim i
 Hourly Workflow source fetches must use `cache: "no-store"`. A 15-minute `next.revalidate` cache can serve stale data on the first request after expiry, making hourly ingestion one run behind. Keep the direct public preview's short cache separate, and verify a newly published source item after the next cron run.
 Keep a bounded replay window for Hacker News new stories so a missed or stale hourly run can recover them; storage deduplicates replayed events. Verify the window reaches stories older than the first hour without making the source step unbounded.
 An ingestion run should report Hacker News unavailable when its newest-story list fails or its newest usable story is stale. A healthy top-story response alone does not prove the hourly feed is fresh.
+Retry a bounded number of rejected Hacker News item requests once. Keep the stories that succeeded, and mark Hacker News partial if any item requests remain unresolved; do not silently claim full coverage.
 Keep successful arXiv query groups when another group fails. Report the source as partial rather than claiming full coverage or discarding fetched papers; an all-group failure remains unavailable.
 Likewise, keep popular GitHub repositories if the recent-update search fails, but mark GitHub partial so the run does not claim complete coverage.
 

@@ -1,5 +1,5 @@
 import { deduplicateSignals } from "./normalize";
-import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews } from "./sources";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion } from "./sources";
 import type { SignalEvent, SignalFeed, SourceId, SourceStatus } from "./model";
 
 export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEvent[] {
@@ -16,7 +16,7 @@ export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEven
 
 export async function getSignalFeed(options: { includeUnclassified?: boolean; forIngestion?: boolean } = {}): Promise<SignalFeed> {
   const sources: [SourceId, () => Promise<{ events: SignalEvent[]; status: "ok" | "partial" }>][] = [
-    ["hacker-news", async () => ({ events: await fetchHackerNews(options.forIngestion), status: "ok" })],
+    ["hacker-news", () => options.forIngestion ? fetchHackerNewsForIngestion() : fetchHackerNews().then((items) => ({ events: items, status: "ok" }))],
     ["github", () => options.forIngestion ? fetchGitHubForIngestion() : fetchGitHub().then((items) => ({ events: items, status: "ok" }))],
     ["arxiv", () => options.forIngestion ? fetchArxivForIngestion() : fetchArxiv().then((items) => ({ events: items, status: "ok" }))],
   ];

@@ -3,6 +3,7 @@ import type { SignalEvent } from "./model";
 
 const hackerNewsReplayLimit = 180;
 const hackerNewsFreshnessLimitMs = 45 * 60 * 1000;
+const hackerNewsRetryLimit = 24;
 
 async function request(url: string, headers?: HeadersInit, fresh = false): Promise<Response> {
   const response = await fetch(url, { headers, ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: 900 } }), signal: AbortSignal.timeout(12000) });
@@ -11,6 +12,14 @@ async function request(url: string, headers?: HeadersInit, fresh = false): Promi
 }
 
 export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent[]> {
+  return (await fetchHackerNewsSample(forIngestion)).events;
+}
+
+export async function fetchHackerNewsForIngestion(): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {
+  return fetchHackerNewsSample(true);
+}
+
+async function fetchHackerNewsSample(forIngestion: boolean): Promise<{ events: SignalEvent[]; status: "ok" | "partial" }> {
   const ids: unknown = await (await request("https://hacker-news.firebaseio.com/v0/topstories.json", undefined, forIngestion)).json();
   if (!Array.isArray(ids)) throw new Error("Invalid Hacker News story list");
   const topIds = ids.filter((id): id is number => Number.isInteger(id) && id > 0).slice(0, 60);
@@ -24,12 +33,29 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
     storyIds = [...new Set([...topIds, ...newestIds])];
   }
   const output: SignalEvent[] = [];
+  const failedIds: number[] = [];
+  const loadStory = async (id: number) => {
+    const item: unknown = await (await request(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, undefined, forIngestion)).json();
+    return normalizeHackerNews(item);
+  };
   for (let offset = 0; offset < storyIds.length; offset += 12) {
-    const batch = await Promise.allSettled(storyIds.slice(offset, offset + 12).map(async (id) => {
-      const item: unknown = await (await request(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, undefined, forIngestion)).json();
-      return normalizeHackerNews(item);
-    }));
-    for (const result of batch) if (result.status === "fulfilled" && result.value) output.push(result.value);
+    const ids = storyIds.slice(offset, offset + 12);
+    const batch = await Promise.allSettled(ids.map(loadStory));
+    batch.forEach((result, index) => {
+      if (result.status === "fulfilled") { if (result.value) output.push(result.value); }
+      else failedIds.push(ids[index]);
+    });
+  }
+  let unresolved = failedIds.length;
+  if (forIngestion && failedIds.length) {
+    for (let offset = 0; offset < Math.min(failedIds.length, hackerNewsRetryLimit); offset += 12) {
+      const batch = await Promise.allSettled(failedIds.slice(offset, offset + 12).map(loadStory));
+      for (const result of batch) if (result.status === "fulfilled") {
+        unresolved--;
+        if (result.value) output.push(result.value);
+      }
+    }
+    if (unresolved) console.warn("SYMTRI Hacker News items unavailable", unresolved);
   }
   if (!output.length) throw new Error("Hacker News returned no usable stories");
   if (forIngestion) {
@@ -39,7 +65,7 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
       throw new Error("Hacker News new stories are stale or unavailable");
     }
   }
-  return output;
+  return { events: output, status: unresolved ? "partial" : "ok" };
 }
 
 async function queryGitHub(sort: "stars" | "updated", fresh: boolean): Promise<SignalEvent[]> {

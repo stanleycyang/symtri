@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews } from "./sources";
+import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion } from "./sources";
 
 test("hourly source sampling finds new items without widening the public sample", async () => {
   const originalFetch = globalThis.fetch;
@@ -99,6 +99,34 @@ test("GitHub keeps popular repositories but reports a missing recent search", as
     const result = await fetchGitHubForIngestion();
     assert.equal(result.status, "partial");
     assert.deepEqual(result.events.map((event) => event.externalId), ["42"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("hourly Hacker News retries failed items and reports any remaining gaps", async () => {
+  const originalFetch = globalThis.fetch;
+  const attempts = new Map<number, number>();
+  let permanentFailure = false;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.endsWith("/topstories.json")) return Response.json([1]);
+    if (url.endsWith("/newstories.json")) return Response.json([2, 3]);
+    const id = Number(url.match(/\/item\/(\d+)\.json$/)?.[1]);
+    if (!id) throw new Error(`Unexpected source request: ${url}`);
+    attempts.set(id, (attempts.get(id) ?? 0) + 1);
+    if (id === 2 && (permanentFailure || attempts.get(id) === 1)) return new Response("Unavailable", { status: 503 });
+    return Response.json({ id, type: "story", title: `AI agent story ${id}`, time: Math.floor(Date.now() / 1000), url: `https://example.com/${id}` });
+  };
+  try {
+    const recovered = await fetchHackerNewsForIngestion();
+    assert.equal(recovered.status, "ok");
+    assert.deepEqual(new Set(recovered.events.map((event) => event.externalId)), new Set(["1", "2", "3"]));
+    assert.equal(attempts.get(2), 2);
+    permanentFailure = true;
+    const partial = await fetchHackerNewsForIngestion();
+    assert.equal(partial.status, "partial");
+    assert.deepEqual(new Set(partial.events.map((event) => event.externalId)), new Set(["1", "3"]));
   } finally {
     globalThis.fetch = originalFetch;
   }
