@@ -11,6 +11,7 @@
 ## Daily checks and recovery
 
 - `/api/status` includes source coverage, RSS active/paused counts, backlog sizes, and the latest hourly monitor result. A degraded monitor includes specific issues; an unavailable monitor endpoint requires Vercel runtime logs and database checks.
+- The health cron records and exposes failures but does not send a push alert. The current Vercel project does not have Observability Plus enabled, so review `/api/status` after hourly runs until an alert destination is configured.
 - On the second UTC date and thereafter, use `SYMTRI_MIN_SNAPSHOT_DAYS=2 npm run check:production` to verify two dated snapshots. A single date on launch day cannot prove historical comparison.
 - If ingestion is late or stalled, inspect the Vercel cron invocation, workflow run, and runtime logs before triggering the current production `/api/ingest` route. The route queues a workflow; wait for `/api/status` to show completion. Do not use a Workflow CLI result from an older deployment as proof of the new code.
 - If RSS sources pause, inspect `growth.rss` in `/api/status`. Failure-paused feeds retry after 24 hours, up to two per hourly run when active capacity allows. Manual and capacity pauses require an operator decision. Keep the 60 active-feed budget until the scale check and source coverage justify a change.
