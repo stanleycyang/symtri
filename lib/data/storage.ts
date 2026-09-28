@@ -314,6 +314,25 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
   return [...found.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }
 
+export async function getConnectionEvents(firstId: string, secondId: string, archive = false): Promise<SignalEvent[]> {
+  const sql = database();
+  const rows = await sql`
+    select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
+    from signal_events
+    where topics @> ${sql.json([{ topicId: firstId }, { topicId: secondId }])}::jsonb
+      and (${archive} or published_at >= now() - interval '14 days')
+      and exists (select 1 from signal_observations as observation
+        join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
+        where observation.signal_id = signal_events.id)
+    order by published_at desc, id desc limit 40`;
+  return rows.flatMap((row) => {
+    const topics = currentTopics(row);
+    if (![firstId, secondId].every((id) => topics.some((match) => match.topicId === id))) return [];
+    return [{ id: row.id, source: row.source, externalId: row.external_id, title: row.title, url: row.url,
+      summary: row.summary, publishedAt: new Date(row.published_at).toISOString(), importance: row.importance, topics }];
+  }).slice(0, 20);
+}
+
 type TopicPageCursor = { publishedAt: string; id: string };
 export type TopicPage = { events: SignalEvent[]; nextCursor: string | null };
 

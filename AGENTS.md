@@ -83,3 +83,8 @@ Postgres.js uses one connection per function instance in this app. Keep database
 Supabase documents that frozen serverless functions can resume with a dead Postgres.js socket while the idle timer was paused. The shared client is recycled after an idle gap; keep this safeguard when changing pooling, and verify `/api/status` and `/api/signals` after a warm-instance pause.
 
 Postgres.js query results are untyped `Row` values unless the SQL call has a generic row shape. Type rows before passing them to typed helpers, or validate optional fields inside the helper; TypeScript has caught this twice in storage changes.
+
+For thread and connection UI, distinguish a quiet seeded thread from loading or failed evidence requests. Use full-window child counts for live labels and saved-sample counts for historical labels. Connection source queries must require both region IDs and apply the current classifier, retain active-source filtering, and reach beyond the overview cap. Keep recent, cumulative, and saved-sample evidence scopes explicit; verify touch targets and visible counts on mobile.
+
+Use the linked Vercel team's explicit `--scope` when inspecting or deploying. The CLI's default personal scope can report that an existing linked project is missing. Resolve the team from `.vercel/project.json` and `vercel teams ls` before diagnosing an access failure.
+Connection selection and refreshed catalog objects must not restart a settled camera preset. Depend on location coordinates and viewport constraints, and verify orbit persists when opening a connection. Map navigation from Ask must keep focus inside Ask; closing it returns focus to its trigger.

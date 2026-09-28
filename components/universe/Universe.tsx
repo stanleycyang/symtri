@@ -19,6 +19,10 @@ export type UniverseProps = {
   signalMarkers: { id: string; source: string }[];
   regionActivity: Record<string, RegionActivity> | null;
   childCounts: Record<string, number>;
+  countsReady: boolean;
+  countPeriod: string;
+  connectedRegionId: string | null;
+  onConnection: (from: string, to: string) => void;
   regionRelationships: RegionRelationships | null;
   archiveRelationships: RegionRelationships | null;
   semanticRelationships: Record<string, number> | null;
@@ -44,23 +48,27 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
   const { camera, size } = useThree();
   const move = useRef<CameraMove | null>(null);
   const panelConstrained = !compact && size.width <= 1000;
+  const topic = getTopic(focusedId, catalog);
+  const child = topic?.children.find((item) => item.id === selectedChildId);
+  const anchor = child?.position ?? topic?.position;
+  const [anchorX, anchorY, anchorZ] = anchor ?? [0, 0, 0];
+  const hasTopic = Boolean(topic);
+  const hasChild = Boolean(child);
 
   useEffect(() => {
-    const topic = getTopic(focusedId, catalog);
-    const child = topic?.children.find((item) => item.id === selectedChildId);
     const toTarget = new THREE.Vector3();
     const toPosition = new THREE.Vector3();
-    if (child) {
-      toTarget.set(child.position[0] + (compact ? 0 : panelConstrained ? 7 : 2.2), child.position[1] - (compact ? 2.5 : 0), child.position[2]);
+    if (hasChild) {
+      toTarget.set(anchorX + (compact ? 0 : panelConstrained ? 7 : 2.2), anchorY - (compact ? 2.5 : 0), anchorZ);
       toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 3, compact ? 0 : 2, compact ? 27 : 15));
-    } else if (topic) {
-      toTarget.set(topic.position[0] + (compact ? 0 : panelConstrained ? 8 : 3), topic.position[1] - (compact ? 4 : 0), topic.position[2]);
+    } else if (hasTopic) {
+      toTarget.set(anchorX + (compact ? 0 : panelConstrained ? 8 : 3), anchorY - (compact ? 4 : 0), anchorZ);
       toPosition.copy(toTarget).add(new THREE.Vector3(compact ? 0 : 5, compact ? 0 : 4, compact ? 43 : 27));
     } else {
       toPosition.set(compact ? 0 : 7, compact ? 0 : 5, compact ? 103 : 48);
     }
-    if (askOverlay && topic) {
-      const offset = child ? 6 : 10;
+    if (askOverlay && hasTopic) {
+      const offset = hasChild ? 6 : 10;
       toTarget.y += offset;
       toPosition.y += offset;
     }
@@ -71,9 +79,9 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
       fromTarget: controls.current?.target.clone() ?? new THREE.Vector3(),
       toTarget,
       elapsed: 0,
-      duration: reducedMotion ? 0 : !entered ? 1 : topic ? 1.7 : 2.2,
+      duration: reducedMotion ? 0 : !entered ? 1 : hasTopic ? 1.7 : 2.2,
     };
-  }, [askOverlay, camera, catalog, compact, controls, entered, focusedId, panelConstrained, selectedChildId, reducedMotion]);
+  }, [askOverlay, camera, anchorX, anchorY, anchorZ, hasTopic, hasChild, compact, controls, entered, focusedId, panelConstrained, selectedChildId, reducedMotion]);
 
   useFrame((_, delta) => {
     const current = move.current;
@@ -104,15 +112,17 @@ function filamentCurve(from: Vec3, to: Vec3, bend: number): THREE.QuadraticBezie
   return new THREE.QuadraticBezierCurve3(start, mid, end);
 }
 
-function Filament({ from, to, color = "#7c8896", opacity = .16, bend = .8 }: { from: Vec3; to: Vec3; color?: string; opacity?: number; bend?: number }) {
-  const line = useMemo(() => {
-    return new THREE.BufferGeometry().setFromPoints(filamentCurve(from, to, bend).getPoints(30));
-  }, [from, to, bend]);
+function Filament({ from, to, color = "#7c8896", opacity = .16, bend = .8, onClick }: { from: Vec3; to: Vec3; color?: string; opacity?: number; bend?: number; onClick?: () => void }) {
+  const curve = useMemo(() => filamentCurve(from, to, bend), [from, to, bend]);
+  const line = useMemo(() => new THREE.BufferGeometry().setFromPoints(curve.getPoints(30)), [curve]);
   const material = useMemo(() => new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }), [color, opacity]);
   const object = useMemo(() => new THREE.Line(line, material), [line, material]);
   useEffect(() => () => line.dispose(), [line]);
   useEffect(() => () => material.dispose(), [material]);
-  return <primitive object={object} />;
+  return <group><primitive object={object} />{onClick && <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
+    <tubeGeometry args={[curve, 30, .22, 6, false]} />
+    <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+  </mesh>}</group>;
 }
 
 function Label({ title, subtitle, color = "#e3e4e1", size = 4.9 }: { title: string; subtitle?: string; color?: string; size?: number }) {
@@ -121,7 +131,7 @@ function Label({ title, subtitle, color = "#e3e4e1", size = 4.9 }: { title: stri
     let context = canvas.getContext("2d")!;
     context.font = "600 75px Arial";
     const titleWidth = context.measureText(title).width;
-    context.font = "36px monospace";
+    context.font = "50px monospace";
     const subtitleWidth = subtitle ? context.measureText(subtitle).width : 0;
     const width = Math.max(640, Math.ceil(Math.max(titleWidth, subtitleWidth) + 80));
     canvas.width = width; canvas.height = 160;
@@ -131,7 +141,7 @@ function Label({ title, subtitle, color = "#e3e4e1", size = 4.9 }: { title: stri
     context.fillStyle = color;
     context.fillText(title, width / 2, subtitle ? 84 : 107);
     if (subtitle) {
-      context.font = "36px monospace";
+      context.font = "50px monospace";
       context.fillStyle = "#a5afb8";
       context.fillText(subtitle, width / 2, 139);
     }
@@ -196,18 +206,18 @@ function GlowNode({ topic, focused, hovered, muted, emphasized, onFocus, onHover
   </group>;
 }
 
-function ChildNode({ position, name, color, active, onClick }: { position: Vec3; name: string; color: string; active: boolean; onClick: () => void }) {
+function ChildNode({ position, name, color, active, count, countPeriod, compact, onClick }: { position: Vec3; name: string; color: string; active: boolean; count: number | null; countPeriod: string; compact: boolean; onClick: () => void }) {
   return <group position={position}>
     <mesh raycast={() => null}>
       <sphereGeometry args={[.18, 14, 10]} />
       <meshBasicMaterial color={color} />
     </mesh>
     <mesh onClick={(event) => { event.stopPropagation(); if (event.delta <= 8) onClick(); }} onPointerOver={() => { document.body.style.cursor = "pointer"; }} onPointerOut={() => { document.body.style.cursor = "auto"; }}>
-      <sphereGeometry args={[.65, 12, 8]} />
+      <sphereGeometry args={[compact ? .95 : .65, 12, 8]} />
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
     <mesh raycast={() => null}><sphereGeometry args={[active ? .55 : .38, 12, 8]} /><meshBasicMaterial color={color} transparent opacity={active ? .13 : .055} depthWrite={false} /></mesh>
-    <group position={[0, -.75, 0]}><Label title={name} color={active ? "#d5a878" : "#d6d9db"} size={2.8} /></group>
+    <group position={[0, -.75, 0]}><Label title={name} subtitle={count === null ? "LOADING" : `${count} ${countPeriod}`} color={active ? "#d5a878" : "#d6d9db"} size={compact ? 4.1 : 3.4} /></group>
   </group>;
 }
 
@@ -356,7 +366,7 @@ function SignalCloud({ topic, reducedMotion }: { topic: Topic; reducedMotion: bo
   return <points ref={points} position={topic.position} geometry={geometry} raycast={() => null}><pointsMaterial ref={material} color={topic.color} size={.035} transparent opacity={Math.min(.58, .33 + topic.change / 1000)} sizeAttenuation depthWrite={false} /></points>;
 }
 
-function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, childCounts, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
+function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, childCounts, countsReady, countPeriod, connectedRegionId, onConnection, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
   const { camera } = useThree();
   const topicPoints = useMemo(() => new Map(catalog.topics.map((topic) => [topic.id, new THREE.Vector3(...topic.position)])), [catalog]);
@@ -365,8 +375,15 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
     const measured = regionActivity[topic.id];
     return measured ? { ...topic, activity: measured.visual, change: measured.momentum === "rising" ? 80 : 0, signals: measured.count } : topic;
   }) : catalog.topics, [catalog, regionActivity]);
-  const activeEdges = useMemo(() => attentionEdges(regionRelationships, catalog), [catalog, regionRelationships]);
-  const flowingEdges = useMemo(() => flowingAttentionEdges(activeEdges, regionRelationships), [activeEdges, regionRelationships]);
+  const activeEdges = useMemo(() => {
+    const edges = attentionEdges(regionRelationships, catalog);
+    if (focusedId && connectedRegionId && getTopic(focusedId, catalog) && getTopic(connectedRegionId, catalog) &&
+      !edges.some(([a, b]) => relationshipKey(a, b) === relationshipKey(focusedId, connectedRegionId))) {
+      return [...edges, [focusedId, connectedRegionId] as [string, string]];
+    }
+    return edges;
+  }, [catalog, regionRelationships, focusedId, connectedRegionId]);
+  const flowingEdges = useMemo(() => regionRelationships ? flowingAttentionEdges(activeEdges, regionRelationships) : [], [activeEdges, regionRelationships]);
   const focused = getTopic(focusedId, catalog);
   const pathChildren = useMemo(() => new Set(askSteps.map((step) => step.subtopicId).filter((id): id is string => id !== null)), [askSteps]);
   const sceneChildren = useMemo(() => new Map(catalog.topics.map((topic) => {
@@ -413,7 +430,8 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
       const first = getTopic(a, catalog)!;
       const second = getTopic(b, catalog)!;
       const key = relationshipKey(a, b);
-      const highlighted = hoveredId === a || hoveredId === b;
+      const selected = Boolean(focusedId && connectedRegionId && relationshipKey(focusedId, connectedRegionId) === key);
+      const highlighted = selected || hoveredId === a || hoveredId === b;
       const inAnswer = askPathIds.some((id, index) => index > 0 && relationshipKey(askPathIds[index - 1], id) === key);
       const count = regionRelationships?.[key] ?? 0;
       const archived = archiveRelationships?.[key] ?? 0;
@@ -421,18 +439,18 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
       const semanticBoost = similarity === undefined ? 0 : Math.max(0, Math.min(.16, (similarity - .25) * .3));
       const recentStrength = regionRelationships ? Math.min(.45, .07 + count * .07 + semanticBoost) : .13 + semanticBoost;
       const strength = Math.max(recentStrength, archived ? Math.min(.24, .06 + Math.log1p(archived) * .045) : 0);
-      const color = inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId, catalog)?.color : establishedEdgeKeys.has(key) ? undefined : "#bfa178";
-      const opacity = inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04)
+      const color = selected ? "#f4d1a8" : inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId, catalog)?.color : establishedEdgeKeys.has(key) ? undefined : "#bfa178";
+      const opacity = selected ? .85 : inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04)
         : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength;
-      return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={color} opacity={opacity} bend={2.6} />;
+      return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={color} opacity={opacity} bend={2.6} onClick={entered ? () => onConnection(focusedId === b ? b : a, focusedId === b ? a : b) : undefined} />;
     })}
     {askSteps.map((step, index) => index > 0 && step.subtopicId && askSteps[index - 1].subtopicId ? <Filament key={`ask-${index}`} from={pathPosition(askSteps[index - 1])} to={pathPosition(step)} color="#e6b988" opacity={.82} bend={.8} /> : null)}
     {activeTopics.map((topic) => <group key={topic.id}>
       <SignalCloud topic={topic} reducedMotion={reducedMotion} />
-      <GlowNode topic={topic} focused={focusedId === topic.id} hovered={hoveredId === topic.id} muted={Boolean(focused && focused.id !== topic.id && !askPathIds.includes(topic.id))} emphasized={askPathIds.includes(topic.id)} onFocus={(id) => onFocus(id)} onHover={onHover} reducedMotion={reducedMotion} compact={compact} measured={Boolean(regionActivity)} showLabel={entered} />
+      <GlowNode topic={topic} focused={focusedId === topic.id} hovered={hoveredId === topic.id} muted={Boolean(focused && focused.id !== topic.id && connectedRegionId !== topic.id && !askPathIds.includes(topic.id))} emphasized={connectedRegionId === topic.id || askPathIds.includes(topic.id)} onFocus={(id) => onFocus(id)} onHover={onHover} reducedMotion={reducedMotion} compact={compact} measured={Boolean(regionActivity)} showLabel={entered} />
       {topic.children.filter((child) => (revealId === topic.id && sceneChildren.get(topic.id)?.has(child.id)) || pathChildren.has(child.id)).map((child) => <group key={child.id}>
         <Filament from={topic.position} to={child.position} color={pathChildren.has(child.id) ? "#e6b988" : topic.color} opacity={pathChildren.has(child.id) ? .55 : .21} bend={.45} />
-        <ChildNode position={child.position} name={child.name} color={topic.color} active={selectedChildId === child.id || pathChildren.has(child.id)} onClick={() => { if (focusedId !== topic.id) onFocus(topic.id); onChild(child.id); }} />
+        <ChildNode count={countsReady ? childCounts[child.id] ?? 0 : null} countPeriod={countPeriod} compact={compact} position={child.position} name={child.name} color={topic.color} active={selectedChildId === child.id || pathChildren.has(child.id)} onClick={() => { if (focusedId !== topic.id) onFocus(topic.id); onChild(child.id); }} />
         {revealSignals && selectedChildId === child.id && signalMarkers.map((signal, index) => {
           const angle = index * Math.PI * 2 / 3 + .5;
           const signalPosition: Vec3 = [child.position[0] + Math.cos(angle) * 1.85, child.position[1] + Math.sin(angle) * 1.6, child.position[2] + .5];

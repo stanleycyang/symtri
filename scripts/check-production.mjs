@@ -108,6 +108,20 @@ try {
     }
     topicPagesVerified = 2;
   }
+  const strongestConnection = Object.entries(signals.relationships)
+    .filter(([key, count]) => count > 0 && key.split(":").every((id) => known.has(id)))
+    .sort((a, b) => b[1] - a[1])[0]?.[0];
+  let connectionSourcesVerified = 0;
+  if (strongestConnection) {
+    const [from, to] = strongestConnection.split(":");
+    const connection = await read(`/api/connections?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    if (!Array.isArray(connection.events) || !connection.events.length || connection.events.length > 20 ||
+      connection.events.some((event) => ![from, to].every((id) => event.topics?.some((match) => match.topicId === id))) ||
+      new Set(connection.events.map((event) => event.id)).size !== connection.events.length) {
+      throw new Error(`Connection ${strongestConnection} has missing or unrelated source evidence`);
+    }
+    connectionSourcesVerified = connection.events.length;
+  }
   const verifiedDays = history.days.slice(0, 2).map((item) => item.day);
   const snapshots = await Promise.all(verifiedDays.map((day) => read(`/api/history?day=${encodeURIComponent(day)}`)));
   for (const [index, snapshot] of snapshots.entries()) {
@@ -136,6 +150,8 @@ try {
     monitor: status.monitor?.status ?? "pending",
     childCounts: Object.keys(signals.childCounts).length,
     topicPagesVerified,
+    strongestConnection,
+    connectionSourcesVerified,
     snapshotDays: history.days.map((day) => day.day),
     liveRelationships: Object.keys(signals.relationships).length,
     snapshotRelationships: Object.keys(snapshots[0].relationships).length,
