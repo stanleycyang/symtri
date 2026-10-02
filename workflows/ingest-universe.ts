@@ -76,9 +76,9 @@ async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: stri
   return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
 }
 
-async function enrichSources(preferRetries = false): Promise<Awaited<ReturnType<typeof enrichBatch>>> {
+async function enrichSources(preferRetries = false, preferOldest = false): Promise<Awaited<ReturnType<typeof enrichBatch>>> {
   "use step";
-  return enrichBatch(1, undefined, undefined, preferRetries);
+  return enrichBatch(1, undefined, undefined, preferRetries, preferOldest);
 }
 
 async function refreshGraph():Promise<number> {
@@ -109,7 +109,7 @@ export async function enrichReadingNotes(slot:string, lane:number) {
   try {
     for(let batch=0;batch<10;batch++) {
       if (!await renewReadingNotes(lane, runId)) { result.status="lease-lost"; break; }
-      const next=await enrichSources(lane === 0 && batch < 3);
+      const next=await enrichSources(lane === 0 && batch < 3, lane === 3);
       result.processed+=next.processed;result.ready+=next.ready;result.failed+=next.failed;
       if(next.status==="not-configured") {result.status="not-configured";break;}
       if(!next.processed) break;

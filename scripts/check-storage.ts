@@ -928,6 +928,16 @@ async function main() {
       assert.equal(fair.ready,2);assert.deepEqual(new Set(visitedSources),new Set(["github","nasa"]));
       assert.ok(visitedIds.includes(`nasa:${externalId}-fair`));assert.ok(!visitedIds.includes(thinMissionId),"Retained evidence precedes a higher-scored thin summary within its source and subject");
       await sql`delete from signal_events where id in ${sql(fairEvents.map(item=>item.id))}`;
+      const olderId=`github:${externalId}-older-note`;
+      const newerId=`github:${externalId}-newer-note`;
+      const ageEvents:SignalEvent[]=[olderId,newerId].map((noteId,index)=>({...event,id:noteId,externalId:`${externalId}-${index}-note`,url:`https://example.org/${externalId}/age/${index}`,title:`Age queue fixture ${index}`,importance:index?1000:1,evidence:{...evidenceInput,text:retainedText}}));
+      await persistSignals({...feed,events:ageEvents});
+      await sql`update signal_events set first_seen_at=now()-interval '2 days' where id=${olderId}`;
+      const aged=await enrichBatch(1,async(answer)=>({...await synthesize(),citedEventIds:[answer.events[0].id]}),async()=>[],false,true);
+      assert.equal(aged.ready,1);
+      assert.equal((await sql`select status from reading_notes where signal_id=${olderId}`)[0].status,"ready","The age lane visits an older low-importance note before a newer one");
+      assert.equal((await sql`select status from reading_notes where signal_id=${newerId}`)[0].status,"pending");
+      await sql`delete from signal_events where id in (${olderId},${newerId})`;
       await sql`update reading_notes set status='pending',attempts=0,retry_at=now() where signal_id=${id}`;
       const generated=await enrichBatch(1,synthesize,async()=>[]);
       assert.equal(generated.ready,1);

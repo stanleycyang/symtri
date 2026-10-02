@@ -135,7 +135,7 @@ export async function getReadingNote(id: string): Promise<{status:string;note:Re
   return {status:row.version!==ENRICHMENT_VERSION || row.status==="ready" && !row.note ? "pending" : row.status,note:row.note?{...row.note,context:row.note.context.filter(context=>context.kind!=="background" || context.title===expected)}:null};
 }
 
-export async function enrichBatch(limit=5, synthesize:typeof summarizeAnswer=summarizeAnswer, loadContext:typeof contextFor=contextFor, preferRetries=false): Promise<{processed:number;ready:number;failed:number;status:string}> {
+export async function enrichBatch(limit=5, synthesize:typeof summarizeAnswer=summarizeAnswer, loadContext:typeof contextFor=contextFor, preferRetries=false, preferOldest=false): Promise<{processed:number;ready:number;failed:number;status:string}> {
   if (!gatewayConfigured()) return {processed:0,ready:0,failed:0,status:"not-configured"};
   const sql=database();
   await sql`update reading_notes set status='failed',lease_until=null,updated_at=now() where status='working' and lease_until<now() and attempts>=3`;
@@ -149,6 +149,7 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeAnswer=sum
         case when ${preferRetries} then case when note.status in ('failed','working') then 0 else 1 end
           else case when note.status='pending' then 0 else 1 end end,
         note.attempts,
+        case when ${preferOldest} then event.first_seen_at end asc,
         case when exists(select 1 from signal_evidence evidence join source_catalog owner on owner.id=evidence.source and owner.status='active'
           where evidence.signal_id=event.id and length(evidence.body->>'text')>=150) then 0 else 1 end,
         event.importance desc,event.first_seen_at desc) as queue_rank,

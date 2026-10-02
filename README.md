@@ -141,9 +141,10 @@ are rejected before model verification. Both calls share the model deadline.
 
 Reading notes use migrations `20260928001000_reading_notes.sql` and
 `20261001000000_reading_note_workers.sql`. `/api/enrich` runs every five minutes
-and starts two independent Workflow lanes. Each lane processes at most ten
-notes, for a maximum of 20 per scheduled run. One lane reserves its first three
-notes for due retries; the remaining capacity prioritizes new notes. A database
+and starts four independent Workflow lanes. Each lane processes at most ten
+notes, for a maximum of 40 per scheduled run. One lane reserves its first three
+notes for due retries, one gives older pending records priority, and the remaining
+capacity prioritizes new notes. A database
 lease prevents lanes from overlapping,
 and a completed slot cannot run twice if Vercel delivers the same cron again. Each
 note uses retained source text, exact supporting passages, and a separate model
