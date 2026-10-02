@@ -26,6 +26,15 @@ function currentTopics(row: { topics?: unknown; classifier_version?: unknown; cl
   return classifySignal(input.title, input.summary, categories);
 }
 
+export function databaseEndpoint(value: string): string {
+  const endpoint = new URL(value);
+  if (endpoint.hostname.endsWith(".pooler.supabase.com") && endpoint.port === "6543") {
+    endpoint.port = "5432";
+    return endpoint.toString();
+  }
+  return value;
+}
+
 export function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is required for persistent signals");
@@ -37,9 +46,12 @@ export function database() {
     void stale.end({ timeout: 0 }).catch(() => {});
   }
   lastDatabaseUse = now;
-  const hostname = new URL(url).hostname;
+  const endpoint = new URL(url);
+  const hostname = endpoint.hostname;
   const local = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
-  connection ??= postgres(url, {
+  // Postgres.js pipelining can hang on Supabase's shared transaction pooler.
+  // Session mode uses the same host and credentials on port 5432.
+  connection ??= postgres(databaseEndpoint(url), {
     max: 1, prepare: false, ssl: local ? false : "require",
     connect_timeout: 5, idle_timeout: 10, max_lifetime: 60,
   });
