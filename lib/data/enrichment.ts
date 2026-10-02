@@ -166,6 +166,7 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeAnswer=sum
   for (const row of claimed) {
     try {
       let event=await retrieveStoryEvidence({id:row.id,source:row.source,externalId:row.external_id,title:row.title,url:row.url,summary:row.summary,publishedAt:row.published_at.toISOString(),importance:row.importance,topics:row.topics});
+      console.info("SYMTRI reading-note evidence ready",{source:row.source});
       // Source hydration may requeue this item. Capture the new revision before generation;
       // a later source change or another worker invalidates the conditional commit.
       const ownership=await sql<{revision:number}[]>`update reading_notes set status='working',attempts=greatest(attempts,1),lease_until=now()+interval '10 minutes' where signal_id=${event.id} and claim_token=${token} returning revision`;
