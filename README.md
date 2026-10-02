@@ -157,7 +157,8 @@ Ready notes lead the source detail; the original excerpt is expandable below the
 supported explanation. World Bank context labels each geography separately.
 The `enrichReadingNotes` Workflow runs independently of the hourly ingestion
 lease, so source fetching can proceed while notes are generated. It does not poll
-news sources or refresh embeddings. Check `/api/status` for note queue counts after
+news sources. The new-note lane refreshes a bounded embedding backlog after
+hydration so newly retained text remains searchable. Check `/api/status` for note queue counts after
 deployment, then verify the ready count rises after a scheduled enrichment run.
 
 Background context uses one Wikipedia intro/revision request per selected subject

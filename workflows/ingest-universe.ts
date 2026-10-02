@@ -104,8 +104,8 @@ async function releaseReadingNotes(lane:number, runId:string):Promise<void> {
 export async function enrichReadingNotes(slot:string, lane:number) {
   "use workflow";
   const runId = `${slot}:${lane}`;
-  if (!await claimReadingNotes(lane, runId)) return {status:"busy",ready:0,failed:0,processed:0};
-  const result={status:"complete",ready:0,failed:0,processed:0};
+  if (!await claimReadingNotes(lane, runId)) return {status:"busy",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
+  const result={status:"complete",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
   try {
     for(let batch=0;batch<10;batch++) {
       if (!await renewReadingNotes(lane, runId)) { result.status="lease-lost"; break; }
@@ -115,6 +115,20 @@ export async function enrichReadingNotes(slot:string, lane:number) {
       if(!next.processed) break;
     }
     if(result.failed) result.status="partial";
+    // Hydrating a source invalidates its previous vector. Keep this pass bounded;
+    // the next scheduled run picks up anything changed after this lane finishes.
+    if (lane === 1) {
+      try {
+        const embedding = await embedBacklog();
+        result.embedded = embedding.embedded;
+        result.embeddingStatus = embedding.hasMore ? "backlog" : embedding.embeddingStatus;
+        if (result.embeddingStatus !== "ok") result.status = "partial";
+      } catch (error) {
+        result.embeddingStatus = "unavailable";
+        result.status = "partial";
+        console.warn("SYMTRI reading-note embeddings unavailable",error instanceof Error ? error.message : "unknown error");
+      }
+    }
   } finally {await releaseReadingNotes(lane, runId);}
   return result;
 }
