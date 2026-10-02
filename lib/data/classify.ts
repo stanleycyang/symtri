@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 10;
+export const CLASSIFIER_VERSION = 11;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -86,9 +86,21 @@ function securitySense(text: string): string {
   return text.replace(/\bsecurity[ -]council\b/gi, "");
 }
 
+function energySense(text: string): string {
+  // Nuclear military and geological stories are not evidence of civil power.
+  if (/\b(?:weapons?|warheads?|arms|military|earthquake|detonation|bombs?)\b/i.test(text)
+    && !/\b(?:power[ -]plants?|electricity|power[ -]generation|reactors?|smrs?|grid)\b/i.test(text)) {
+    return text.replace(/\bnuclear\b/gi, "");
+  }
+  return text;
+}
+
 export function classifySignal(title: string, summary: string, categories: string[] = []): TopicMatch[] {
   const scored = topics.map((topic) => {
     const terms = topicTerms[topic.id] ?? [];
+    const energyText = energySense(`${title} ${summary}`);
+    const regionTitle = topic.id === "energy" ? energyText === `${title} ${summary}` ? title : title.replace(/\bnuclear\b/gi, "") : title;
+    const regionSummary = topic.id === "energy" && energyText !== `${title} ${summary}` ? summary.replace(/\bnuclear\b/gi, "") : summary;
     const physicalEnergy = topic.id === "energy" && (
       /\b(?:dark|vacuum|holographic) energy\b/i.test(`${title} ${summary}`)
       || categories.some((category) => category.startsWith("astro-ph") || category === "gr-qc" || category === "hep-th")
@@ -96,8 +108,8 @@ export function classifySignal(title: string, summary: string, categories: strin
     if (physicalEnergy && !matched(`${title} ${summary}`, terms.filter((term) => term !== "energy"))) {
       return { topicId: topic.id, subtopicId: null, score: 0 };
     }
-    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : topic.id === "security" ? securitySense(title) : title, terms);
-    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : topic.id === "security" ? securitySense(summary) : summary, terms);
+    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : topic.id === "security" ? securitySense(title) : regionTitle, terms);
+    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : topic.id === "security" ? securitySense(summary) : regionSummary, terms);
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));
     const categoryWeight = topic.id === "space" && parentInCategory ? 8 : 6;
     let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? categoryWeight : 0);
@@ -105,7 +117,7 @@ export function classifySignal(title: string, summary: string, categories: strin
       ? { id: "space-astronomy", score: 4 } : null;
     for (const child of topic.children) {
       const childAliases = childTerms[child.id] ?? [child.name.toLowerCase()];
-      const childTitle = child.id === "ai-agents" ? title.replace(/\bforeign agents?\b/gi, "") : title;
+      const childTitle = child.id === "ai-agents" ? title.replace(/\bforeign agents?\b/gi, "") : topic.id === "energy" ? regionTitle : title;
       const titleMatch = strongestTerm(childTitle, childAliases);
       const childScore = titleMatch ? 5 + Math.min(3, titleMatch / 5) : 0;
       if (childScore > (bestChild?.score ?? 0)) bestChild = { id: child.id, score: childScore };

@@ -14,6 +14,7 @@
     "test:storage:local": "bash scripts/check-storage-local.sh",
     "test:scale:local": "bash scripts/check-growth-scale-local.sh",
     "check:production": "node scripts/check-production.mjs",
+    "evaluate:ask": "node scripts/evaluate-ask.mjs",
     "growth:manage": "tsx scripts/manage-growth.ts"
   },
   "dependencies": {

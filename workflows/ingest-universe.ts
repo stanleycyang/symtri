@@ -7,6 +7,7 @@ import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { catalogMatches, getUniverseCatalog, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
 import { discoverFeedCandidates, fetchActiveFeeds, pollTrialFeeds, recoverPausedFeeds } from "@/lib/data/feed-registry";
+import { claimReadingNoteWorker, enrichBatch, releaseReadingNoteWorker, renewReadingNoteWorker } from "@/lib/data/enrichment";
 import { pruneAskRateLimits } from "@/lib/data/ask-limit";
 
 async function begin(slot: string): Promise<boolean> {
@@ -59,7 +60,6 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), archiveCount);
   await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships, catalog });
   await backfillSnapshotMetadata();
-  await rebuildKnowledgeGraph(relationships);
   await persistCurrentFeed({ ...snapshot, observedAt: feed.observedAt, archiveCount, activity, childCounts,
     catalog, sources: feed.sources, partial: feed.partial });
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity, archiveCount, childCounts };
@@ -76,6 +76,49 @@ async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: stri
   return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
 }
 
+async function enrichSources(preferRetries = false): Promise<Awaited<ReturnType<typeof enrichBatch>>> {
+  "use step";
+  return enrichBatch(1, undefined, undefined, preferRetries);
+}
+
+async function refreshGraph():Promise<number> {
+  "use step";
+  return rebuildKnowledgeGraph();
+}
+
+async function claimReadingNotes(lane:number, runId:string):Promise<boolean> {
+  "use step";
+  return claimReadingNoteWorker(lane, runId);
+}
+
+async function renewReadingNotes(lane:number, runId:string):Promise<boolean> {
+  "use step";
+  return renewReadingNoteWorker(lane, runId);
+}
+
+async function releaseReadingNotes(lane:number, runId:string):Promise<void> {
+  "use step";
+  await releaseReadingNoteWorker(lane, runId);
+}
+
+export async function enrichReadingNotes(slot:string, lane:number) {
+  "use workflow";
+  const runId = `${slot}:${lane}`;
+  if (!await claimReadingNotes(lane, runId)) return {status:"busy",ready:0,failed:0,processed:0};
+  const result={status:"complete",ready:0,failed:0,processed:0};
+  try {
+    for(let batch=0;batch<10;batch++) {
+      if (!await renewReadingNotes(lane, runId)) { result.status="lease-lost"; break; }
+      const next=await enrichSources(lane === 0 && batch < 3);
+      result.processed+=next.processed;result.ready+=next.ready;result.failed+=next.failed;
+      if(next.status==="not-configured") {result.status="not-configured";break;}
+      if(!next.processed) break;
+    }
+    if(result.failed) result.status="partial";
+  } finally {await releaseReadingNotes(lane, runId);}
+  return result;
+}
+
 async function finish(slot: string, result: IngestionResult): Promise<void> {
   "use step";
   try { await finishIngestionRun(slot, result); }
@@ -89,6 +132,11 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
   try {
     const feed = await fetchSources(slot);
     const stored = await storeFeed(slot, feed);
+    // Each step rebuilds at most 30 days. Backfills can dirty more than one batch.
+    for(let batch=0;batch<3;batch++) {
+      if(await refreshGraph()<30) break;
+    }
+    // Reading notes run on their own schedule so source ingestion remains bounded.
     const embedding = { embedded: 0, embeddingStatus: "unavailable" };
     try {
       for (let batch = 0; batch < 3; batch++) {

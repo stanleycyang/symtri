@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { SignalEvent } from "../data/model";
 import { MockEmbeddingModelV4 } from "ai/test";
-import { EMBEDDING_DIMENSIONS, embedTexts, embeddingInputHash } from "./embed";
+import { EMBEDDING_DIMENSIONS, embedTexts, embeddingInputHash,signalEmbeddingText } from "./embed";
 
 test("gateway embeddings batch inputs and preserve response order", async () => {
   const sizes: number[] = [];
@@ -34,4 +35,13 @@ test("embedding input hashes change when content changes and malformed vectors f
     if (original === undefined) delete process.env.SYMTRI_EMBEDDING_MODEL;
     else process.env.SYMTRI_EMBEDDING_MODEL = original;
   }
+});
+
+
+test("signal vectors include bounded source evidence and exclude generated notes",()=>{
+  const event={title:"A short title",summary:"Display summary",evidence:{text:"Retained findings. ".repeat(1000),kind:"abstract",url:"https://example.org",attribution:"Authors",license:null,retrievedAt:"2026-09-28"}} as SignalEvent;
+  const text=signalEmbeddingText(event);
+  assert.ok(text.includes("Source text: Retained findings."));
+  assert.ok(text.length<3100);
+  assert.notEqual(embeddingInputHash(text),embeddingInputHash(signalEmbeddingText({...event,evidence:undefined})));
 });

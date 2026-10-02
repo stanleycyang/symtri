@@ -62,7 +62,7 @@ export const topicEdges: [string, string][] = [
 
 export const seedCatalog: UniverseCatalog = {
   revision: 0, topics, topicEdges,
-  sourceLabels: { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv", openalex: "OpenAlex" },
+  sourceLabels: { "hacker-news": "Hacker News", github: "GitHub", arxiv: "arXiv", openalex: "OpenAlex", nasa: "NASA", "nasa-jpl": "NASA JPL", cisa: "CISA", "europe-pmc": "Europe PMC", "hugging-face": "Hugging Face" },
 };
 
 export function getTopic(id: string | null, catalog: UniverseCatalog = seedCatalog) { return catalog.topics.find((topic) => topic.id === (id ? catalog.redirects?.[id] ?? id : null)) ?? null; }

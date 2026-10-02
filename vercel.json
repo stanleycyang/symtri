@@ -3,6 +3,7 @@
   "buildCommand": "npm test && npm run lint && npm run build",
   "crons": [
     { "path": "/api/ingest", "schedule": "0 * * * *" },
+    { "path": "/api/enrich", "schedule": "*/5 * * * *" },
     { "path": "/api/verify", "schedule": "12 * * * *" }
   ]
 }

@@ -25,6 +25,9 @@ test("OpenAlex uses a bounded deterministic hourly sample and short public previ
     assert.equal((await fetchOpenAlex()).length, 1);
     assert.equal(calls[1].url.searchParams.get("sample"), "12");
     assert.equal(calls[1].revalidate, 900);
+    await fetchOpenAlex("manual:2026-09-24T16:12:34.000Z");
+    assert.match(calls[2].url.searchParams.get("filter") ?? "", /from_publication_date:2026-09-22,to_publication_date:2026-09-24/);
+    assert.equal(calls[2].cache,"no-store");
   } finally {
     globalThis.fetch = originalFetch;
   }

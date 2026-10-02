@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getConnectionEvents, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getCisaEntryHashes, getSignalEvidence, getArchivedSignal, withStoredEvidence, getConnectionEvents, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -10,6 +10,8 @@ import { regionActivity } from "../lib/data/activity";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
+import { claimReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION } from "../lib/data/enrichment";
+import { GET as readStory } from "../app/api/story/route";
 import { POST as askSymtri } from "../app/api/ask/route";
 import { getUniverseCatalog, recordCatalogRevision, seedUniverseCatalog } from "../lib/data/catalog";
 import { discoverConcepts, syncArchiveConcepts } from "../lib/data/discovery";
@@ -103,6 +105,7 @@ async function main() {
   const launchControlsMigration = await readFile(new URL("../supabase/migrations/20260924019000_launch_controls.sql", import.meta.url), "utf8");
   await sql.unsafe(launchControlsMigration);
   assert.equal((await sql`select count(*)::int as count from concept_catalog`)[0].count, 76);
+  await sql.unsafe(await readFile(new URL("../supabase/migrations/20260928000000_source_evidence.sql", import.meta.url), "utf8"));
   await seedUniverseCatalog();
   assert.equal((await getUniverseCatalog()).topics.length, 10);
   assert.equal((await sql`select public.symtri_canonical_url('https://news.ycombinator.com/item?id=47&utm_source=hn') as url`)[0].url, "news.ycombinator.com/item?id=47");
@@ -114,14 +117,25 @@ async function main() {
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_content_key_key'`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_search_idx'`)[0].count, 1);
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_source_preview_idx'`)[0].count, 1);
+  await sql.unsafe(await readFile(new URL("../supabase/migrations/20260928001000_reading_notes.sql", import.meta.url), "utf8"));
+  await sql.unsafe(await readFile(new URL("../supabase/migrations/20261001000000_reading_note_workers.sql", import.meta.url), "utf8"));
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
       'concept_catalog', 'concept_candidates', 'concept_candidate_evidence', 'signal_concepts', 'catalog_revisions', 'source_catalog', 'source_trial_items', 'source_probes',
-      'current_feed', 'knowledge_graph_days', 'knowledge_graph_dirty_days', 'ask_request_buckets', 'production_health_checks')
+      'current_feed', 'knowledge_graph_days', 'knowledge_graph_dirty_days', 'ask_request_buckets', 'production_health_checks', 'signal_evidence', 'reading_notes', 'background_context', 'reading_note_workers')
   `;
-  assert.equal(protectedTables.length, 20);
+  assert.equal(protectedTables.length, 24);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
+  const workerSlot=`storage-check:${externalId}`;
+  assert.equal(await claimReadingNoteWorker(0,workerSlot),true);
+  assert.equal(await claimReadingNoteWorker(0,workerSlot),false,"A duplicate cron delivery cannot repeat the same lane");
+  assert.equal(await claimReadingNoteWorker(0,`${workerSlot}:other`),false,"An active lane excludes another run");
+  assert.equal(await renewReadingNoteWorker(0,workerSlot),true);
+  await releaseReadingNoteWorker(0,workerSlot);
+  assert.equal(await claimReadingNoteWorker(0,workerSlot),false,"A released lane still records its completed cron slot");
+  assert.equal(await claimReadingNoteWorker(0,`${workerSlot}:next`),true);
+  await releaseReadingNoteWorker(0,`${workerSlot}:next`);
   const quotaTime = new Date("2025-01-01T10:30:00Z");
   const visitorRequest = new Request("https://symtri.com/api/ask", { headers: { "x-vercel-forwarded-for": "203.0.113.10" } });
   for (let attempt = 0; attempt < 60; attempt++) assert.equal(await checkAskRateLimit(visitorRequest, quotaTime), null);
@@ -136,7 +150,14 @@ async function main() {
   await pruneAskRateLimits(new Date("2025-01-05T00:00:00Z"));
   assert.equal((await sql`select count(*)::int as count from ask_request_buckets`)[0].count, 0);
   assert.equal((await askSymtri(new Request("https://symtri.com/api/ask", { method: "POST",
-    body: JSON.stringify({ question: "x".repeat(2_000) }) }))).status, 413);
+    body: JSON.stringify({ question: "x".repeat(5_000) }) }))).status, 413);
+  assert.equal((await askSymtri(new Request("https://symtri.com/api/ask", { method: "POST",
+    body: JSON.stringify({ question: "Explain AI", context: { question: "x".repeat(241) } }) }))).status, 400);
+  assert.equal((await askSymtri(new Request("https://symtri.com/api/ask",{method:"POST",body:JSON.stringify({question:"Explain AI",context:{answer:"x".repeat(801)}})}))).status,400);
+  const clarification = await askSymtri(new Request("https://symtri.com/api/ask", { method: "POST",
+    body: JSON.stringify({ question: "What are their limitations?" }) }));
+  assert.equal(clarification.status, 200);
+  assert.equal((await clarification.json()).needsClarification, true);
   const event: SignalEvent = {
     id, source: "github", externalId, title: "First title",
     url: `https://github.com/symtri/${externalId}`, summary: "Storage roundtrip",
@@ -356,6 +377,9 @@ async function main() {
     const threadLinks = await getRelatedSignals(id);
     assert.ok(threadLinks.some((item) => item.id === sharedThreadId));
     assert.ok(!threadLinks.some((item) => item.id === weakParentId));
+    await sql`update signal_events set classifier_version=0,classification_input=${sql.json({title:"Biological factor identity in plant cells",summary:"Genome expression and biological factors",categories:["q-bio"]})} where id=${sharedThreadId}`;
+    assert.ok(!(await getRelatedSignals(id)).some(item=>item.id===sharedThreadId),"Stale thread tags cannot lower the related-source similarity threshold");
+
     await sql`delete from signal_events where id in (${weakParentId}, ${sharedThreadId})`;
     const crowd = Array.from({ length: 300 }, (_, index) => ({
       id: `${crowdPrefix}${index}`, source: "github", external_id: `${externalId}-crowd-${index}`,
@@ -402,6 +426,10 @@ async function main() {
     `;
     assert.ok(!(await getStoredFeed())?.events.some((item) => item.id === `${crowdPrefix}battery-recycling`));
     assert.ok(!(await getRecentTopicEvents([{ id: "energy", childId: "energy-battery-storage" }])).some((item) => item.id === `${crowdPrefix}battery-recycling`));
+    const crowdedEvidenceId = `${crowdPrefix}battery-recycling`;
+    await sql`insert into signal_evidence(signal_id,source,external_id,body,content_hash,retrieved_at)
+      values(${crowdedEvidenceId},'github',${`${externalId}-battery-recycling`},${sql.json({text:"The authors describe recovery of cathode materials from spent batteries. ".repeat(4),kind:"repository",url:`https://github.com/symtri/${externalId}-battery-recycling`,attribution:"Repository authors",license:null,retrievedAt:new Date().toISOString()})},'crowded-evidence',now())`;
+    assert.ok((await getRecentTopicEvents([{id:"energy",childId:"energy-battery-storage"}],true)).some(item=>item.id===crowdedEvidenceId),"Ask reserves retained evidence beyond recent upload bursts");
     const firstBatteryPage = await getTopicPage("energy", "energy-battery-storage", null, 20);
     assert.equal(firstBatteryPage.events.length, 20);
     assert.ok(firstBatteryPage.nextCursor);
@@ -429,6 +457,7 @@ async function main() {
     assert.ok(!(await getConnectionEvents("ai", "software")).some((item) => item.id === `${crowdPrefix}link-recent-1`));
     await rebuildKnowledgeGraph(recentRelationships);
     assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"], 3);
+    assert.match((await getKnowledgeGraph())!.updatedAt,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     assert.equal((await getKnowledgeGraph())?.recentRelationships?.["ai:markets"], 2);
     await sql`update source_catalog set status = 'paused' where id = 'github'`;
     assert.deepEqual(await getConnectionEvents("ai", "markets"), []);
@@ -438,6 +467,11 @@ async function main() {
     await rebuildKnowledgeGraph(await getArchiveRelationships());
     assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"], 3);
     assert.equal((await (await getPublicSignals()).json() as SignalFeed).relationships?.["ai:markets"], 2);
+    await sql`insert into knowledge_graph_dirty_days(day) select date '2000-01-01'+day_offset from generate_series(0,30) as series(day_offset) on conflict do nothing`;
+    assert.equal(await rebuildKnowledgeGraph(recentRelationships),30);
+    assert.equal(await getKnowledgeGraph(),null);
+    assert.equal(await rebuildKnowledgeGraph(recentRelationships),1);
+    assert.equal((await getKnowledgeGraph())?.relationships["ai:markets"],3);
     const gatewayKeyForArchive = process.env.AI_GATEWAY_API_KEY;
     const vercelFlagForArchive = process.env.VERCEL;
     process.env.AI_GATEWAY_API_KEY = "";
@@ -449,6 +483,35 @@ async function main() {
       assert.equal(response.status, 200);
       const result = await response.json();
       assert.deepEqual(result.events.map((item: SignalEvent) => item.id), [`${crowdPrefix}battery-recycling`]);
+      const sourceQuestion = await askSymtri(new Request("http://localhost/api/ask", {
+        method:"POST",body:JSON.stringify({question:"What limitations does this source report?",context:{signalId:`${crowdPrefix}battery-recycling`}}),
+      }));
+      assert.equal(sourceQuestion.status,200);
+      assert.deepEqual((await sourceQuestion.json()).events.map((item:SignalEvent)=>item.id),[`${crowdPrefix}battery-recycling`]);
+      const followUp = await askSymtri(new Request("http://localhost/api/ask", {
+        method: "POST", body: JSON.stringify({ question: "Explain it", context: { subject: "battery recycling" } }),
+      }));
+      assert.equal(followUp.status, 200);
+      assert.deepEqual((await followUp.json()).events.map((item: SignalEvent) => item.id), [`${crowdPrefix}battery-recycling`]);
+      const comparisonSources: SignalEvent[] = [
+        { ...event, id: `${crowdPrefix}comparison-coding`, externalId: `${externalId}-comparison-coding`,
+          url: `https://github.com/symtri/${externalId}-comparison-coding`, title: "Coding agents modify repositories",
+          summary: "Coding agents use tools to modify software repositories.", publishedAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+          topics: [{ topicId: "ai", subtopicId: "ai-coding-agents", relevance: 1 }] },
+        { ...event, id: `${crowdPrefix}comparison-models`, externalId: `${externalId}-comparison-models`,
+          url: `https://github.com/symtri/${externalId}-comparison-models`, title: "Language models predict sequences",
+          summary: "Language models predict sequences from text context.", publishedAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+          topics: [{ topicId: "ai", subtopicId: "ai-language-models", relevance: 1 }] },
+      ];
+      await persistSignals({ ...feed, events: comparisonSources });
+      const comparison = await askSymtri(new Request("http://localhost/api/ask", {
+        method: "POST", body: JSON.stringify({ question: "Compare coding agents and language models" }),
+      }));
+      assert.equal(comparison.status, 200);
+      const compared = await comparison.json();
+      assert.equal(compared.intent, "comparison");
+      assert.ok(compared.evidenceGroups.every((group: { eventIds: string[] }) => group.eventIds.length > 0));
+      assert.ok(comparisonSources.every((source) => compared.events.some((item: SignalEvent) => item.id === source.id)));
     } finally {
       if (gatewayKeyForArchive === undefined) delete process.env.AI_GATEWAY_API_KEY;
       else process.env.AI_GATEWAY_API_KEY = gatewayKeyForArchive;
@@ -756,7 +819,156 @@ async function main() {
     assert.ok(await syncArchiveConcepts() >= 12);
     assert.equal((await getArchiveActivity(new Date(), organicCatalog))[organicPoint.id].count, 12);
     await sql`delete from signal_events where id like ${`${organicPrefix}%`}`;
-    console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, and snapshot preservation passed");
+    const evidenceInput = { text: "Full retained NASA mission evidence with a supported finding.", kind: "feed" as const,
+      url: event.url, attribution: "NASA", license: null, retrievedAt: new Date().toISOString() };
+    const evidenceEvents: SignalEvent[] = [
+      { ...event, id: `nasa:${externalId}`, source: "nasa", externalId, evidence: evidenceInput },
+      { ...event, id: `nasa-jpl:${externalId}`, source: "nasa-jpl", externalId, evidence: { ...evidenceInput, attribution: "NASA JPL" } },
+      { ...event, id: `cisa:${externalId}`, source: "cisa", externalId, evidence: { ...evidenceInput, kind: "advisory", attribution: "CISA", metadata: { entryHash: "fixture-hash" } } },
+    ];
+    assert.equal(await persistSignals({ ...feed, events: evidenceEvents }), 0);
+    const evidenceRows = await sql<{ signal_id: string; body: { text: string }; content_hash: string }[]>`
+      select signal_id, body, content_hash from signal_evidence where signal_id = ${id} order by source`;
+    assert.equal(evidenceRows.length, 3);
+    assert.equal((await getCisaEntryHashes())[externalId], "fixture-hash");
+    assert.equal((await getSignalEvidence(id)).length, 3);
+    await sql`update source_catalog set status = 'paused' where id = 'cisa'`;
+    assert.equal((await getSignalEvidence(id)).length, 2);
+    await sql`update source_catalog set status = 'active' where id = 'cisa'`;
+    assert.ok(evidenceRows.every((row) => row.body.text === evidenceInput.text && row.signal_id === id));
+    await persistSignals({ ...feed, events: evidenceEvents.map((item) => ({ ...item,
+      evidence: { ...item.evidence!, retrievedAt: new Date(Date.now() + 1000).toISOString() } })) });
+    assert.deepEqual((await sql`select content_hash from signal_evidence where signal_id = ${id} order by source`).map((row) => row.content_hash), evidenceRows.map((row) => row.content_hash));
+    const releaseId=`hacker-news:${externalId}-release`;
+    const releaseUrl=`https://github.com/symtri/${externalId}/releases/tag/v1.2.3`;
+    const releaseEvent:SignalEvent={...event,id:releaseId,source:"hacker-news",externalId:`${externalId}-release`,url:releaseUrl,title:"Repository v1.2.3 release",summary:"A release announcement"};
+    await persistSignals({...feed,events:[releaseEvent]});
+    const releaseCalls:string[]=[];
+    const releaseBody="The maintainers added reproducible build support and documented its compatibility limits. ".repeat(4);
+    const enrichedRelease=await retrieveStoryEvidence(releaseEvent,async(url)=>{releaseCalls.push(url);return {url,contentType:"application/json",text:JSON.stringify({body:releaseBody,html_url:releaseUrl,published_at:"2026-09-27T12:00:00Z",draft:false})};});
+    assert.deepEqual(releaseCalls,[`https://api.github.com/repos/symtri/${externalId}/releases/tags/v1.2.3`]);
+    assert.equal(enrichedRelease.evidence?.kind,"repository");assert.equal(enrichedRelease.evidence?.text,releaseBody.trim());
+    assert.equal(enrichedRelease.evidence?.metadata?.contentType,"release notes");
+    assert.equal((await getSignalEvidence(releaseId))[0].body.metadata?.releaseTag,"v1.2.3");
+    await sql`delete from signal_events where id=${releaseId}`;
+    // An unchanged observation keeps a ready note; changed content invalidates it
+    // and prevents a worker holding the old revision from publishing stale prose.
+    const noteRevision=Number((await sql`select revision from reading_notes where signal_id=${id}`)[0].revision);
+    const fixtureNote={explanation:"Supported fixture",claims:[],questions:[],sourceKind:"feed",evidenceSource:"nasa",createdAt:new Date().toISOString(),context:[]};
+    await sql`update reading_notes set version=${ENRICHMENT_VERSION},status='ready',note=${sql.json(fixtureNote)},claim_token='old-worker' where signal_id=${id}`;
+    assert.equal((await readStory(new Request(`http://localhost/api/story?id=${encodeURIComponent(id)}`))).status,200);
+    const noteResponse=await readStory(new Request(`http://localhost/api/story?id=${encodeURIComponent(id)}`));
+    assert.equal((await noteResponse.json()).note.explanation,"Supported fixture");
+    await sql`update source_catalog set status='paused' where id='nasa'`;
+    assert.equal((await (await readStory(new Request(`http://localhost/api/story?id=${encodeURIComponent(id)}`))).json()).note,null);
+    await sql`update source_catalog set status='active' where id='nasa'`;
+    await persistSignals({...feed,events:evidenceEvents});
+    assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"ready");
+    await sql`update signal_events set summary=summary || ' Updated source content.' where id=${id}`;
+    const requeued=(await sql`select status,note,revision from reading_notes where signal_id=${id}`)[0];
+    assert.equal(requeued.status,"pending");assert.equal(requeued.note,null);assert.equal(Number(requeued.revision),noteRevision+1);
+    assert.equal((await sql`update reading_notes set status='ready',note=${sql.json(fixtureNote)} where signal_id=${id} and revision=${noteRevision} and claim_token='old-worker' returning signal_id`).length,0);
+    const hubId=`hugging-face:${externalId}-updated`;
+    const hubCreated=new Date(Date.now()-20*86400000).toISOString();
+    const hubUpdated=new Date().toISOString();
+    const hubEvent:SignalEvent={...event,id:hubId,source:"hugging-face",externalId:`${externalId}-hub`,url:`https://huggingface.co/qa/${externalId}`,title:"QA model release",summary:"Documented model release",publishedAt:hubCreated};
+    assert.equal(await persistSignals({...feed,events:[hubEvent]}),1);
+    assert.ok(!(await getStoredFeed())?.events.some(item=>item.id===hubId));
+    assert.equal(await persistSignals({...feed,events:[{...hubEvent,title:"QA model update",summary:"Documented model update",publishedAt:hubUpdated}]}),0);
+    assert.equal((await getArchivedSignal(hubId))?.publishedAt,hubUpdated);
+    assert.ok((await getStoredFeed())?.events.some(item=>item.id===hubId));
+    assert.equal(Number((await sql`select count(*)::int as count from signal_observations where signal_id=${hubId}`)[0].count),1);
+    await sql`delete from signal_events where id=${hubId}`;
+    const connectionId=`github:${externalId}-civil-connection`;
+    const connectionEvent:SignalEvent={...event,id:connectionId,externalId:`${externalId}-civil-connection`,url:`https://example.org/${externalId}-civil-connection`,title:"Nuclear reactors provide electricity for AI data centers",summary:"A civil nuclear power project supplies electricity to AI infrastructure in a data center.",publishedAt:hubCreated,topics:[{topicId:"energy",subtopicId:"energy-nuclear",relevance:1},{topicId:"ai",subtopicId:"ai-infrastructure",relevance:1}]};
+    await persistSignals({...feed,events:[connectionEvent]});
+    const connectionAnswer=await askSymtri(new Request("http://localhost/api/ask",{method:"POST",body:JSON.stringify({question:"What connects nuclear energy and AI?"})}));
+    assert.equal(connectionAnswer.status,200);
+    assert.deepEqual((await connectionAnswer.json()).events.map((item:SignalEvent)=>item.id),[connectionId]);
+    await sql`delete from signal_events where id=${connectionId}`;
+    // Retained-only subjects remain searchable, active-source filtering applies,
+    // and vectors are built from retained evidence rather than the display excerpt.
+    const retrievalText="The study examines zeolite membranes for xenon separation under controlled laboratory conditions. ".repeat(3);
+    await persistSignals({...feed,events:evidenceEvents.map(item=>({...item,evidence:{...item.evidence!,text:retrievalText}}))});
+    const retainedMatches=await searchKnowledge("Explain xenon separation",null);
+    assert.equal(retainedMatches[0]?.event.id,id);
+    assert.equal(retainedMatches[0]?.event.evidence?.text,retrievalText);
+    const [retainedEvent]=await withStoredEvidence([(await getArchivedSignal(id))!]);
+    await persistEmbeddings({...feed,events:[retainedEvent]},fakeEmbedder);
+    assert.equal(await hasCurrentSignalEmbeddings([{...retainedEvent,evidence:undefined}]),true);
+    assert.equal(await hasCurrentSignalEmbeddings([{...retainedEvent,evidence:undefined}],false),false);
+    const staleEmbedding=await persistEmbeddings({...feed,events:[{...retainedEvent,evidence:{...retainedEvent.evidence!,text:retrievalText+" New findings."}}]},async inputs=>{
+      await sql`update signal_events set summary=summary || ' Changed during embedding.' where id=${id}`;
+      return fakeEmbedder(inputs);
+    });
+    assert.ok(staleEmbedding>0); // Work was computed, but its stale vector cannot be stored.
+    assert.equal((await sql`select embedding from signal_events where id=${id}`)[0].embedding,null);
+    await sql`update source_catalog set status='paused' where id in ('nasa','nasa-jpl','cisa')`;
+    assert.equal((await searchKnowledge("Explain xenon separation",null)).length,0);
+    await sql`update source_catalog set status='active' where id in ('nasa','nasa-jpl','cisa')`;
+    // Exercise the actual queue worker with a deterministic synthesis seam and no
+    // external calls. Only this isolated database's target fixture is eligible.
+    await sql`update reading_notes set status='ready' where signal_id<>${id}`;
+    await sql`update signal_events set importance=1000 where id=${id}`;
+    const retainedText="A retained source passage describing the fixture study and its explicitly reported limitations. ".repeat(3);
+    await persistSignals({...feed,events:evidenceEvents.map(item=>({...item,evidence:{...item.evidence!,text:retainedText}}))});
+    const priorGateway=process.env.AI_GATEWAY_API_KEY;
+    process.env.AI_GATEWAY_API_KEY="local-test-placeholder";
+    try {
+      const synthesize=async()=>({summary:"A deterministic source-backed fixture note.",citedEventIds:[id],claims:[{text:"A deterministic source-backed fixture note.",evidence:[{sourceId:id,quote:retainedText.slice(0,90)}]}]});
+      await sql`update reading_notes set status='ready' where signal_id=${id}`;
+      const fairEvents:SignalEvent[]=[0,1,2].map(index=>({...event,id:`github:${externalId}-fair-${index}`,externalId:`${externalId}-fair-${index}`,url:`https://example.org/${externalId}/fair/${index}`,title:`High importance documentation ${index}`,importance:1000,evidence:{...evidenceInput,text:retainedText}}));
+      fairEvents.push({...event,id:`nasa:${externalId}-fair`,source:"nasa",externalId:`${externalId}-fair`,url:`https://example.org/${externalId}/fair/nasa`,title:"Lower importance mission report",importance:1,evidence:{...evidenceInput,text:retainedText}});
+      const thinMissionId=`nasa:${externalId}-thin-mission`;
+      fairEvents.push({...event,id:thinMissionId,source:"nasa",externalId:`${externalId}-thin-mission`,url:`https://127.0.0.1/${externalId}/thin`,title:"Mission discovery headline",importance:2000,evidence:undefined});
+      await persistSignals({...feed,events:fairEvents});
+      const visitedSources:string[]=[];
+      const visitedIds:string[]=[];
+      const fair=await enrichBatch(2,async(answer)=>{visitedSources.push(answer.events[0].source);visitedIds.push(answer.events[0].id);return {...await synthesize(),citedEventIds:[answer.events[0].id]};},async()=>[]);
+      assert.equal(fair.ready,2);assert.deepEqual(new Set(visitedSources),new Set(["github","nasa"]));
+      assert.ok(visitedIds.includes(`nasa:${externalId}-fair`));assert.ok(!visitedIds.includes(thinMissionId),"Retained evidence precedes a higher-scored thin summary within its source and subject");
+      await sql`delete from signal_events where id in ${sql(fairEvents.map(item=>item.id))}`;
+      await sql`update reading_notes set status='pending',attempts=0,retry_at=now() where signal_id=${id}`;
+      const generated=await enrichBatch(1,synthesize,async()=>[]);
+      assert.equal(generated.ready,1);
+      assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"ready");
+      await sql`update signal_events set summary=summary || ' Next revision.' where id=${id}`;
+      const stale=await enrichBatch(1,async()=>{
+        await sql`update signal_events set summary=summary || ' Concurrent revision.' where id=${id}`;
+        return synthesize();
+      },async()=>[]);
+      assert.equal(stale.ready,0);
+      assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"pending");
+      await sql`update reading_notes set version=0,attempts=2 where signal_id=${id}`;
+      const rejected=await enrichBatch(1,async()=>{throw new Error("Unsupported claim");},async()=>[]);
+      assert.equal(rejected.failed,1);
+      const retryState=(await sql`select status,version,attempts,retry_at>now() as delayed from reading_notes where signal_id=${id}`)[0];
+      assert.equal(retryState.status,"failed");assert.equal(retryState.delayed,true);assert.equal(retryState.attempts,1);assert.equal(retryState.version,ENRICHMENT_VERSION,"A failed current worker is counted under the current enrichment version");
+      await sql`update reading_notes set retry_at=now()-interval '1 minute' where signal_id=${id}`;
+      const retried=await enrichBatch(1,synthesize,async()=>[],true);
+      assert.equal(retried.ready,1,"A retry lane can claim a due failed note");
+      await sql`update reading_notes set status='working',attempts=3,lease_until=now()-interval '1 minute' where signal_id=${id}`;
+      assert.equal((await enrichBatch(1,synthesize,async()=>[])).processed,0);
+      assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"failed");
+      await sql`update reading_notes set version=${ENRICHMENT_VERSION} where signal_id<>${id}`;
+      await sql`update reading_notes set version=${ENRICHMENT_VERSION},status='ready',note=${sql.json(fixtureNote)} where signal_id=${id}`;
+      await sql`update source_catalog set status='paused' where id='nasa'`;
+      assert.equal(await enqueueMissingNotes(1),1,"An inactive cached evidence owner requeues a story that still has active observations");
+      assert.equal((await sql`select status,note from reading_notes where signal_id=${id}`)[0].status,"pending");
+      await sql`update source_catalog set status='active' where id='nasa'`;
+      await sql`update reading_notes set version=0,status='ready',note=${sql.json(fixtureNote)} where signal_id=${id}`;
+      await sql`update reading_notes set version=0,status='pending',updated_at=now()-interval '30 days' where signal_id=${unclassifiedId}`;
+      const outdatedResponse=await (await readStory(new Request(`http://localhost/api/story?id=${encodeURIComponent(id)}`))).json();
+      assert.equal(outdatedResponse.status,"pending");assert.equal(outdatedResponse.note,null);
+      assert.equal(await enqueueMissingNotes(1),1);
+      const upgraded=(await sql`select version,status,note,attempts from reading_notes where signal_id=${id}`)[0];
+      assert.equal(upgraded.version,ENRICHMENT_VERSION);assert.equal(upgraded.status,"pending");assert.equal(upgraded.note,null);assert.equal(upgraded.attempts,0);
+      assert.equal((await sql`select version from reading_notes where signal_id=${unclassifiedId}`)[0].version,0,"Version refresh reserves bounded work for previously available reading notes before an older unprocessed backlog");
+
+    } finally {
+      if(priorGateway===undefined) delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorGateway;
+    }
+    console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, snapshot preservation, and canonical source evidence passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${weakParentId}, ${sharedThreadId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;

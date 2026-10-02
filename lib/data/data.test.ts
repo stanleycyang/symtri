@@ -40,6 +40,16 @@ test("solar wind research does not create a false energy connection", () => {
   assert.ok(classifySignal("Solar panels built over irrigation canals", "Hacker News discussion").some((match) => match.topicId === "energy" && match.subtopicId === "energy-solar"));
 });
 
+test("military nuclear and earthquake reports are not civil energy evidence", () => {
+  for (const title of ["AI hallucination of Chinese nuclear components almost led to US Military attack", "Unusual earthquake activity detected at site of former N. Korea nuclear facility", "Nuclear weapons development using AI"]) {
+    assert.ok(!classifySignal(title, "Hacker News discussion.").some((match) => match.topicId === "energy"));
+  }
+  assert.ok(classifySignal("AI data centers powered by nuclear reactors", "Nuclear electricity generation")
+    .some((match) => match.topicId === "energy" && match.subtopicId === "energy-nuclear"));
+  assert.ok(classifySignal("Earthquake resilience for nuclear power plants", "Civil electricity generation")
+    .some((match) => match.topicId === "energy"));
+});
+
 test("cosmology dark energy stays in space without an applied energy link", () => {
   const cosmology = classifySignal(
     "Entropy applications in cosmology: spacetime thermodynamics, holographic dark energy and entropic gravity",

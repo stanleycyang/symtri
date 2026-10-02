@@ -1,15 +1,17 @@
 import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
 import { fetchArxiv, fetchArxivForIngestion, fetchGitHub, fetchGitHubForIngestion, fetchHackerNews, fetchHackerNewsForIngestion, fetchOpenAlex } from "./sources";
 import { unavailableSources, type SignalEvent, type SignalFeed, type SourceId } from "./model";
+import { fetchCisa, fetchCuratedFeed, fetchEuropePmc, fetchHuggingFace } from "./extended-sources";
+import { getCisaEntryHashes } from "./storage";
 
 export function selectFeedEvents(events: SignalEvent[], limit = 150): SignalEvent[] {
   return deduplicateSignals(events.filter((event) => event.topics.length > 0))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, limit)
     .map((event) => {
-      if (!event.classificationInput) return event;
       const visible = { ...event };
       delete visible.classificationInput;
+      delete visible.evidence;
       return visible;
     });
 }
@@ -22,8 +24,13 @@ export async function getSignalFeed(options: { includeUnclassified?: boolean; fo
     ["arxiv", () => options.forIngestion ? fetchArxivForIngestion() : fetchArxiv().then((items) => ({ events: items, status: "ok" }))],
     ["openalex", () => fetchOpenAlex(options.forIngestion ? options.slot : undefined).then((items) => ({ events: items, status: "ok" }))],
   ];
+  if (options.forIngestion) sources.push(
+    ["nasa", () => fetchCuratedFeed("nasa")], ["nasa-jpl", () => fetchCuratedFeed("nasa-jpl")],
+    ["cisa", async () => fetchCisa(undefined, process.env.DATABASE_URL ? await getCisaEntryHashes() : {})],
+    ["europe-pmc", () => fetchEuropePmc(options.slot!)], ["hugging-face", fetchHuggingFace],
+  );
   const results = await Promise.allSettled(sources.map(([, fetchSource]) => fetchSource()));
-  const status = unavailableSources();
+  const status = unavailableSources(options.forIngestion);
   const events: SignalEvent[] = [];
   results.forEach((result, index) => {
     const source = sources[index][0];

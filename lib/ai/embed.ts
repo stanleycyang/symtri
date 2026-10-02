@@ -18,7 +18,7 @@ function embeddingOptions(modelId: string): Record<string, Record<string, number
 }
 
 export function signalEmbeddingText(event: SignalEvent): string {
-  return `${event.title.slice(0, 240)}\n${event.summary.slice(0, 800)}`.trim();
+  return `${event.title.slice(0, 240)}\n${event.summary.slice(0, 800)}${event.evidence ? `\nSource text: ${event.evidence.text.slice(0, 3000)}` : ""}`.trim();
 }
 
 export function topicEmbeddingText(topic: Topic): string {
@@ -29,7 +29,7 @@ export function embeddingInputHash(input: string): string {
   return createHash("sha256").update(`${embeddingModelId()}:${EMBEDDING_DIMENSIONS}:${input}`).digest("hex");
 }
 
-export async function embedTexts(inputs: string[], model: EmbeddingModel = gateway.embeddingModel(embeddingModelId())): Promise<number[][]> {
+export async function embedTexts(inputs: string[], model: EmbeddingModel = gateway.embeddingModel(embeddingModelId()), deadline?:AbortSignal): Promise<number[][]> {
   if (!inputs.length) return [];
   const vectors: number[][] = [];
   const modelId = embeddingModelId();
@@ -40,7 +40,7 @@ export async function embedTexts(inputs: string[], model: EmbeddingModel = gatew
       values: batch,
       providerOptions: embeddingOptions(modelId),
       maxRetries: 0,
-      abortSignal: AbortSignal.timeout(20_000),
+      abortSignal: deadline ? AbortSignal.any([deadline,AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
     if (embeddings.length !== batch.length) throw new Error("Embedding response has an unexpected item count");
     for (const vector of embeddings) {

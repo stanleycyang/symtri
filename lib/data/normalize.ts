@@ -13,7 +13,7 @@ function decodeEntity(match: string, entity: string): string {
   const point = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10);
   return point > 0 && point <= 0x10ffff && !(point >= 0xd800 && point <= 0xdfff) ? String.fromCodePoint(point) : match;
 }
-function clean(value: unknown): string { return text(value).replace(/<[^>]*>/g, " ").replace(/&(#(?:x[\da-f]+|\d+)|[a-z]+);/gi, decodeEntity).replace(/\s+/g, " ").trim(); }
+export function cleanSourceText(value: unknown): string { return text(value).replace(/<[^>]*>/g, " ").replace(/&(#(?:x[\da-f]+|\d+)|[a-z]+);/gi, decodeEntity).replace(/<\/?[a-z][^>]*>/gi," ").replace(/\s+/g, " ").trim(); }
 function safeUrl(value: unknown, fallback: string): string {
   try { const url = new URL(text(value)); return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : fallback; } catch { return fallback; }
 }
@@ -24,12 +24,12 @@ export function normalizeHackerNews(input: unknown): SignalEvent | null {
   const item = record(input);
   if (!item || item.type !== "story" || item.deleted || item.dead) return null;
   const externalId = String(number(item.id));
-  const title = clean(item.title);
+  const title = cleanSourceText(item.title);
   const publishedAt = iso(item.time);
   if (!title || !publishedAt || externalId === "0") return null;
   const score = number(item.score);
   const comments = number(item.descendants);
-  const summary = short(clean(item.text) || "Hacker News discussion.");
+  const summary = short(cleanSourceText(item.text) || "Hacker News discussion.");
   return { id: `hacker-news:${externalId}`, source: "hacker-news", externalId, title, url: safeUrl(item.url, `https://news.ycombinator.com/item?id=${externalId}`), summary, publishedAt, importance: Math.min(100, Math.log1p(score + comments * 2) * 14), topics: classifySignal(title, summary), classificationInput: { title, summary, categories: [] } };
 }
 
@@ -37,11 +37,11 @@ export function normalizeGitHub(input: unknown): SignalEvent | null {
   const item = record(input);
   if (!item || item.private || item.archived || item.fork) return null;
   const externalId = String(number(item.id));
-  const title = clean(item.full_name);
+  const title = cleanSourceText(item.full_name);
   const publishedAt = iso(item.created_at);
   const url = safeUrl(item.html_url, "");
   if (!title || !publishedAt || !url || externalId === "0") return null;
-  const description = clean(item.description);
+  const description = cleanSourceText(item.description);
   const tags = Array.isArray(item.topics) ? item.topics.filter((tag): tag is string => typeof tag === "string").join(" ") : "";
   const summary = short(description || `Open-source repository${text(item.language) ? ` in ${text(item.language)}` : ""}.`);
   const stars = number(item.stargazers_count);
@@ -58,13 +58,14 @@ export function normalizeArxivFeed(xml: string): SignalEvent[] {
     if (!entry) return [];
     const sourceUrl = text(entry.id);
     const externalId = sourceUrl.split("/").pop()?.replace(/v\d+$/, "") ?? "";
-    const title = clean(entry.title);
+    const title = cleanSourceText(entry.title);
     const publishedAt = iso(entry.published);
     if (!externalId || !title || !publishedAt) return [];
-    const summary = short(clean(entry.summary), 600);
+    const abstract = cleanSourceText(entry.summary);
+    const summary = short(abstract, 600);
     const rawCategories = entry.category ? (Array.isArray(entry.category) ? entry.category : [entry.category]) : [];
     const categories = rawCategories.map((category) => text(record(category)?.["@term"])).filter(Boolean);
-    return [{ id: `arxiv:${externalId}`, source: "arxiv", externalId, title, url: `https://arxiv.org/abs/${encodeURIComponent(externalId)}`, summary, publishedAt, importance: 25, topics: classifySignal(title, summary, categories), classificationInput: { title, summary, categories } }];
+    return [{ id: `arxiv:${externalId}`, source: "arxiv", externalId, title, url: `https://arxiv.org/abs/${encodeURIComponent(externalId)}`, summary, publishedAt, importance: 25, topics: classifySignal(title, summary, categories), classificationInput: { title, summary, categories }, evidence: { text: abstract.slice(0, 12000), kind: "preprint", url: `https://arxiv.org/abs/${encodeURIComponent(externalId)}`, attribution: "arXiv authors", license: null, retrievedAt: new Date().toISOString() } }];
   });
 }
 
@@ -78,14 +79,14 @@ function openAlexAbstract(value: unknown): string {
       if (Number.isInteger(position) && position >= 0 && position < 1200) words[position] = word;
     }
   }
-  return clean(words.filter(Boolean).join(" "));
+  return cleanSourceText(words.filter(Boolean).join(" "));
 }
 
 export function normalizeOpenAlex(input: unknown): SignalEvent | null {
   const work = record(input);
   if (!work || work.is_retracted === true) return null;
   const externalId = text(work.id).match(/W\d+$/)?.[0];
-  const title = clean(work.display_name);
+  const title = cleanSourceText(work.display_name);
   const summary = openAlexAbstract(work.abstract_inverted_index);
   const publishedAt = iso(work.publication_date);
   const doi = safeUrl(work.doi, "");
@@ -94,7 +95,7 @@ export function normalizeOpenAlex(input: unknown): SignalEvent | null {
   const classificationInput = { title, summary: excerpt, categories: [] as string[] };
   return { id: `openalex:${externalId}`, source: "openalex", externalId, title, url: doi,
     summary: excerpt, publishedAt, importance: 25,
-    topics: classifySignal(title, excerpt), classificationInput };
+    topics: classifySignal(title, excerpt), classificationInput, evidence: { text: summary.slice(0, 12000), kind: "abstract", url: doi, attribution: "Publication authors via OpenAlex", license: null, retrievedAt: new Date().toISOString() } };
 }
 
 export function normalizeSyndicationFeed(xml: string, source: string): SignalEvent[] {
@@ -110,13 +111,14 @@ export function normalizeSyndicationFeed(xml: string, source: string): SignalEve
     const linkEntry = Array.isArray(linkValue) ? linkValue.find((entry) => record(entry)?.["@rel"] === "alternate") ?? linkValue[0] : linkValue;
     const link = typeof linkEntry === "string" ? linkEntry : text(record(linkEntry)?.["@href"] ?? record(linkEntry)?.["#text"]);
     const url = safeUrl(link, "");
-    const title = clean(item.title);
-    const summary = short(clean(item.description ?? item.summary ?? item.content), 600);
+    const title = cleanSourceText(item.title);
+    const content = cleanSourceText(item.encoded ?? item.content ?? item.description ?? item.summary);
+    const summary = short(content, 600);
     const publishedAt = iso(item.pubDate ?? item.published ?? item.updated);
     if (!url.startsWith("https://") || !title || summary.length < 30 || !publishedAt) return [];
     const externalId = createHash("sha256").update(text(item.guid ?? item.id) || url).digest("hex").slice(0, 24);
     return [{ id: `${source}:${externalId}`, source, externalId, title, url, summary, publishedAt,
-      importance: 25, topics: classifySignal(title, summary), classificationInput: { title, summary, categories: [] } }];
+      importance: 25, topics: classifySignal(title, summary), classificationInput: { title, summary, categories: [] }, evidence: { text: content.slice(0, 12000), kind: "feed", url, attribution: source, license: null, retrievedAt: new Date().toISOString() } }];
   });
 }
 

@@ -12,6 +12,9 @@ test("archive search keeps the subject and removes recency intent", () => {
   assert.equal(knowledgeSearchQuery("What did the UN Security Council say about AI?"), "un security council ai");
   assert.equal(knowledgeSearchQuery("What is new in people analytics?"), "people analytics");
   assert.equal(knowledgeSearchQuery("Quantum meadow"), "quantum meadow");
+  assert.equal(knowledgeSearchQuery("Explain AI agents"), "ai agents");
+  assert.equal(knowledgeSearchQuery("What are the limitations of coding agents?"), "coding agents");
+  assert.equal(knowledgeSearchQuery("What is new in spending limits?"), "spending limits");
 });
 
 test("archive search retains broad questions when every term is intent", () => {

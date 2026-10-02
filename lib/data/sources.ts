@@ -17,7 +17,7 @@ export async function fetchHackerNews(forIngestion = false): Promise<SignalEvent
 }
 
 export async function fetchOpenAlex(slot?: string): Promise<SignalEvent[]> {
-  const hour = slot ? Date.parse(`${slot.replace(/^hour:/, "")}:00:00Z`) : Date.now();
+  const hour = slot?.startsWith("manual:") ? Date.parse(slot.slice(7)) : slot ? Date.parse(`${slot.replace(/^hour:/, "")}:00:00Z`) : Date.now();
   if (!Number.isFinite(hour)) throw new Error("Invalid OpenAlex ingestion slot");
   const from = new Date(hour - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const to = new Date(hour).toISOString().slice(0, 10);

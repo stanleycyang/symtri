@@ -2,8 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import { answerQuestion } from "./ask";
-import { canSummarize, summarizeAnswer } from "./summarize";
+import { canSummarize, summarizeAnswer,validatePassages } from "./summarize";
 import type { SignalEvent, SignalFeed } from "../data/model";
+
+test("numeric claims cannot borrow quantities from unquoted source text",()=>{
+  const source={id:"paper",title:"A measured comparison",summary:"The phages share 89.67% genomic identity. C5 showed higher adsorption and larger plaques than N30."};
+  assert.throws(()=>validatePassages([{text:"The phages share 89.67% identity and C5 showed higher adsorption.",evidence:[{sourceId:"paper",quote:"C5 showed higher adsorption and larger plaques than N30."}]}],[source]),/quantity lacked quoted support/);
+  const quote="The authors evaluated 2,000 simulated scenarios.";
+  assert.equal(validatePassages([{text:"The authors evaluated 2000 simulated scenarios.",evidence:[{sourceId:"paper",quote}]}],[{...source,summary:quote}]).length,1);
+});
+
+test("a limitations request cannot be answered with positive performance facts",async()=>{
+  const answer=answerQuestion("What's happening with AI agents?",feed);
+  const model=modelResponse({claims:[{kind:"fact",text:"The paper evaluates how AI agents use tools.",evidence:[{sourceId:event.id,quote:event.summary}]}]});
+  await assert.rejects(summarizeAnswer({...answer,question:"What limitations does this source explicitly report?"},feed,model),/valid source passage/);
+  assert.equal(model.doGenerateCalls.length,1);
+});
 
 const event: SignalEvent = {
   id: "arxiv:agents", source: "arxiv", externalId: "agents", title: "Agents learn to use tools",
@@ -13,32 +27,123 @@ const event: SignalEvent = {
 };
 const feed: SignalFeed = { observedAt: "2026-09-22T13:00:00.000Z", events: [event], sources: { "hacker-news": "ok", github: "ok", arxiv: "ok", openalex: "unavailable" }, partial: false, scope: "sample" };
 
-function modelResponse(note: { summary: string; source_ids: string[] }) {
-  return new MockLanguageModelV4({ doGenerate: {
-    content: [{ type: "text", text: JSON.stringify(note) }],
-    finishReason: { unified: "stop", raw: undefined },
+function modelResponse(note: unknown, supported = [true]) {
+  const response = (value: unknown) => ({
+    content: [{ type: "text" as const, text: JSON.stringify(value) }],
+    finishReason: { unified: "stop" as const, raw: undefined },
     usage: {
       inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
       outputTokens: { total: 1, text: 1, reasoning: 0 },
     },
     warnings: [],
-  } });
+  });
+  return new MockLanguageModelV4({ doGenerate: [response(note), response({ supported })] });
 }
 
 test("a source synthesis uses only the selected evidence and validates its citations", async () => {
   const answer = answerQuestion("What is happening with AI agents?", feed);
   assert.equal(canSummarize(answer, feed), true);
-  const model = modelResponse({ summary: "A new paper evaluates how AI agents use tools.", source_ids: [event.id] });
+  const model = modelResponse({ claims: [{ text: "A new paper evaluates how AI agents use tools.", evidence: [{ sourceId: event.id, quote: event.summary }] }] });
   const note = await summarizeAnswer(answer, feed, model);
-  assert.equal(note.summary, "A new paper evaluates how AI agents use tools.");
+  assert.equal(note.summary, "The cited preprint authors report: A new paper evaluates how AI agents use tools.");
   assert.deepEqual(note.citedEventIds, [event.id]);
   assert.match(JSON.stringify(model.doGenerateCalls[0].prompt), /arxiv:agents/);
 });
 
 test("unsupported citations and broader evidence do not produce a model note", async () => {
   const answer = answerQuestion("What is happening with AI agents?", feed);
-  const model = modelResponse({ summary: "A confident unsupported claim.", source_ids: ["not-in-the-sample"] });
-  await assert.rejects(summarizeAnswer(answer, feed, model), /valid source citations/);
+  const model = modelResponse({ claims: [{ text: "A confident unsupported claim.", evidence: [{ sourceId: "not-in-the-sample", quote: event.summary }] }] });
+  await assert.rejects(summarizeAnswer(answer, feed, model), /valid source passage/);
   assert.equal(canSummarize(answerQuestion("What is happening with AI robotics?", feed), feed), false);
   assert.equal(canSummarize(answerQuestion("What connects AI and energy?", feed), feed), false);
+});
+
+
+test("valid source IDs and exact quotes cannot bypass the support audit", async () => {
+  const answer = answerQuestion("What is happening with AI agents?", feed);
+  const hallucination = { claims: [{ text: "This proves agents are safe in every clinical setting.", evidence: [{ sourceId: event.id, quote: event.summary }] }] };
+  await assert.rejects(summarizeAnswer(answer, feed, modelResponse(hallucination, [false])), /unsupported claim/);
+  const inventedQuote = { claims: [{ text: "Agents are universally safe.", evidence: [{ sourceId: event.id, quote: "This is not a passage from the source." }] }] };
+  await assert.rejects(summarizeAnswer(answer, feed, modelResponse(inventedQuote)), /valid source passage/);
+});
+
+
+test("source synthesis can cite retained passages beyond the display excerpt",async()=>{
+  const passage="The authors report that the evaluation covers only simulated tool environments.";
+  const retained={...event,evidence:{text:"Introduction. ".repeat(70)+passage,kind:"preprint" as const,url:event.url,attribution:"Authors",license:null,retrievedAt:feed.observedAt}};
+  const enriched={...feed,events:[retained]};
+  const model=modelResponse({claims:[{kind:"limitation",text:"The authors limit their evaluation to simulated tool environments.",evidence:[{sourceId:event.id,quote:passage}]}]});
+  const note=await summarizeAnswer(answerQuestion("What is happening with AI agents?",enriched),enriched,model);
+  assert.equal(note.claims[0].kind,"limitation");
+  assert.ok(JSON.stringify(model.doGenerateCalls[0].prompt).includes(passage));
+});
+
+
+test("support audit receives cited passages without unquoted factual context",async()=>{
+  const model=modelResponse({claims:[{text:"The paper evaluates AI agents using tools.",evidence:[{sourceId:event.id,quote:event.summary}]}]});
+  await summarizeAnswer(answerQuestion("Explain AI agents",feed),feed,model);
+  const audit=JSON.stringify(model.doGenerateCalls[1].prompt);
+  assert.ok(audit.includes("sourceIdentity"));assert.ok(!audit.includes('\"summary\":'));
+});
+test("synthesis keeps individually supported claims and removes unsupported ones",async()=>{
+  const model=modelResponse({claims:[
+    {text:"The paper proves safe clinical use everywhere.",evidence:[{sourceId:event.id,quote:event.summary}]},
+    {text:"The paper evaluates tool use by AI agents.",evidence:[{sourceId:event.id,quote:event.summary}]},
+  ]},[false,true]);
+  const note=await summarizeAnswer(answerQuestion("Explain AI agents",feed),feed,model);
+  assert.equal(note.claims.length,1);assert.match(note.summary,/evaluates tool use/);
+});
+test("title-only discussion headlines remain discovery links during synthesis",async()=>{
+  const headline={...event,id:"hacker-news:headline",source:"hacker-news",title:"Scientists establish a new universal finding",summary:"Hacker News discussion."};
+  const mixed={...feed,events:[headline,event]};
+  const model=modelResponse({claims:[{text:"The paper evaluates tool use by AI agents.",evidence:[{sourceId:event.id,quote:event.summary}]}]});
+  await summarizeAnswer(answerQuestion("Explain AI agents",mixed),mixed,model);
+  assert.ok(!JSON.stringify(model.doGenerateCalls[0].prompt).includes("hacker-news:headline"));
+});
+
+test("Ask scopes preprint update claims before auditing and displaying them",async()=>{
+  const retained={...event,evidence:{text:event.summary,kind:"preprint" as const,url:event.url,attribution:"Authors",license:null,retrievedAt:feed.observedAt}};
+  const enriched={...feed,events:[retained]};
+  const model=modelResponse({claims:[{text:"AI agents are evaluated for tool use.",evidence:[{sourceId:event.id,quote:event.summary}]}]});
+  const note=await summarizeAnswer(answerQuestion("What is happening with AI agents?",enriched),enriched,model);
+  assert.match(note.summary,/^The cited preprint authors report:/);
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt),/The cited preprint authors report:/);
+});
+
+test("comparison claims are scoped to cited evaluations before support verification",async()=>{
+  const coding={...event,topics:[{topicId:"ai",subtopicId:"ai-coding-agents",relevance:1}],title:"Coding agents resolve issues",summary:"The authors evaluated coding agents resolving repository issues with compact documentation.",evidence:{text:"The authors evaluated coding agents resolving repository issues with compact documentation.",kind:"preprint" as const,url:event.url,attribution:"Authors",license:null,retrievedAt:feed.observedAt}};
+  const models={...coding,id:"arxiv:models",title:"Language models translate network intents",summary:"The Intent2Tc authors evaluated language models translating network intents into traffic policies.",topics:[{topicId:"ai",subtopicId:"ai-language-models",relevance:1}],evidence:{...coding.evidence,text:"The Intent2Tc authors evaluated language models translating network intents into traffic policies."}};
+  const enriched={...feed,events:[coding,models]};
+  const model=modelResponse({claims:[
+    {text:"Coding agents resolve repository issues using compact documentation.",evidence:[{sourceId:coding.id,quote:coding.summary}]},
+    {text:"Intent2Tc evaluates language models translating network intents into traffic policies.",evidence:[{sourceId:models.id,quote:models.summary}]},
+  ]},[true,true]);
+  const note=await summarizeAnswer(answerQuestion("Compare coding agents and language models",enriched),enriched,model);
+  assert.equal(note.claims.length,2);
+  assert.ok(note.claims.every(claim=>claim.text.startsWith("In the cited study's evaluation:")));
+  assert.deepEqual(new Set(note.citedEventIds),new Set([coding.id,models.id]));
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt),/In the cited study's evaluation:/);
+});
+
+test("a positive finding mislabeled as a limitation still needs a task-aware audit",async()=>{
+  const model=modelResponse({claims:[{kind:"limitation",text:"The authors successfully evaluate tool use by AI agents.",evidence:[{sourceId:event.id,quote:event.summary}]}]},[false]);
+  await assert.rejects(summarizeAnswer({...answerQuestion("Explain AI agents",feed),question:"What limitations are explicitly reported?"},feed,model),/unsupported claim/);
+  assert.equal(model.doGenerateCalls.length,2);
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt),/limitationsOnly/);
+  assert.match(JSON.stringify(model.doGenerateCalls[1].prompt),/reject positive performance findings/);
+});
+
+
+test("unknown ransomware use cannot imply absent exploitation evidence",()=>{
+  const quote="Known ransomware campaign use: Unknown. Added to the KEV catalog: 2026-05-21 (not the first disclosure date).";
+  const source={id:"cisa",title:"Known exploited vulnerability",summary:quote};
+  assert.throws(()=>validatePassages([{kind:"limitation",text:"Ransomware use is unknown, limiting evidence of active real-world exploitation.",evidence:[{sourceId:"cisa",quote}]}],[source]),/Unknown ransomware use/);
+  assert.equal(validatePassages([{text:"The advisory reports that ransomware campaign use is unknown.",evidence:[{sourceId:"cisa",quote}]}],[source]).length,1);
+});
+
+
+test("an older arXiv excerpt still scopes an update as a preprint",async()=>{
+  const model=modelResponse({claims:[{text:"The paper evaluates tool use by AI agents.",evidence:[{sourceId:event.id,quote:event.summary}]}]});
+  const note=await summarizeAnswer(answerQuestion("What is happening with AI agents?",feed),feed,model);
+  assert.match(note.summary,/^The cited preprint authors report:/);
 });

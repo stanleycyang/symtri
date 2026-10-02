@@ -1,34 +1,55 @@
 import { lookup } from "node:dns/promises";
 import { Agent, request } from "undici";
 import ipaddr from "ipaddr.js";
+import type { LookupAddress } from "node:dns";
+import type { LookupFunction } from "node:net";
 
-export async function publicHttpsUrl(value: string): Promise<URL> {
+export function pinnedLookup(address: LookupAddress): LookupFunction {
+  return (_hostname, options, callback) => {
+    // Node's autoSelectFamily requests all:true; it requires an address array.
+    if (options.all) {
+      (callback as unknown as (error: null, addresses: LookupAddress[]) => void)(null, [address]);
+    } else callback(null, address.address, address.family);
+  };
+}
+
+async function resolvePublicUrl(value: string, deadline: AbortSignal): Promise<{url: URL; address: LookupAddress}> {
   const url = new URL(value);
   if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) throw new Error("Only public HTTPS URLs are allowed");
-  const addresses = await lookup(url.hostname, { all: true });
+  if (deadline.aborted) throw deadline.reason;
+  let onAbort: () => void = () => {};
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(deadline.reason);
+    deadline.addEventListener("abort", onAbort, { once: true });
+  });
+  let addresses: LookupAddress[];
+  try { addresses = await Promise.race([lookup(url.hostname, { all: true }), aborted]); }
+  finally { deadline.removeEventListener("abort", onAbort); }
   if (!addresses.length || addresses.some(({ address }) => ipaddr.process(address).range() !== "unicast")) throw new Error("Feed destination is not public");
-  return url;
+  return {url,address:addresses[0]};
+}
+
+export async function publicHttpsUrl(value: string): Promise<URL> {
+  return (await resolvePublicUrl(value, AbortSignal.timeout(12_000))).url;
 }
 
 export async function fetchPublicText(value: string, maxBytes = 2_000_000): Promise<{ url: string; text: string; contentType: string }> {
   let target = value;
+  const deadline = AbortSignal.timeout(12_000);
   for (let redirects = 0; redirects <= 2; redirects++) {
-    const url = await publicHttpsUrl(target);
-    const addresses = await lookup(url.hostname, { all: true });
-    if (!addresses.length || addresses.some(({ address }) => ipaddr.process(address).range() !== "unicast")) throw new Error("Feed destination is not public");
-    const address = addresses[0];
-    const agent = new Agent({ connect: { lookup: (_hostname, _options, callback) => callback(null, address.address, address.family) } });
+    const {url,address} = await resolvePublicUrl(target, deadline);
+    const agent = new Agent({ connect: { lookup: pinnedLookup(address) } });
     try {
       const response = await request(url, {
-        dispatcher: agent, headersTimeout: 8_000, bodyTimeout: 8_000,
-        headers: { "user-agent": "SYMTRI/0.1 (https://symtri.com)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, text/html" },
+        dispatcher: agent, signal: deadline, headersTimeout: 8_000, bodyTimeout: 8_000,
+        headers: { "user-agent": "SYMTRI/0.1 (https://symtri.com)", accept: "application/rss+xml, application/atom+xml, application/xml, application/json, text/plain, text/xml, text/html" },
       });
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         target = new URL(String(response.headers.location), url).toString();
-        await response.body.dump();
+        response.body.destroy();
         continue;
       }
-      if (response.statusCode !== 200) { await response.body.dump(); throw new Error(`Feed returned HTTP ${response.statusCode}`); }
+      if (response.statusCode !== 200) { response.body.destroy(); throw new Error(`Feed returned HTTP ${response.statusCode}`); }
       const chunks: Buffer[] = [];
       let size = 0;
       for await (const chunk of response.body) {
@@ -37,7 +58,7 @@ export async function fetchPublicText(value: string, maxBytes = 2_000_000): Prom
         chunks.push(Buffer.from(chunk));
       }
       return { url: url.toString(), text: Buffer.concat(chunks).toString("utf8"), contentType: String(response.headers["content-type"] ?? "") };
-    } finally { await agent.close(); }
+    } finally { void agent.destroy().catch(() => {}); }
   }
   throw new Error("Too many feed redirects");
 }
