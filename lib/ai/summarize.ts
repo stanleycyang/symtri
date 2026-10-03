@@ -7,7 +7,9 @@ import type { AskResult } from "./ask";
 
 export const DEFAULT_SUMMARY_MODEL = "anthropic/claude-haiku-4.5";
 export const DEFAULT_SUPPORT_MODEL = "anthropic/claude-sonnet-4.6";
-export const DEFAULT_READING_NOTE_MODEL = "mistral/mistral-large-3";
+export const DEFAULT_READING_NOTE_MODEL = "zai/glm-4.7-flash";
+export const DEFAULT_READING_NOTE_SUPPORT_MODEL = "mistral/mistral-large-3";
+export const DEFAULT_READING_NOTE_FALLBACK_MODEL = "mistral/mistral-large-3";
 const claimSchema = z.object({
   text: z.string().min(12).max(300),
   kind: z.enum(["fact", "implication", "limitation"]).optional(),
@@ -30,7 +32,11 @@ export function readingNoteModelId(): string {
 }
 
 export function readingNoteSupportModelId(): string {
-  return process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL?.trim() || DEFAULT_READING_NOTE_MODEL;
+  return process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL?.trim() || DEFAULT_READING_NOTE_SUPPORT_MODEL;
+}
+
+export function readingNoteFallbackModelId(): string {
+  return process.env.SYMTRI_READING_NOTE_FALLBACK_MODEL?.trim() || DEFAULT_READING_NOTE_FALLBACK_MODEL;
 }
 
 export function canSummarize(answer: AskResult, feed: SignalFeed): boolean {
@@ -63,8 +69,17 @@ export function validatePassages(claims: GroundedClaim[], sources: { id: string;
   return claims.map((claim) => ({ ...(claim.kind ? {kind:claim.kind} : {}), text: normalize(claim.text), evidence: claim.evidence.map((item) => ({ ...item, quote: normalize(item.quote) })) }));
 }
 
-export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed): ReturnType<typeof summarizeAnswer> {
-  return summarizeAnswer(answer, feed, readingNoteModelId(), undefined, undefined, readingNoteSupportModelId());
+export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed, summarize: typeof summarizeAnswer = summarizeAnswer): ReturnType<typeof summarizeAnswer> {
+  const draftModel=readingNoteModelId();
+  const auditModel=readingNoteSupportModelId();
+  try {
+    return await summarize(answer,feed,draftModel,undefined,undefined,auditModel);
+  } catch(error) {
+    const fallbackModel=readingNoteFallbackModelId();
+    if(draftModel===fallbackModel && auditModel===fallbackModel) throw error;
+    console.info("SYMTRI reading-note model fallback",{from:draftModel,to:fallbackModel});
+    return summarize(answer,feed,fallbackModel,undefined,undefined,fallbackModel);
+  }
 }
 
 export async function summarizeAnswer(answer: AskResult, feed: SignalFeed, model: LanguageModel = summaryModelId(), context?:AskContext, overallDeadline?:AbortSignal, supportModel?: LanguageModel): Promise<{ summary: string; citedEventIds: string[]; claims: GroundedClaim[] }> {

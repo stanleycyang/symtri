@@ -2,27 +2,49 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import { answerQuestion } from "./ask";
-import { canSummarize, readingNoteModelId, readingNoteSupportModelId, summarizeAnswer,validatePassages } from "./summarize";
+import { canSummarize, readingNoteFallbackModelId, readingNoteModelId, readingNoteSupportModelId, summarizeAnswer, summarizeReadingNote,validatePassages } from "./summarize";
 import type { SignalEvent, SignalFeed } from "../data/model";
 
 test("reading-note workers use their own open-weight model settings",()=>{
   const priorModel=process.env.SYMTRI_READING_NOTE_MODEL;
   const priorSupport=process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL;
+  const priorFallback=process.env.SYMTRI_READING_NOTE_FALLBACK_MODEL;
   try {
     delete process.env.SYMTRI_READING_NOTE_MODEL;
     delete process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL;
-    assert.equal(readingNoteModelId(),"mistral/mistral-large-3");
+    delete process.env.SYMTRI_READING_NOTE_FALLBACK_MODEL;
+    assert.equal(readingNoteModelId(),"zai/glm-4.7-flash");
     assert.equal(readingNoteSupportModelId(),"mistral/mistral-large-3");
+    assert.equal(readingNoteFallbackModelId(),"mistral/mistral-large-3");
     process.env.SYMTRI_READING_NOTE_MODEL="custom/draft";
     process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL="custom/audit";
+    process.env.SYMTRI_READING_NOTE_FALLBACK_MODEL="custom/fallback";
     assert.equal(readingNoteModelId(),"custom/draft");
     assert.equal(readingNoteSupportModelId(),"custom/audit");
+    assert.equal(readingNoteFallbackModelId(),"custom/fallback");
   } finally {
     if(priorModel===undefined) delete process.env.SYMTRI_READING_NOTE_MODEL;
     else process.env.SYMTRI_READING_NOTE_MODEL=priorModel;
     if(priorSupport===undefined) delete process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL;
     else process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL=priorSupport;
+    if(priorFallback===undefined) delete process.env.SYMTRI_READING_NOTE_FALLBACK_MODEL;
+    else process.env.SYMTRI_READING_NOTE_FALLBACK_MODEL=priorFallback;
   }
+});
+
+test("reading notes use the cheaper draft with independent audit, then retry with Mistral",async()=>{
+  const calls: {draft: unknown;audit:unknown}[]=[];
+  const fake=(async (...args:Parameters<typeof summarizeAnswer>)=>{
+    calls.push({draft:args[2],audit:args[5]});
+    if(calls.length===1) throw new Error("Claim lacked a valid source passage");
+    return {summary:"Supported note",claims:[],citedEventIds:[]};
+  }) as typeof summarizeAnswer;
+  const result=await summarizeReadingNote(answerQuestion("Explain AI agents",feed),feed,fake);
+  assert.equal(result.summary,"Supported note");
+  assert.deepEqual(calls,[
+    {draft:"zai/glm-4.7-flash",audit:"mistral/mistral-large-3"},
+    {draft:"mistral/mistral-large-3",audit:"mistral/mistral-large-3"},
+  ]);
 });
 
 test("numeric claims cannot borrow quantities from unquoted source text",()=>{
