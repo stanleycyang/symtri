@@ -5,7 +5,7 @@ import { cleanSourceText } from "./normalize";
 import { backgroundSubjectFor, fetchWikipedia, fetchWorldBank, type BackgroundContext } from "./background";
 import { gatewayConfigured } from "../ai/gateway";
 import { answerKnowledgeQuestion } from "../ai/ask";
-import { summarizeAnswer, type GroundedClaim } from "../ai/summarize";
+import { summarizeReadingNote, type GroundedClaim } from "../ai/summarize";
 import { unavailableSources, type SignalEvent } from "./model";
 
 export const ENRICHMENT_VERSION = 5;
@@ -135,7 +135,7 @@ export async function getReadingNote(id: string): Promise<{status:string;note:Re
   return {status:row.version!==ENRICHMENT_VERSION || row.status==="ready" && !row.note ? "pending" : row.status,note:row.note?{...row.note,context:row.note.context.filter(context=>context.kind!=="background" || context.title===expected)}:null};
 }
 
-export async function enrichBatch(limit=5, synthesize:typeof summarizeAnswer=summarizeAnswer, loadContext:typeof contextFor=contextFor, preferRetries=false, preferOldest=false): Promise<{processed:number;ready:number;failed:number;status:string}> {
+export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNote=summarizeReadingNote, loadContext:typeof contextFor=contextFor, preferRetries=false, preferOldest=false): Promise<{processed:number;ready:number;failed:number;status:string}> {
   if (!gatewayConfigured()) return {processed:0,ready:0,failed:0,status:"not-configured"};
   const sql=database();
   await sql`update reading_notes set status='failed',lease_until=null,updated_at=now() where status='working' and lease_until<now() and attempts>=3`;

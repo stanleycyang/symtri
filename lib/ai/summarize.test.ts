@@ -2,8 +2,28 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { MockLanguageModelV4 } from "ai/test";
 import { answerQuestion } from "./ask";
-import { canSummarize, summarizeAnswer,validatePassages } from "./summarize";
+import { canSummarize, readingNoteModelId, readingNoteSupportModelId, summarizeAnswer,validatePassages } from "./summarize";
 import type { SignalEvent, SignalFeed } from "../data/model";
+
+test("reading-note workers use their own open-weight model settings",()=>{
+  const priorModel=process.env.SYMTRI_READING_NOTE_MODEL;
+  const priorSupport=process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL;
+  try {
+    delete process.env.SYMTRI_READING_NOTE_MODEL;
+    delete process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL;
+    assert.equal(readingNoteModelId(),"mistral/mistral-large-3");
+    assert.equal(readingNoteSupportModelId(),"mistral/mistral-large-3");
+    process.env.SYMTRI_READING_NOTE_MODEL="custom/draft";
+    process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL="custom/audit";
+    assert.equal(readingNoteModelId(),"custom/draft");
+    assert.equal(readingNoteSupportModelId(),"custom/audit");
+  } finally {
+    if(priorModel===undefined) delete process.env.SYMTRI_READING_NOTE_MODEL;
+    else process.env.SYMTRI_READING_NOTE_MODEL=priorModel;
+    if(priorSupport===undefined) delete process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL;
+    else process.env.SYMTRI_READING_NOTE_SUPPORT_MODEL=priorSupport;
+  }
+});
 
 test("numeric claims cannot borrow quantities from unquoted source text",()=>{
   const source={id:"paper",title:"A measured comparison",summary:"The phages share 89.67% genomic identity. C5 showed higher adsorption and larger plaques than N30."};

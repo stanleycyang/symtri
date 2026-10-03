@@ -156,6 +156,10 @@ notes without generating them during a visit. Ask questions about “this source
 use the selected story identity rather than a broad topic search.
 Ready notes lead the source detail; the original excerpt is expandable below the
 supported explanation. World Bank context labels each geography separately.
+Background reading-note generation and support audits use the open-weight
+`mistral/mistral-large-3` model by default. Set `SYMTRI_READING_NOTE_MODEL`
+or `SYMTRI_READING_NOTE_SUPPORT_MODEL` to override either stage. Interactive Ask
+keeps its separate summary and support model settings.
 The `enrichReadingNotes` Workflow runs independently of the hourly ingestion
 lease, so source fetching can proceed while notes are generated. It does not poll
 news sources. The new-note lane refreshes a bounded embedding backlog after
