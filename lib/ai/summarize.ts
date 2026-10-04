@@ -107,8 +107,13 @@ export function extractiveReadingNote(answer: AskResult, feed: SignalFeed): {sum
   // This last resort repeats a source passage verbatim, without adding a
   // model's unsupported inference. The richer model note remains the default.
   const text=normalize(event.evidence.text);
+  const overview=event.evidence.kind==="repository"
+    ? /(?:^|\s)#{1,3}\s+(?:[^\w\s]+\s*)?(?:Project\s+)?(?:Overview|Introduction|About)\s+/i.exec(text)
+    : null;
   const titleAt=text.toLowerCase().indexOf(normalize(event.title).toLowerCase());
-  const passageText=titleAt>0 && titleAt<2000 && text.length-titleAt>=100 ? text.slice(titleAt) : text;
+  const passageText=overview && text.length-overview.index-overview[0].length>=100
+    ? text.slice(overview.index+overview[0].length)
+    : titleAt>0 && titleAt<2000 && text.length-titleAt>=100 ? text.slice(titleAt) : text;
   const words=passageText.split(" ");
   const passage: string[]=[];
   for (const word of words) {

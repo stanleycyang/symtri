@@ -103,6 +103,16 @@ test("short retained abstracts do not invite unsupported model expansion",async(
   assert.equal(note.claims[0].evidence[0].quote,shortText);
 });
 
+test("extractive repository notes skip navigation before an overview",async()=>{
+  const text="Project title Overview • Architecture • Demo • Quick Start --- ## Project Overview The project combines a local search index with a browser interface so users can explore the saved documents. It stores the documents and exposes a query interface. ## Installation Run the installer.";
+  const retained={...event,evidence:{text,kind:"repository" as const,url:event.url,attribution:"Repository authors",license:null,retrievedAt:feed.observedAt}};
+  const retainedFeed={...feed,events:[retained]};
+  const note=await summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
+    (async()=>{throw Object.assign(new Error("Bad model request"),{statusCode:400});}) as typeof summarizeAnswer);
+  assert.ok(note.claims[0].evidence[0].quote.startsWith("The project combines"));
+  assert.ok(text.includes(note.claims[0].evidence[0].quote));
+});
+
 test("numeric claims cannot borrow quantities from unquoted source text",()=>{
   const source={id:"paper",title:"A measured comparison",summary:"The phages share 89.67% genomic identity. C5 showed higher adsorption and larger plaques than N30."};
   assert.throws(()=>validatePassages([{text:"The phages share 89.67% identity and C5 showed higher adsorption.",evidence:[{sourceId:"paper",quote:"C5 showed higher adsorption and larger plaques than N30."}]}],[source]),/quantity lacked quoted support/);
