@@ -28,8 +28,8 @@ function currentTopics(row: { topics?: unknown; classifier_version?: unknown; cl
 
 export function databaseEndpoint(value: string): string {
   const endpoint = new URL(value);
-  if (endpoint.hostname.endsWith(".pooler.supabase.com") && endpoint.port === "6543") {
-    endpoint.port = "5432";
+  if (endpoint.hostname.endsWith(".pooler.supabase.com") && endpoint.port === "5432") {
+    endpoint.port = "6543";
     return endpoint.toString();
   }
   return value;
@@ -49,12 +49,14 @@ export function database() {
   const endpoint = new URL(url);
   const hostname = endpoint.hostname;
   const local = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
-  // Postgres.js pipelining can hang on Supabase's shared transaction pooler.
-  // Session mode uses the same host and credentials on port 5432.
+  // Supabase transaction mode releases a database slot after each query, which
+  // keeps short-lived Workflow steps from exhausting the 15 session slots.
+  // Serializing the wire protocol avoids Postgres.js pipelining across pooled
+  // backends; prepared statements are unsupported in transaction mode.
   connection ??= postgres(databaseEndpoint(url), {
-    max: 1, prepare: false, ssl: local ? false : "require",
-    connect_timeout: 5, idle_timeout: 10, max_lifetime: 60,
-  });
+    max: 1, max_pipeline: 1, prepare: false, ssl: local ? false : "require",
+    connect_timeout: 5, idle_timeout: 2, max_lifetime: 60,
+  } as Parameters<typeof postgres>[1]);
   return connection;
 }
 
