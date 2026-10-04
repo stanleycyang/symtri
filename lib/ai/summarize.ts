@@ -75,6 +75,9 @@ export function validatePassages(claims: GroundedClaim[], sources: { id: string;
 }
 
 export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed, summarize: typeof summarizeAnswer = summarizeAnswer): ReturnType<typeof summarizeAnswer> {
+  const selected=feed.events.find((event)=>event.id===answer.events[0]?.id);
+  if (selected?.evidence && ["abstract","preprint"].includes(selected.evidence.kind)
+    && selected.evidence.text.length>=100 && selected.evidence.text.length<150) return extractiveReadingNote(answer,feed);
   const draftModel=readingNoteModelId();
   const auditModel=readingNoteSupportModelId();
   try {

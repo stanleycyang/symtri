@@ -88,6 +88,18 @@ test("reading-note quote failures end with a verbatim attributed passage",async(
   assert.equal(noObject.claims.length,1);
 });
 
+test("short retained abstracts do not invite unsupported model expansion",async()=>{
+  const shortText="One nucleotide substitution in nucleotide 579 of HLA-C*08:22:01:01 results in a novel allele HLA-C*08:22:06.";
+  assert.ok(shortText.length>=100 && shortText.length<150);
+  const retained={...event,evidence:{text:shortText,kind:"abstract" as const,url:event.url,attribution:"Study authors",license:null,retrievedAt:feed.observedAt}};
+  const shortFeed={...feed,events:[retained]};
+  let calls=0;
+  const note=await summarizeReadingNote(answerQuestion("Explain AI agents",shortFeed),shortFeed,
+    (async()=>{calls++;throw new Error("Model should not run");}) as typeof summarizeAnswer);
+  assert.equal(calls,0);
+  assert.equal(note.claims[0].evidence[0].quote,shortText);
+});
+
 test("numeric claims cannot borrow quantities from unquoted source text",()=>{
   const source={id:"paper",title:"A measured comparison",summary:"The phages share 89.67% genomic identity. C5 showed higher adsorption and larger plaques than N30."};
   assert.throws(()=>validatePassages([{text:"The phages share 89.67% identity and C5 showed higher adsorption.",evidence:[{sourceId:"paper",quote:"C5 showed higher adsorption and larger plaques than N30."}]}],[source]),/quantity lacked quoted support/);
