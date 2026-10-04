@@ -91,8 +91,11 @@ export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed, 
       return await summarize(answer,feed,fallbackModel,undefined,undefined,fallbackAuditModel);
     } catch (fallbackError) {
       const message=fallbackError instanceof Error ? fallbackError.message : "";
+      const status=fallbackError && typeof fallbackError==="object" && "statusCode" in fallbackError ? Number(fallbackError.statusCode) : NaN;
       if (!/valid source passage|supported claim|support audit|direct evidence/i.test(message)
-        && !(fallbackError instanceof Error && fallbackError.name === "AI_NoObjectGeneratedError")) throw fallbackError;
+        && !(fallbackError instanceof Error && fallbackError.name === "AI_NoObjectGeneratedError")
+        && status!==400) throw fallbackError;
+      if(status===400) console.info("SYMTRI reading-note extractive fallback",{reason:"model-http-400"});
       return extractiveReadingNote(answer,feed);
     }
   }

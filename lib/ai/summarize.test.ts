@@ -86,6 +86,9 @@ test("reading-note quote failures end with a verbatim attributed passage",async(
   const noObject=await summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
     (async()=>{const error=new Error("No object generated");error.name="AI_NoObjectGeneratedError";throw error;}) as typeof summarizeAnswer);
   assert.equal(noObject.claims.length,1);
+  const badRequest=await summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
+    (async()=>{throw Object.assign(new Error("Bad model request"),{statusCode:400});}) as typeof summarizeAnswer);
+  assert.equal(badRequest.claims[0].evidence[0].quote,noObject.claims[0].evidence[0].quote);
 });
 
 test("short retained abstracts do not invite unsupported model expansion",async()=>{
