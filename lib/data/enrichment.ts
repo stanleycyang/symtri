@@ -145,7 +145,9 @@ export async function hackerNewsDiscussionEvidence(event: SignalEvent, load: typ
 
 export async function retrieveStoryEvidence(event: SignalEvent, load:typeof fetchPublicText=fetchPublicText): Promise<SignalEvent> {
   const existing = await getSignalEvidence(event.id);
-  if (existing[0]?.body.text.length >= 150) return {...event,evidence:existing[0].body};
+  const retained = existing[0]?.body;
+  const minimum = event.source === "europe-pmc" && (retained?.kind === "abstract" || retained?.kind === "preprint") ? 100 : 150;
+  if (retained && retained.text.length >= minimum) return {...event,evidence:retained};
   const archived = archivedAbstractEvidence(event);
   if (archived) {
     const enriched = { ...event, evidence: archived };

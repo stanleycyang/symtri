@@ -83,6 +83,9 @@ test("reading-note quote failures end with a verbatim attributed passage",async(
   assert.ok(cited?.evidence?.text.includes(note.claims[0].evidence[0].quote));
   await assert.rejects(summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
     (async()=>{throw Object.assign(new Error("Payment required"),{statusCode:402});}) as typeof summarizeAnswer),/Payment required/);
+  const noObject=await summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
+    (async()=>{const error=new Error("No object generated");error.name="AI_NoObjectGeneratedError";throw error;}) as typeof summarizeAnswer);
+  assert.equal(noObject.claims.length,1);
 });
 
 test("numeric claims cannot borrow quantities from unquoted source text",()=>{

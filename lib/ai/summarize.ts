@@ -88,7 +88,8 @@ export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed, 
       return await summarize(answer,feed,fallbackModel,undefined,undefined,fallbackAuditModel);
     } catch (fallbackError) {
       const message=fallbackError instanceof Error ? fallbackError.message : "";
-      if (!/valid source passage|supported claim|support audit|direct evidence/i.test(message)) throw fallbackError;
+      if (!/valid source passage|supported claim|support audit|direct evidence/i.test(message)
+        && !(fallbackError instanceof Error && fallbackError.name === "AI_NoObjectGeneratedError")) throw fallbackError;
       return extractiveReadingNote(answer,feed);
     }
   }
@@ -96,10 +97,13 @@ export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed, 
 
 export function extractiveReadingNote(answer: AskResult, feed: SignalFeed): {summary:string;citedEventIds:string[];claims:GroundedClaim[]} {
   const event=feed.events.find((item)=>item.id===answer.events[0]?.id);
-  if (!event?.evidence?.text || event.evidence.text.length<150) throw new Error("No direct evidence for an extractive reading note");
+  if (!event?.evidence?.text || event.evidence.text.length<100) throw new Error("No direct evidence for an extractive reading note");
   // This last resort repeats a source passage verbatim, without adding a
   // model's unsupported inference. The richer model note remains the default.
-  const words=normalize(event.evidence.text).split(" ");
+  const text=normalize(event.evidence.text);
+  const titleAt=text.toLowerCase().indexOf(normalize(event.title).toLowerCase());
+  const passageText=titleAt>0 && titleAt<2000 && text.length-titleAt>=100 ? text.slice(titleAt) : text;
+  const words=passageText.split(" ");
   const passage: string[]=[];
   for (const word of words) {
     if (passage.length>=40 || [...passage,word].join(" ").length>230) break;

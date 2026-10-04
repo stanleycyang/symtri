@@ -863,6 +863,17 @@ async function main() {
     assert.equal(recoveredAbstract.evidence?.kind,"abstract");
     assert.equal((await getSignalEvidence(archivedId))[0].body.metadata?.archivedExcerpt,true);
     await sql`delete from signal_events where id=${archivedId}`;
+    const shortAbstractId=`europe-pmc:${externalId}-short-abstract`;
+    const shortAbstract="A newly observed allele differs from a previously recorded allele by one nucleotide substitution in a typed sample.";
+    const shortAbstractEvent:SignalEvent={...event,id:shortAbstractId,source:"europe-pmc",externalId:`MED-${externalId}-short`,
+      url:`https://doi.org/10.9999/${externalId}-short`,title:"A short Europe PMC abstract",summary:shortAbstract,
+      evidence:{text:shortAbstract,kind:"abstract",url:`https://doi.org/10.9999/${externalId}-short`,attribution:"Study authors",license:null,retrievedAt:new Date().toISOString()}};
+    await persistSignals({...feed,events:[shortAbstractEvent]});
+    const shortCalls:string[]=[];
+    const retainedAbstract=await retrieveStoryEvidence(shortAbstractEvent,async(url)=>{shortCalls.push(url);throw new Error("Publisher should not be fetched");});
+    assert.deepEqual(shortCalls,[]);
+    assert.equal(retainedAbstract.evidence?.text,shortAbstract);
+    await sql`delete from signal_events where id=${shortAbstractId}`;
     const discussionId=`hacker-news:${externalId}-discussion`;
     const discussionEvent:SignalEvent={...event,id:discussionId,source:"hacker-news",externalId:"123456789",
       url:`https://example.org/${externalId}/unreadable`,title:"A linked page that cannot be extracted",summary:"Hacker News discussion."};
