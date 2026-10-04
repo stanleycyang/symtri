@@ -119,9 +119,12 @@ export async function enrichReadingNotes(slot:string, lane:number) {
     // the next scheduled run picks up anything changed after this lane finishes.
     if (lane === 1) {
       try {
-        const embedding = await embedBacklog();
-        result.embedded = embedding.embedded;
-        result.embeddingStatus = embedding.hasMore ? "backlog" : embedding.embeddingStatus;
+        for (let batch=0;batch<3;batch++) {
+          const embedding = await embedBacklog();
+          result.embedded += embedding.embedded;
+          result.embeddingStatus = embedding.hasMore ? "backlog" : embedding.embeddingStatus;
+          if (embedding.embeddingStatus !== "ok" || !embedding.hasMore) break;
+        }
         if (result.embeddingStatus !== "ok") result.status = "partial";
       } catch (error) {
         result.embeddingStatus = "unavailable";
