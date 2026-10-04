@@ -128,17 +128,14 @@ export async function hackerNewsDiscussionEvidence(event: SignalEvent, load: typ
   const passages: string[] = [];
   if (ownText.length >= 150) passages.push(`Story by ${typeof story.by === "string" ? story.by : "Hacker News user"}: ${ownText}`);
   if (!passages.length && Array.isArray(story.kids)) {
-    for (const id of story.kids.slice(0, 8)) {
-      if (!Number.isInteger(id) || id <= 0) continue;
-      try {
-        const value: unknown = JSON.parse((await load(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, 100_000)).text);
-        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-        const comment = value as {type?:unknown;deleted?:unknown;dead?:unknown;text?:unknown;by?:unknown};
-        const content = cleanSourceText(comment.text);
-        if (comment.type === "comment" && !comment.dead && !comment.deleted && content.length >= 80)
-          passages.push(`Comment by ${typeof comment.by === "string" ? comment.by : "Hacker News user"}: ${content}`);
-      } catch { /* A missing comment must not discard other public comments. */ }
-      if (passages.join(" ").length >= 1200) break;
+    const ids=story.kids.slice(0,6).filter((id):id is number=>Number.isInteger(id) && id>0);
+    const comments=await Promise.allSettled(ids.map(async id=>JSON.parse((await load(`https://hacker-news.firebaseio.com/v0/item/${id}.json`,100_000)).text) as unknown));
+    for (const result of comments) {
+      if (result.status!=="fulfilled" || !result.value || typeof result.value!=="object" || Array.isArray(result.value)) continue;
+      const comment=result.value as {type?:unknown;deleted?:unknown;dead?:unknown;text?:unknown;by?:unknown};
+      const content=cleanSourceText(comment.text);
+      if (comment.type==="comment" && !comment.dead && !comment.deleted && content.length>=40)
+        passages.push(`Comment by ${typeof comment.by==="string" ? comment.by : "Hacker News user"}: ${content}`);
     }
   }
   const text = passages.join(" ").slice(0, 8000);
