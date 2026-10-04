@@ -5,7 +5,7 @@ import { enqueueMissingNotes } from "@/lib/data/enrichment";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const workerCount = 8;
+const workerCount = 4;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
