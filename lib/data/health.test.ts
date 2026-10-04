@@ -44,3 +44,10 @@ test("graph and vector backlog degrade a completed run", () => {
   assert.ok(result.issues.some((issue) => issue.includes("Embedding")));
   assert.ok(result.issues.some((issue) => issue.includes("Knowledge graph")));
 });
+
+test("a later worker can clear a run's recorded embedding backlog", () => {
+  const completed = { ...status, lastRun: { ...status.lastRun!, embeddingStatus: "backlog" }, embeddingBacklog: 0 } as Parameters<typeof evaluateProductionHealth>[1];
+  assert.equal(evaluateProductionHealth(now, completed, growth, feed, [day], "2026-09-24").status, "healthy");
+  const pending = { ...completed, embeddingBacklog: 1 };
+  assert.ok(evaluateProductionHealth(now, pending, growth, feed, [day], "2026-09-24").issues.includes("Embedding backlog remains"));
+});

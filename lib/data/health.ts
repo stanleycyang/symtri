@@ -18,7 +18,7 @@ export function evaluateProductionHealth(now: Date, status: Status, growth: Grow
   if (!run?.completedAt || !["complete", "partial"].includes(run.status) || Date.parse(run.startedAt) < start.getTime()) {
     issues.push("Current UTC hour has no completed ingestion");
   } else {
-    if (run.embeddingStatus !== "ok" || status.embeddingBacklog > 0) issues.push("Embedding backlog remains");
+    if (status.embeddingBacklog > 0 || !["ok", "backlog"].includes(run.embeddingStatus ?? "")) issues.push("Embedding backlog remains");
     if (Object.values(run.sources ?? {}).every((source) => source === "unavailable")) issues.push("All source feeds are unavailable");
     if (run.status === "partial") warnings.push("Ingestion source coverage is partial");
   }

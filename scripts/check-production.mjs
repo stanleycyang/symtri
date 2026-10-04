@@ -53,7 +53,7 @@ try {
       throw new Error(`${requiredSource} has no visible overview signal`);
     }
   }
-  if (run.embeddingStatus !== "ok") throw new Error(`Latest embedding step is ${run.embeddingStatus ?? "missing"}`);
+  if (!["ok", "backlog"].includes(run.embeddingStatus)) throw new Error(`Latest embedding step is ${run.embeddingStatus ?? "missing"}`);
   const observedAt = Date.parse(signals.lastIngestedAt);
   if (!Number.isFinite(observedAt) || observedAt < Date.parse(run.startedAt) || observedAt > Date.parse(run.completedAt)) {
     throw new Error("Public feed does not reflect the latest completed ingest");
