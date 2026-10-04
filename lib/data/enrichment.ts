@@ -11,6 +11,27 @@ import { unavailableSources, type SignalEvent } from "./model";
 export const ENRICHMENT_VERSION = 5;
 export type ReadingNote = { explanation: string; claims: GroundedClaim[]; questions: string[]; createdAt: string; sourceKind: string; evidenceSource: string; evidenceUrl: string; evidenceAttribution: string; evidenceLicense: string|null; context: BackgroundContext[] };
 
+export function readingNoteFailureCode(stage: "evidence" | "hydrate" | "generate" | "context" | "commit", error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/timeout|abort/i.test(message) || error instanceof Error && /AbortError|TimeoutError/.test(error.name)) return `${stage}-timeout`;
+  if (stage === "evidence") {
+    const status = /\bHTTP (\d{3})\b/.exec(message)?.[1];
+    if (status) return `source-http-${status}`;
+    if (/restricts extraction/i.test(message)) return "source-restricted";
+    if (/Insufficient|Awaiting retained|No repository README|No public release notes/i.test(message)) return "source-too-thin";
+    if (/too large/i.test(message)) return "source-too-large";
+    return "source-fetch-error";
+  }
+  if (stage === "generate") {
+    if (/valid source passage|quantity lacked quoted support/i.test(message)) return "quote-rejected";
+    if (/supported claim|support audit|direct evidence/i.test(message)) return "support-rejected";
+    const status = error && typeof error === "object" && "statusCode" in error ? Number(error.statusCode) : NaN;
+    if (Number.isInteger(status)) return `model-http-${status}`;
+    return "model-error";
+  }
+  return `${stage}-error`;
+}
+
 export async function claimReadingNoteWorker(lane: number, runId: string): Promise<boolean> {
   const rows = await database()`insert into reading_note_workers(lane,run_id,lease_until)
     values(${lane},${runId},now()+interval '15 minutes')
@@ -42,7 +63,7 @@ export async function enqueueMissingNotes(limit = 200): Promise<number> {
           and not exists(select 1 from source_catalog source where source.id=note.note->>'evidenceSource' and source.status='active')
           and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=note.signal_id))
       order by case when note.status='ready' then 0 else 1 end,note.updated_at limit ${limit})
-    update reading_notes note set version=${ENRICHMENT_VERSION},status='pending',note=null,input_hash=null,attempts=0,retry_at=now(),lease_until=null,revision=revision+1,updated_at=now()
+    update reading_notes note set version=${ENRICHMENT_VERSION},status='pending',note=null,input_hash=null,attempts=0,retry_at=now(),lease_until=null,failure_code=null,revision=revision+1,updated_at=now()
     from stale where note.signal_id=stale.signal_id returning note.signal_id`;
   return rows.length+refreshed.length;
 }
@@ -84,15 +105,73 @@ async function contextFor(event: SignalEvent): Promise<BackgroundContext[]> {
   return result;
 }
 
+export function archivedAbstractEvidence(event: SignalEvent): SignalEvent["evidence"] | null {
+  if (event.source !== "arxiv" && event.source !== "openalex") return null;
+  // These two adapters store an excerpt of the source abstract in summary.
+  // Older observations predate signal_evidence; their archived excerpt is still
+  // source text and can ground a note without scraping a publisher's DOI page.
+  const excerpt = cleanSourceText(event.summary).replace(/…$/, "").trim();
+  if (excerpt.length < 150) return null;
+  return { text: excerpt, kind: event.source === "arxiv" ? "preprint" : "abstract",
+    url: event.url, attribution: event.source === "arxiv" ? "arXiv authors" : "Publication authors via OpenAlex",
+    license: null, retrievedAt: new Date().toISOString(), metadata: { archivedExcerpt: true } };
+}
+
+export async function hackerNewsDiscussionEvidence(event: SignalEvent, load: typeof fetchPublicText = fetchPublicText): Promise<NonNullable<SignalEvent["evidence"]>> {
+  if (event.source !== "hacker-news" || !/^\d+$/.test(event.externalId)) throw new Error("Invalid Hacker News story ID");
+  const discussionUrl = `https://news.ycombinator.com/item?id=${event.externalId}`;
+  const itemUrl = `https://hacker-news.firebaseio.com/v0/item/${event.externalId}.json`;
+  const item: unknown = JSON.parse((await load(itemUrl, 200_000)).text);
+  if (!item || typeof item !== "object" || Array.isArray(item) || (item as {type?:unknown}).type !== "story") throw new Error("Hacker News story unavailable");
+  const story = item as {text?:unknown;kids?:unknown;by?:unknown};
+  const ownText = cleanSourceText(story.text);
+  const passages: string[] = [];
+  if (ownText.length >= 150) passages.push(`Story by ${typeof story.by === "string" ? story.by : "Hacker News user"}: ${ownText}`);
+  if (!passages.length && Array.isArray(story.kids)) {
+    for (const id of story.kids.slice(0, 8)) {
+      if (!Number.isInteger(id) || id <= 0) continue;
+      try {
+        const value: unknown = JSON.parse((await load(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, 100_000)).text);
+        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+        const comment = value as {type?:unknown;deleted?:unknown;dead?:unknown;text?:unknown;by?:unknown};
+        const content = cleanSourceText(comment.text);
+        if (comment.type === "comment" && !comment.dead && !comment.deleted && content.length >= 80)
+          passages.push(`Comment by ${typeof comment.by === "string" ? comment.by : "Hacker News user"}: ${content}`);
+      } catch { /* A missing comment must not discard other public comments. */ }
+      if (passages.join(" ").length >= 1200) break;
+    }
+  }
+  const text = passages.join(" ").slice(0, 8000);
+  if (text.length < 150) throw new Error("Insufficient Hacker News discussion text");
+  return { text, kind: "discussion", url: discussionUrl, attribution: passages.length === 1 && ownText.length >= 150 ? "Hacker News post author" : "Hacker News commenters", license: null, retrievedAt: new Date().toISOString() };
+}
+
 export async function retrieveStoryEvidence(event: SignalEvent, load:typeof fetchPublicText=fetchPublicText): Promise<SignalEvent> {
   const existing = await getSignalEvidence(event.id);
   if (existing[0]?.body.text.length >= 150) return {...event,evidence:existing[0].body};
+  const archived = archivedAbstractEvidence(event);
+  if (archived) {
+    const enriched = { ...event, evidence: archived };
+    await persistSourceEvidence([enriched]);
+    return enriched;
+  }
   const url=new URL(event.url);
+  if (event.source === "arxiv" && /^(?:www\.)?arxiv\.org$/.test(url.hostname)) {
+    const page = await load(event.url, 600_000);
+    const abstract = /<meta\s+name=["']citation_abstract["']\s+content=["']([^"']+)["']/i.exec(page.text)?.[1];
+    const text = cleanSourceText(abstract).slice(0, 12000);
+    if (text.length < 150) throw new Error("Insufficient arXiv abstract text");
+    const enriched: SignalEvent = { ...event, evidence: { text, kind: "preprint", url: event.url,
+      attribution: "arXiv authors", license: null, retrievedAt: new Date().toISOString() } };
+    await persistSourceEvidence([enriched]);
+    return enriched;
+  }
   let content=""; let kind="article" as NonNullable<SignalEvent["evidence"]>["kind"]; let evidenceUrl=event.url;
   let metadata:Record<string,string|number|boolean>|undefined;
   let attribution=url.hostname;
+  let evidence: NonNullable<SignalEvent["evidence"]>;
   const githubRepo=/^\/([\w.-]+)\/([\w.-]+)(?:\/|$)/.exec(url.pathname);
-  if (url.hostname === "github.com" && githubRepo) {
+  try { if (url.hostname === "github.com" && githubRepo) {
     const repo=`${githubRepo[1]}/${githubRepo[2]}`;
     const release=/^\/[\w.-]+\/[\w.-]+\/releases\/tag\/(.+)$/.exec(url.pathname);
     if (release) {
@@ -121,7 +200,12 @@ export async function retrieveStoryEvidence(event: SignalEvent, load:typeof fetc
   }
   const cleaned=cleanSourceText(content).slice(0,12000);
   if (cleaned.length<150) throw new Error("Insufficient source text");
-  const enriched={...event,evidence:{text:cleaned,kind,url:evidenceUrl,attribution,license:null,retrievedAt:new Date().toISOString(),...(metadata?{metadata}:{})}};
+  evidence={text:cleaned,kind,url:evidenceUrl,attribution,license:null,retrievedAt:new Date().toISOString(),...(metadata?{metadata}:{})};
+  } catch (error) {
+    if (event.source !== "hacker-news") throw error;
+    evidence = await hackerNewsDiscussionEvidence(event, load);
+  }
+  const enriched = { ...event, evidence };
   await persistSourceEvidence([enriched]);
   return enriched;
 }
@@ -161,13 +245,15 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
     candidates as (select note.signal_id from balanced join reading_notes note on note.signal_id=balanced.signal_id
       order by balanced.source_rank,balanced.recently_served,balanced.queue_rank,balanced.attempts,balanced.importance desc,balanced.first_seen_at desc
       limit ${Math.min(5,Math.max(1,limit))} for update of note skip locked),
-    claimed as (update reading_notes note set claim_token=${token},status='working',note=null,attempts=case when note.version<>${ENRICHMENT_VERSION} then 1 else note.attempts+1 end,version=${ENRICHMENT_VERSION},lease_until=now()+interval '10 minutes' from candidates where note.signal_id=candidates.signal_id returning note.signal_id)
+    claimed as (update reading_notes note set claim_token=${token},status='working',note=null,failure_code=null,attempts=case when note.version<>${ENRICHMENT_VERSION} then 1 else note.attempts+1 end,version=${ENRICHMENT_VERSION},lease_until=now()+interval '10 minutes' from candidates where note.signal_id=candidates.signal_id returning note.signal_id)
     select event.* from signal_events event join claimed on claimed.signal_id=event.id`;
   let ready=0,failed=0;
   for (const row of claimed) {
+    let stage: "evidence" | "hydrate" | "generate" | "context" | "commit" = "evidence";
     try {
       let event=await retrieveStoryEvidence({id:row.id,source:row.source,externalId:row.external_id,title:row.title,url:row.url,summary:row.summary,publishedAt:row.published_at.toISOString(),importance:row.importance,topics:row.topics});
       console.info("SYMTRI reading-note evidence ready",{source:row.source});
+      stage = "hydrate";
       // Source hydration may requeue this item. Capture the new revision before generation;
       // a later source change or another worker invalidates the conditional commit.
       const ownership=await sql<{revision:number}[]>`update reading_notes set status='working',attempts=greatest(attempts,1),lease_until=now()+interval '10 minutes' where signal_id=${event.id} and claim_token=${token} returning revision`;
@@ -181,17 +267,18 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
       const hash=evidenceHash(event);
       const feed={observedAt:new Date().toISOString(),events:[event],sources:unavailableSources(),partial:true,scope:"knowledge" as const};
       const answer=answerKnowledgeQuestion(`Explain this source: ${event.title}`, [{event,similarity:null}]);
+      stage = "generate";
       const summary=await synthesize(answer,feed);
+      stage = "context";
       const note:ReadingNote={explanation:summary.summary,claims:summary.claims,questions:[`What does this source establish about ${event.title.slice(0,100)}?`,`What limitations does this source report?`],createdAt:new Date().toISOString(),sourceKind:event.evidence!.kind,evidenceSource,evidenceUrl:event.evidence!.url,evidenceAttribution:event.evidence!.attribution,evidenceLicense:event.evidence!.license,context:await loadContext(event)};
-      const committed=await sql`update reading_notes set status='ready',note=${sql.json(note)},input_hash=${hash},version=${ENRICHMENT_VERSION},lease_until=null,updated_at=now() where signal_id=${event.id} and revision=${revision} and claim_token=${token} returning signal_id`;
+      stage = "commit";
+      const committed=await sql`update reading_notes set status='ready',note=${sql.json(note)},failure_code=null,input_hash=${hash},version=${ENRICHMENT_VERSION},lease_until=null,updated_at=now() where signal_id=${event.id} and revision=${revision} and claim_token=${token} returning signal_id`;
       ready+=committed.length;
     } catch(error) {
-      const message=error instanceof Error ? error.message : "";
-      const reason=/valid source passage|supported claim|support audit|direct evidence/.test(message) ? "evidence-rejected"
-        : /timeout|abort/i.test(message) ? "deadline" : /source text|Source evidence|Public fetch|HTTP|repository README|release notes|Awaiting retained|restricts extraction/.test(message) ? "source-unavailable" : "generation-or-storage";
+      const reason=readingNoteFailureCode(stage,error);
       // Do not log provider responses, source bodies, request headers, or credentials.
-      console.warn("Reading note failed",{source:row.source,reason});
-      await sql`update reading_notes set status='failed',retry_at=now()+interval '6 hours',lease_until=null,updated_at=now() where signal_id=${row.id} and claim_token=${token} and status='working'`;
+      console.warn("Reading note failed",{source:row.source,stage,reason,errorName:error instanceof Error ? error.name : "unknown"});
+      await sql`update reading_notes set status='failed',failure_code=${reason},retry_at=now()+interval '6 hours',lease_until=null,updated_at=now() where signal_id=${row.id} and claim_token=${token} and status='working'`;
       failed++;
     }
   }

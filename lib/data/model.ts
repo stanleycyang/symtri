@@ -6,7 +6,7 @@ export type SourceId = string;
 
 export type SourceEvidence = {
   text: string;
-  kind: "abstract" | "preprint" | "feed" | "advisory" | "model-card" | "dataset-card" | "repository" | "article";
+  kind: "abstract" | "preprint" | "feed" | "advisory" | "model-card" | "dataset-card" | "repository" | "article" | "discussion";
   url: string;
   attribution: string;
   license: string | null;

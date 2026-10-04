@@ -72,6 +72,19 @@ test("reading-note fallback can use a separate inexpensive auditor",async()=>{
   }
 });
 
+test("reading-note quote failures end with a verbatim attributed passage",async()=>{
+  const retained={...event,evidence:{text:"The authors evaluate how AI agents use tools in a controlled test environment and describe the observed result. ".repeat(4),kind:"preprint" as const,url:event.url,attribution:"Authors",license:null,retrievedAt:feed.observedAt}};
+  const retainedFeed={...feed,events:[retained]};
+  const note=await summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
+    (async()=>{throw new Error("Claim lacked a valid source passage");}) as typeof summarizeAnswer);
+  assert.equal(note.claims.length,1);
+  assert.ok(note.claims[0].text.includes(note.claims[0].evidence[0].quote));
+  const cited=retainedFeed.events.find(event=>event.id===note.citedEventIds[0]);
+  assert.ok(cited?.evidence?.text.includes(note.claims[0].evidence[0].quote));
+  await assert.rejects(summarizeReadingNote(answerQuestion("Explain AI agents",retainedFeed),retainedFeed,
+    (async()=>{throw Object.assign(new Error("Payment required"),{statusCode:402});}) as typeof summarizeAnswer),/Payment required/);
+});
+
 test("numeric claims cannot borrow quantities from unquoted source text",()=>{
   const source={id:"paper",title:"A measured comparison",summary:"The phages share 89.67% genomic identity. C5 showed higher adsorption and larger plaques than N30."};
   assert.throws(()=>validatePassages([{text:"The phages share 89.67% identity and C5 showed higher adsorption.",evidence:[{sourceId:"paper",quote:"C5 showed higher adsorption and larger plaques than N30."}]}],[source]),/quantity lacked quoted support/);

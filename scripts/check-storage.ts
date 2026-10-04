@@ -119,6 +119,7 @@ async function main() {
   assert.equal((await sql`select count(*)::int as count from pg_indexes where indexname = 'signal_events_source_preview_idx'`)[0].count, 1);
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20260928001000_reading_notes.sql", import.meta.url), "utf8"));
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261001000000_reading_note_workers.sql", import.meta.url), "utf8"));
+  await sql.unsafe(await readFile(new URL("../supabase/migrations/20261004000000_reading_note_failure_code.sql", import.meta.url), "utf8"));
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
@@ -851,6 +852,28 @@ async function main() {
     assert.equal(enrichedRelease.evidence?.metadata?.contentType,"release notes");
     assert.equal((await getSignalEvidence(releaseId))[0].body.metadata?.releaseTag,"v1.2.3");
     await sql`delete from signal_events where id=${releaseId}`;
+    const archivedId=`openalex:${externalId}-archived-abstract`;
+    const archivedEvent:SignalEvent={...event,id:archivedId,source:"openalex",externalId:`${externalId}-archived-abstract`,
+      url:`https://doi.org/10.9999/${externalId}`,title:"Archived abstract about orbital methods",
+      summary:"The archived journal abstract describes a measured orbital method under controlled conditions. The authors compare the new method with a prior technique and report the boundary of the evaluation. ".repeat(2)};
+    await persistSignals({...feed,events:[archivedEvent]});
+    const archivedCalls:string[]=[];
+    const recoveredAbstract=await retrieveStoryEvidence(archivedEvent,async(url)=>{archivedCalls.push(url);throw new Error("Publisher should not be fetched");});
+    assert.deepEqual(archivedCalls,[]);
+    assert.equal(recoveredAbstract.evidence?.kind,"abstract");
+    assert.equal((await getSignalEvidence(archivedId))[0].body.metadata?.archivedExcerpt,true);
+    await sql`delete from signal_events where id=${archivedId}`;
+    const discussionId=`hacker-news:${externalId}-discussion`;
+    const discussionEvent:SignalEvent={...event,id:discussionId,source:"hacker-news",externalId:"123456789",
+      url:`https://example.org/${externalId}/unreadable`,title:"A linked page that cannot be extracted",summary:"Hacker News discussion."};
+    await persistSignals({...feed,events:[discussionEvent]});
+    const comment="A commenter describes a specific result from the linked project and explains the limited circumstances in which they observed it. ".repeat(2);
+    const recoveredDiscussion=await retrieveStoryEvidence(discussionEvent,async(url)=>({url,contentType:url.includes("firebaseio")?"application/json":"text/html",
+      text:url.endsWith("123456789.json")?JSON.stringify({type:"story",kids:[987654321]}):url.endsWith("987654321.json")?JSON.stringify({type:"comment",by:"observer",text:comment}):"<html><main>Short</main></html>"}));
+    assert.equal(recoveredDiscussion.evidence?.kind,"discussion");
+    assert.equal(recoveredDiscussion.evidence?.url,"https://news.ycombinator.com/item?id=123456789");
+    assert.equal((await getSignalEvidence(discussionId))[0].body.kind,"discussion");
+    await sql`delete from signal_events where id=${discussionId}`;
     // An unchanged observation keeps a ready note; changed content invalidates it
     // and prevents a worker holding the old revision from publishing stale prose.
     const noteRevision=Number((await sql`select revision from reading_notes where signal_id=${id}`)[0].revision);
@@ -954,9 +977,11 @@ async function main() {
       assert.equal(rejected.failed,1);
       const retryState=(await sql`select status,version,attempts,retry_at>now() as delayed from reading_notes where signal_id=${id}`)[0];
       assert.equal(retryState.status,"failed");assert.equal(retryState.delayed,true);assert.equal(retryState.attempts,1);assert.equal(retryState.version,ENRICHMENT_VERSION,"A failed current worker is counted under the current enrichment version");
+      assert.equal((await sql`select failure_code from reading_notes where signal_id=${id}`)[0].failure_code,"support-rejected");
       await sql`update reading_notes set retry_at=now()-interval '1 minute' where signal_id=${id}`;
       const retried=await enrichBatch(1,synthesize,async()=>[],true);
       assert.equal(retried.ready,1,"A retry lane can claim a due failed note");
+      assert.equal((await sql`select failure_code from reading_notes where signal_id=${id}`)[0].failure_code,null);
       await sql`update reading_notes set status='working',attempts=3,lease_until=now()-interval '1 minute' where signal_id=${id}`;
       assert.equal((await enrichBatch(1,synthesize,async()=>[])).processed,0);
       assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"failed");

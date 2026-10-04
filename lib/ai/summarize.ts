@@ -84,8 +84,31 @@ export async function summarizeReadingNote(answer: AskResult, feed: SignalFeed, 
     const fallbackAuditModel=readingNoteFallbackSupportModelId();
     if(draftModel===fallbackModel && auditModel===fallbackAuditModel) throw error;
     console.info("SYMTRI reading-note model fallback",{draftFrom:draftModel,auditFrom:auditModel,draftTo:fallbackModel,auditTo:fallbackAuditModel});
-    return summarize(answer,feed,fallbackModel,undefined,undefined,fallbackAuditModel);
+    try {
+      return await summarize(answer,feed,fallbackModel,undefined,undefined,fallbackAuditModel);
+    } catch (fallbackError) {
+      const message=fallbackError instanceof Error ? fallbackError.message : "";
+      if (!/valid source passage|supported claim|support audit|direct evidence/i.test(message)) throw fallbackError;
+      return extractiveReadingNote(answer,feed);
+    }
   }
+}
+
+export function extractiveReadingNote(answer: AskResult, feed: SignalFeed): {summary:string;citedEventIds:string[];claims:GroundedClaim[]} {
+  const event=feed.events.find((item)=>item.id===answer.events[0]?.id);
+  if (!event?.evidence?.text || event.evidence.text.length<150) throw new Error("No direct evidence for an extractive reading note");
+  // This last resort repeats a source passage verbatim, without adding a
+  // model's unsupported inference. The richer model note remains the default.
+  const words=normalize(event.evidence.text).split(" ");
+  const passage: string[]=[];
+  for (const word of words) {
+    if (passage.length>=40 || [...passage,word].join(" ").length>230) break;
+    passage.push(word);
+  }
+  const quote=passage.join(" ");
+  if (quote.length<100) throw new Error("Insufficient source passage for an extractive reading note");
+  const claim:GroundedClaim={text:`The ${event.evidence.kind === "discussion" ? "discussion" : "source"} states: “${quote}”`,kind:"fact",evidence:[{sourceId:event.id,quote}]};
+  return {summary:claim.text,citedEventIds:[event.id],claims:validatePassages([claim],[{id:event.id,title:event.title,summary:event.evidence.text}])};
 }
 
 export async function summarizeAnswer(answer: AskResult, feed: SignalFeed, model: LanguageModel = summaryModelId(), context?:AskContext, overallDeadline?:AbortSignal, supportModel?: LanguageModel): Promise<{ summary: string; citedEventIds: string[]; claims: GroundedClaim[] }> {
