@@ -156,11 +156,12 @@ notes without generating them during a visit. Ask questions about “this source
 use the selected story identity rather than a broad topic search.
 Ready notes lead the source detail; the original excerpt is expandable below the
 supported explanation. World Bank context labels each geography separately.
-Background reading notes use open-weight `zai/glm-4.7-flash` to draft, then
-`mistral/mistral-large-3` to audit claims. A rejected or failed first pass retries
-the note with Mistral for both stages before the database marks it failed. Set
-`SYMTRI_READING_NOTE_MODEL`, `SYMTRI_READING_NOTE_SUPPORT_MODEL`, or
-`SYMTRI_READING_NOTE_FALLBACK_MODEL` to override these choices. Interactive Ask
+Background reading notes use hosted `alibaba/qwen3.7-flash` with reasoning disabled
+to draft, then open-weight `mistral/mistral-nemo` on DeepInfra to audit claims.
+A rejected or failed first pass retries Qwen with `mistral/mistral-small` auditing
+before the database marks it failed. Set `SYMTRI_READING_NOTE_MODEL`,
+`SYMTRI_READING_NOTE_SUPPORT_MODEL`, `SYMTRI_READING_NOTE_FALLBACK_MODEL`, or
+`SYMTRI_READING_NOTE_FALLBACK_SUPPORT_MODEL` to override these choices. Interactive Ask
 keeps its separate summary and support model settings.
 The `enrichReadingNotes` Workflow runs independently of the hourly ingestion
 lease, so source fetching can proceed while notes are generated. It does not poll
