@@ -10,7 +10,7 @@ import { regionActivity } from "../lib/data/activity";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
-import { claimReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION } from "../lib/data/enrichment";
+import { availableReadingNoteLanes, claimableReadingNoteCount, claimReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION } from "../lib/data/enrichment";
 import { GET as readStory } from "../app/api/story/route";
 import { POST as askSymtri } from "../app/api/ask/route";
 import { getUniverseCatalog, recordCatalogRevision, seedUniverseCatalog } from "../lib/data/catalog";
@@ -129,11 +129,14 @@ async function main() {
   assert.equal(protectedTables.length, 24);
   assert.ok(protectedTables.every((table) => table.relrowsecurity));
   const workerSlot=`storage-check:${externalId}`;
+  assert.deepEqual(await availableReadingNoteLanes(4),[0,1,2,3]);
   assert.equal(await claimReadingNoteWorker(0,workerSlot),true);
+  assert.deepEqual(await availableReadingNoteLanes(4),[1,2,3]);
   assert.equal(await claimReadingNoteWorker(0,workerSlot),false,"A duplicate cron delivery cannot repeat the same lane");
   assert.equal(await claimReadingNoteWorker(0,`${workerSlot}:other`),false,"An active lane excludes another run");
   assert.equal(await renewReadingNoteWorker(0,workerSlot),true);
   await releaseReadingNoteWorker(0,workerSlot);
+  assert.deepEqual(await availableReadingNoteLanes(4),[0,1,2,3]);
   assert.equal(await claimReadingNoteWorker(0,workerSlot),false,"A released lane still records its completed cron slot");
   assert.equal(await claimReadingNoteWorker(0,`${workerSlot}:next`),true);
   await releaseReadingNoteWorker(0,`${workerSlot}:next`);
@@ -943,6 +946,11 @@ async function main() {
     // Exercise the actual queue worker with a deterministic synthesis seam and no
     // external calls. Only this isolated database's target fixture is eligible.
     await sql`update reading_notes set status='ready' where signal_id<>${id}`;
+    await sql`update reading_notes set status='pending',attempts=0,retry_at=now() where signal_id=${id}`;
+    assert.equal(await claimableReadingNoteCount(4),1);
+    await sql`update reading_notes set retry_at=now()+interval '1 hour' where signal_id=${id}`;
+    assert.equal(await claimableReadingNoteCount(4),0);
+    await sql`update reading_notes set retry_at=now() where signal_id=${id}`;
     await sql`update signal_events set importance=1000 where id=${id}`;
     const retainedText="A retained source passage describing the fixture study and its explicitly reported limitations. ".repeat(3);
     await persistSignals({...feed,events:evidenceEvents.map(item=>({...item,evidence:{...item.evidence!,text:retainedText}}))});

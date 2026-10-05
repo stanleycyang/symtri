@@ -51,6 +51,24 @@ export async function releaseReadingNoteWorker(lane: number, runId: string): Pro
     where lane=${lane} and run_id=${runId}`;
 }
 
+export async function availableReadingNoteLanes(workerCount: number): Promise<number[]> {
+  const rows = await database()<{lane:number}[]>`select series.lane::int from generate_series(0, ${workerCount - 1}) as series(lane)
+    where not exists(select 1 from reading_note_workers worker where worker.lane=series.lane and worker.lease_until>now())
+    order by series.lane`;
+  return rows.map((row) => row.lane);
+}
+
+export async function claimableReadingNoteCount(limit: number): Promise<number> {
+  const rows = await database()<{count:number}[]>`select count(*)::int as count from (
+    select 1 from reading_notes note where
+      ((note.status in ('pending','failed') and note.retry_at<=now() and note.attempts<3)
+        or (note.status='working' and note.lease_until<now() and note.attempts<3))
+      and exists(select 1 from signal_observations observation join source_catalog source
+        on source.id=observation.source and source.status='active' where observation.signal_id=note.signal_id)
+    limit ${limit}) candidate`;
+  return rows[0]?.count ?? 0;
+}
+
 export async function enqueueMissingNotes(limit = 200): Promise<number> {
   const rows = await database()`insert into reading_notes(signal_id)
     select event.id from signal_events event where not exists(select 1 from reading_notes note where note.signal_id=event.id)

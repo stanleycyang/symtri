@@ -78,7 +78,7 @@ async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: stri
 
 async function enrichSources(preferRetries = false, preferOldest = false): Promise<Awaited<ReturnType<typeof enrichBatch>>> {
   "use step";
-  return enrichBatch(1, undefined, undefined, preferRetries, preferOldest);
+  return enrichBatch(2, undefined, undefined, preferRetries, preferOldest);
 }
 
 async function refreshGraph():Promise<number> {
@@ -107,7 +107,7 @@ export async function enrichReadingNotes(slot:string, lane:number) {
   if (!await claimReadingNotes(lane, runId)) return {status:"busy",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
   const result={status:"complete",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
   try {
-    for(let batch=0;batch<10;batch++) {
+    for(let batch=0;batch<5;batch++) {
       if (!await renewReadingNotes(lane, runId)) { result.status="lease-lost"; break; }
       const next=await enrichSources(lane === 0 && batch < 3, lane === 3);
       result.processed+=next.processed;result.ready+=next.ready;result.failed+=next.failed;
