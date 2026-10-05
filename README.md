@@ -4,6 +4,8 @@
 
 The map reflects the connected sources, not everything published on the internet. Every source card links to its origin; classification and AI summaries are aids to exploration, not independent verification of a claim.
 
+[View the application flow](docs/symtri-flow.svg) or edit its [Mermaid source](docs/symtri-flow.mmd). Regenerate the SVG with `mmdc -i docs/symtri-flow.mmd -o docs/symtri-flow.svg`.
+
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), report vulnerabilities through [SECURITY.md](SECURITY.md), and review the [MIT license](LICENSE).
 
 ## Explore the universe

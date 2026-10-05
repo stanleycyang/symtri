@@ -1,0 +1,42 @@
+flowchart TB
+  Sources["Source feeds<br/>HN · GitHub · arXiv · OpenAlex<br/>NASA · CISA · Europe PMC · Hugging Face"]
+  Hourly["Hourly cron"]
+  Ingest["Ingestion workflow<br/>fetch · deduplicate · classify"]
+  Archive[("Supabase archive<br/>signals · observations · evidence")]
+  Prepared[("Map feed · knowledge graph<br/>daily snapshots")]
+  Embed["AI Gateway<br/>embed changed text"]
+  Vectors[("pgvector index")]
+
+  Sources --> Hourly --> Ingest
+  Ingest --> Archive
+  Ingest --> Prepared
+  Ingest --> Embed --> Vectors
+
+  FiveMinutes["Cron every 5 minutes"] --> Queue["Queue missing and retryable notes"]
+  Archive --> Queue
+  Queue --> Workers["Four leased enrichment workers"]
+  Workers --> Evidence["Retrieve and retain<br/>source passage"]
+  Evidence --> Draft["AI Gateway<br/>draft and support audit"]
+  Draft --> Notes[("Reading notes")]
+  Evidence --> Quote["Exact attributed quote<br/>if model cannot make a supported note"]
+  Quote --> Notes
+
+  Visitor["Visitor"] --> Map["Map · topics · history"]
+  Prepared --> Map
+  Archive --> Map
+  Visitor --> Story["Source detail"]
+  Notes --> Story
+  Visitor --> Ask["Ask SYMTRI"]
+  Archive --> Ask
+  Vectors --> Ask
+  Ask --> Answer["AI Gateway<br/>cited answer when supported"]
+  Answer --> Visitor
+
+  classDef external fill:#e9f2ff,stroke:#4472a3,color:#17324d
+  classDef process fill:#f3edff,stroke:#7659a8,color:#30214d
+  classDef store fill:#e8f7ee,stroke:#448568,color:#183d2c
+  classDef interface fill:#fff0df,stroke:#ae7541,color:#4f3218
+  class Sources,Visitor external
+  class Hourly,Ingest,Embed,FiveMinutes,Queue,Workers,Evidence,Draft,Quote,Answer process
+  class Archive,Prepared,Vectors,Notes store
+  class Map,Story,Ask interface
