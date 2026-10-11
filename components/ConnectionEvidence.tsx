@@ -16,7 +16,7 @@ export default function ConnectionEvidence({ from, to, recent, archived, seeded,
     const controller = new AbortController();
     const params = new URLSearchParams({ from: from.id, to: to.id });
     if (archive) params.set("archive", "1");
-    fetch(`/api/connections?${params}`, { cache: "no-store", signal: controller.signal }).then(async (response) => {
+    fetch(`/api/connections?${params}`, { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) }).then(async (response) => {
       if (!response.ok) throw new Error("Connection unavailable");
       const data = await response.json() as { events: SignalEvent[] };
       if (!Array.isArray(data.events)) throw new Error("Invalid connection");

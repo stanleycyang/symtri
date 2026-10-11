@@ -7,6 +7,7 @@ import {sourceHasDayPrecision,sourceKindLabels} from "@/lib/data/source-presenta
 
 type Props = {
   day: string | null;
+  open: boolean;
   initialQuestion?: string;
   subject?: string;
   signalId?: string;
@@ -32,7 +33,10 @@ function sourceTime(publishedAt: string, observedAt: string, historical: boolean
   return `${days} ${days === 1 ? "DAY" : "DAYS"} AGO`;
 }
 
-export default function AskSymtri({ day, subject, signalId, initialQuestion="", sourceLabels, onClose, onResult, onNavigate }: Props) {
+export default function AskSymtri({ open, day, subject, signalId, initialQuestion="", sourceLabels, onClose, onResult, onNavigate }: Props) {
+  const panel = useRef<HTMLElement>(null);
+  const answerHeading = useRef<HTMLParagraphElement>(null);
+  const completed = useRef<AskResult | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null);
   const sources = useRef<HTMLDivElement>(null);
@@ -40,17 +44,45 @@ export default function AskSymtri({ day, subject, signalId, initialQuestion="", 
   const [result, setResult] = useState<AskResult | null>(null);
   const [synthesizing, setSynthesizing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [incomplete, setIncomplete] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { input.current?.focus(); return () => controller.current?.abort(); }, []);
+  useEffect(() => {
+    if (!open) controller.current?.abort("closed");
+    const frame = requestAnimationFrame(() => {
+      if (open) {
+        if (initialQuestion) setQuestion(initialQuestion);
+        // Focus touch panels without opening the software keyboard.
+        if (window.matchMedia("(pointer: fine)").matches) input.current?.focus({ preventScroll: true });
+        else panel.current?.focus({ preventScroll: true });
+      } else {
+        setBusy(false);
+        setSynthesizing(false);
+      }
+    });
+    return () => { cancelAnimationFrame(frame); controller.current?.abort("closed"); };
+  }, [open, initialQuestion]);
+
+  const stop = () => {
+    controller.current?.abort("stopped");
+    setBusy(false);
+    setSynthesizing(false);
+    setError("Stopped. You can ask another question.");
+    input.current?.focus({ preventScroll: true });
+  };
 
   const ask = async (value: string, selected?:{signalId:string;subject:string}) => {
     const trimmed = value.trim();
     if (trimmed.length < 3 || busy) return;
+    const previous = completed.current;
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
     setQuestion(trimmed);
     setBusy(true);
+    setResult(null);
+    setIncomplete(true);
+    panel.current?.scrollTo({ top: 0 });
+    input.current?.focus({ preventScroll: true });
     setSynthesizing(false);
     setError("");
     const deadline = setTimeout(() => request.abort("timeout"), 40_000);
@@ -58,39 +90,47 @@ export default function AskSymtri({ day, subject, signalId, initialQuestion="", 
       const response = await fetch("/api/ask", {
         method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/x-ndjson" }, cache: "no-store",
         body: JSON.stringify({ question: trimmed, ...(day ? { day } : {}),
-          context: { ...(result && !result.needsClarification ? { question: (result.intent === "comparison"
-            ? `Compare ${result.subjects?.join(" and ")}` : result.subjects?.length===1 ? `Explain ${result.subjects[0]}` : result.question).slice(0,240),answer:result.summary.slice(0,800) } : {}), ...((selected?.subject ?? subject) ? {subject:(selected?.subject ?? subject)?.slice(0,240)} : {}), ...((selected?.signalId ?? signalId ?? result?.sourceSignalId) ? {signalId:selected?.signalId ?? signalId ?? result?.sourceSignalId} : {}) } }), signal: request.signal,
+          context: { ...(previous && !previous.needsClarification ? { question: (previous.intent === "comparison"
+            ? `Compare ${previous.subjects?.join(" and ")}` : previous.subjects?.length===1 ? `Explain ${previous.subjects[0]}` : previous.question).slice(0,240),answer:previous.summary.slice(0,800) } : {}), ...((selected?.subject ?? subject) ? {subject:(selected?.subject ?? subject)?.slice(0,240)} : {}), ...((selected?.signalId ?? signalId ?? previous?.sourceSignalId) ? {signalId:selected?.signalId ?? signalId ?? previous?.sourceSignalId} : {}) } }), signal: request.signal,
       });
       if (response.status === 429) throw new Error("Ask is busy right now. Please try again after the limit resets.");
       if (!response.ok) throw new Error("Signals are unavailable right now. Try again shortly.");
       const answer: AskResult = response.headers.get("content-type")?.includes("application/x-ndjson")
-        ? await readAskStream(response, preview => { setResult(preview); setSynthesizing(true); })
+        ? await readAskStream(response, preview => { if (!request.signal.aborted && controller.current === request) { setResult(preview); setSynthesizing(true); } })
         : await response.json();
+      if (request.signal.aborted || controller.current !== request) return;
+      const focusedControl = document.activeElement;
+      completed.current = answer;
       setResult(answer);
+      setIncomplete(false);
       onResult(answer);
+      // A preview's source or follow-up can disappear after the citation audit.
+      requestAnimationFrame(() => {
+        if (open && focusedControl instanceof HTMLElement && !focusedControl.isConnected) answerHeading.current?.focus({ preventScroll: true });
+      });
     } catch (cause) {
+      if (controller.current !== request) return;
       if (request.signal.reason === "timeout") setError("Following these sources took too long. Please try again.");
       else if (!request.signal.aborted) setError(cause instanceof Error ? cause.message : "Signals are unavailable right now. Try again shortly.");
     } finally {
       clearTimeout(deadline);
-      setSynthesizing(false);
-      if (!request.signal.aborted || request.signal.reason === "timeout") setBusy(false);
+      if (controller.current === request) { setSynthesizing(false); setBusy(false); }
     }
   };
 
-  return <section className="ask-panel" aria-label="Ask Symtri">
+  return <section ref={panel} className="ask-panel" aria-label="Ask Symtri" tabIndex={-1} hidden={!open} inert={!open}>
     <div className="ask-panel-top"><span>ASK SYMTRI <i /> {day ? "HISTORICAL VIEW" : result?.scope === "knowledge" ? "KNOWLEDGE ARCHIVE" : "CURRENT SOURCES"}</span><button type="button" onClick={onClose} aria-label="Close Ask Symtri">×</button></div>
     <form onSubmit={(event) => { event.preventDefault(); void ask(question); }}>
       <label htmlFor="symtri-question">Where should we look?</label>
-      <div className="ask-input-row"><input ref={input} id="symtri-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What's happening with AI agents?" maxLength={240} /><button type="submit" disabled={busy || question.trim().length < 3} aria-label="Ask Symtri">↗</button></div>
+      <div className="ask-input-row"><input ref={input} id="symtri-question" name="question" autoComplete="off" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What's happening with AI agents?" maxLength={240} /><button type="submit" disabled={busy || question.trim().length < 3} aria-label="Ask Symtri">↗</button></div>
     </form>
     {!result && !busy && <div className="ask-examples"><button type="button" onClick={() => void ask("What's happening with AI agents?")}>AI AGENTS ↗</button><button type="button" onClick={() => void ask("What connects nuclear energy and AI?")}>AI × ENERGY ↗</button></div>}
-    {busy && <p className="ask-state">{synthesizing ? "CHECKING SOURCE SYNTHESIS…" : "FOLLOWING THE SIGNALS…"}</p>}
-    {error && <p className="ask-state ask-state--error" role="alert">{error}</p>}
-    {result && <div className="ask-result" aria-live="polite">
+    <div className="ask-progress" role="status" aria-live="polite">{busy && <><p className="ask-state">{synthesizing ? "Sources found. Checking the answer…" : "Finding relevant sources…"}</p><button type="button" onClick={stop}>Stop</button></>}</div>
+    {error && <div className="ask-state ask-state--error" role="alert"><p>{error}</p>{!busy && <button type="button" onClick={() => void ask(question)}>Try again</button>}</div>}
+    {result && <div className="ask-result"><p ref={answerHeading} className="ask-answer-question" tabIndex={-1}>{result.question}</p>{incomplete && <p className="ask-preview-label">{busy ? "Source preview · answer is being checked" : "Source preview · synthesis did not finish"}</p>}
       {(result.summaryKind === "model" || result.events.length > 0) && <div className="ask-summary-heading">
         {result.summaryKind === "model" && <span className="ask-summary-label">SOURCE SYNTHESIS</span>}
-        {result.events.length > 0 && <button type="button" onClick={() => sources.current?.scrollIntoView({ block: "nearest" })} aria-label={`Show ${result.events.length} sources`}>{result.events.length} SOURCES ↓</button>}
+        {result.events.length > 0 && <button type="button" onClick={() => sources.current?.scrollIntoView({ block: "nearest" })} aria-label={`Show ${result.events.length} sources`}>{result.events.length} {result.events.length === 1 ? "SOURCE" : "SOURCES"} ↓</button>}
       </div>}
       {result.claims?.length ? <div className="ask-claims">{result.claims.slice(0, 2).map((claim, index) => <p className="ask-summary" key={index}>{claim.text} {claim.evidence.map((item, evidenceIndex) => {
         const source = result.events.find((event) => event.id === item.sourceId);

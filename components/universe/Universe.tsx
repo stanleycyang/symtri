@@ -83,6 +83,13 @@ function CameraRig({ entered, focusedId, selectedChildId, reducedMotion, compact
     };
   }, [askOverlay, camera, anchorX, anchorY, anchorZ, hasTopic, hasChild, compact, controls, entered, focusedId, panelConstrained, selectedChildId, reducedMotion]);
 
+  useEffect(() => {
+    const orbit = controls.current;
+    const interrupt = () => { move.current = null; };
+    orbit?.addEventListener("start", interrupt);
+    return () => orbit?.removeEventListener("start", interrupt);
+  }, [controls]);
+
   useFrame((_, delta) => {
     const current = move.current;
     if (!current) return;
