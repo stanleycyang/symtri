@@ -1,3 +1,4 @@
+import {streamAskResponse} from "@/lib/ai/ask-stream";
 import {runAskWithDeadline} from "@/lib/ai/deadline";
 import { withExplorationQuestions, answerComparison, answerKnowledgeQuestion, answerQuestion, questionSpecificWords, questionTopics, shouldSearchKnowledge, type AskResult } from "@/lib/ai/ask";
 import { planQuestion, type AskContext } from "@/lib/ai/intent";
@@ -34,7 +35,8 @@ async function readQuestionBody(request: Request): Promise<{ value?: unknown; st
   } catch { return { status: 400 }; }
 }
 
-async function withSourceSummary(answer: AskResult, feed: SignalFeed, context?:AskContext, deadline?:AbortSignal): Promise<AskResult> {
+async function withSourceSummary(answer: AskResult, feed: SignalFeed, context?:AskContext, deadline?:AbortSignal, publish?:(answer:AskResult)=>void): Promise<AskResult> {
+  publish?.(withExplorationQuestions(answer));
   if (deadline?.aborted || !gatewayConfigured() || !canSummarize(answer, feed)) return withExplorationQuestions(answer);
   try {
     const enriched = {...feed,events:[...feed.events]};
@@ -56,7 +58,7 @@ async function withSourceSummary(answer: AskResult, feed: SignalFeed, context?:A
   }
 }
 
-async function handleAsk(request: Request, deadline:AbortSignal) {
+async function handleAsk(request: Request, deadline:AbortSignal, publish?:(answer:AskResult)=>void) {
   const parsed = await readQuestionBody(request);
   if (parsed.status) return new Response(parsed.status === 413 ? "Question too large" : "Invalid request", { status: parsed.status });
   const body = parsed.value;
@@ -88,7 +90,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
       const results=event ? [{event,similarity:null}] : [];
       const selectedFeed:SignalFeed={observedAt:snapshot?.observedAt ?? new Date().toISOString(),events:event?[event]:[],sources:snapshot?.sources ?? unavailableSources(),partial:snapshot?.partial ?? false,scope:snapshot ? "history" : "knowledge"};
       const answer={...answerKnowledgeQuestion(question.trim(),results,catalog),intent:"explanation" as const,subjects:event?[event.title]:[],sourceSignalId:event?.id,scope:selectedFeed.scope,observedAt:selectedFeed.observedAt};
-      return Response.json(await withSourceSummary(answer,selectedFeed,context as AskContext|undefined,deadline),{headers:{"Cache-Control":"no-store"}});
+      return Response.json(await withSourceSummary(answer,selectedFeed,context as AskContext|undefined,deadline,publish),{headers:{"Cache-Control":"no-store"}});
     }
     if (!day && process.env.DATABASE_URL && plan.intent !== "comparison" && shouldSearchKnowledge(trimmed, catalog)) {
       try {
@@ -100,7 +102,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
         const results = await searchKnowledge(trimmed, vector, true);
         const knowledgeFeed: SignalFeed = { observedAt: new Date().toISOString(), events: results.map((item) => item.event),
           sources: unavailableSources(), partial: true, scope: "knowledge" };
-        return Response.json(await withSourceSummary(answerKnowledgeQuestion(trimmed, results, catalog), knowledgeFeed,context as AskContext|undefined,deadline), { headers: { "Cache-Control": "no-store" } });
+        return Response.json(await withSourceSummary(answerKnowledgeQuestion(trimmed, results, catalog), knowledgeFeed,context as AskContext|undefined,deadline,publish), { headers: { "Cache-Control": "no-store" } });
       } catch (error) { console.warn("SYMTRI knowledge search unavailable", error instanceof Error ? error.message : "unknown error"); }
     }
     let feed = day && process.env.DATABASE_URL ? await getSnapshotFeed(day) : null;
@@ -174,7 +176,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
         }
       } catch (error) { console.warn("SYMTRI specific archive search unavailable", error instanceof Error ? error.message : "unknown error"); }
     }
-    answer = await withSourceSummary(answer, feed,context as AskContext|undefined,deadline);
+    answer = await withSourceSummary(answer, feed,context as AskContext|undefined,deadline,publish);
     return Response.json(answer, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.warn("SYMTRI ask unavailable", error instanceof Error ? error.message : "unknown error");
@@ -184,5 +186,9 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
 
 
 export async function POST(request:Request) {
-  return runAskWithDeadline(signal=>handleAsk(request,signal));
+  if (request.headers.get("accept")?.includes("application/x-ndjson")) {
+    return streamAskResponse(request.signal, (signal, publish) => runAskWithDeadline(
+      deadline => handleAsk(request, AbortSignal.any([signal, deadline]), publish)));
+  }
+  return runAskWithDeadline(signal=>handleAsk(request,AbortSignal.any([request.signal,signal])));
 }

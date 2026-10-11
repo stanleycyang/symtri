@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {readAskStream} from "@/lib/ai/ask-stream";
 import type { AskResult } from "@/lib/ai/ask";
 import {sourceHasDayPrecision,sourceKindLabels} from "@/lib/data/source-presentation";
 
@@ -37,6 +38,7 @@ export default function AskSymtri({ day, subject, signalId, initialQuestion="", 
   const sources = useRef<HTMLDivElement>(null);
   const [question, setQuestion] = useState(initialQuestion);
   const [result, setResult] = useState<AskResult | null>(null);
+  const [synthesizing, setSynthesizing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => { input.current?.focus(); return () => controller.current?.abort(); }, []);
@@ -49,18 +51,21 @@ export default function AskSymtri({ day, subject, signalId, initialQuestion="", 
     controller.current = request;
     setQuestion(trimmed);
     setBusy(true);
+    setSynthesizing(false);
     setError("");
     const deadline = setTimeout(() => request.abort("timeout"), 40_000);
     try {
       const response = await fetch("/api/ask", {
-        method: "POST", headers: { "Content-Type": "application/json" }, cache: "no-store",
+        method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/x-ndjson" }, cache: "no-store",
         body: JSON.stringify({ question: trimmed, ...(day ? { day } : {}),
           context: { ...(result && !result.needsClarification ? { question: (result.intent === "comparison"
             ? `Compare ${result.subjects?.join(" and ")}` : result.subjects?.length===1 ? `Explain ${result.subjects[0]}` : result.question).slice(0,240),answer:result.summary.slice(0,800) } : {}), ...((selected?.subject ?? subject) ? {subject:(selected?.subject ?? subject)?.slice(0,240)} : {}), ...((selected?.signalId ?? signalId ?? result?.sourceSignalId) ? {signalId:selected?.signalId ?? signalId ?? result?.sourceSignalId} : {}) } }), signal: request.signal,
       });
       if (response.status === 429) throw new Error("Ask is busy right now. Please try again after the limit resets.");
       if (!response.ok) throw new Error("Signals are unavailable right now. Try again shortly.");
-      const answer: AskResult = await response.json();
+      const answer: AskResult = response.headers.get("content-type")?.includes("application/x-ndjson")
+        ? await readAskStream(response, preview => { setResult(preview); setSynthesizing(true); })
+        : await response.json();
       setResult(answer);
       onResult(answer);
     } catch (cause) {
@@ -68,6 +73,7 @@ export default function AskSymtri({ day, subject, signalId, initialQuestion="", 
       else if (!request.signal.aborted) setError(cause instanceof Error ? cause.message : "Signals are unavailable right now. Try again shortly.");
     } finally {
       clearTimeout(deadline);
+      setSynthesizing(false);
       if (!request.signal.aborted || request.signal.reason === "timeout") setBusy(false);
     }
   };
@@ -79,7 +85,7 @@ export default function AskSymtri({ day, subject, signalId, initialQuestion="", 
       <div className="ask-input-row"><input ref={input} id="symtri-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What's happening with AI agents?" maxLength={240} /><button type="submit" disabled={busy || question.trim().length < 3} aria-label="Ask Symtri">↗</button></div>
     </form>
     {!result && !busy && <div className="ask-examples"><button type="button" onClick={() => void ask("What's happening with AI agents?")}>AI AGENTS ↗</button><button type="button" onClick={() => void ask("What connects nuclear energy and AI?")}>AI × ENERGY ↗</button></div>}
-    {busy && <p className="ask-state">FOLLOWING THE SIGNALS…</p>}
+    {busy && <p className="ask-state">{synthesizing ? "CHECKING SOURCE SYNTHESIS…" : "FOLLOWING THE SIGNALS…"}</p>}
     {error && <p className="ask-state ask-state--error" role="alert">{error}</p>}
     {result && <div className="ask-result" aria-live="polite">
       {(result.summaryKind === "model" || result.events.length > 0) && <div className="ask-summary-heading">
