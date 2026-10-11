@@ -1,5 +1,5 @@
 import { getSignalFeed } from "./feed";
-import { getArchiveCount, getLatestIngestionFeedMetadata, getPersistedCurrentFeed, getStoredFeed } from "./storage";
+import { getArchiveCount, getLatestIngestionFeedMetadata, getPersistedCurrentFeed, getPublishedEvidenceCounts, getStoredFeed } from "./storage";
 import { unavailableSources, type SignalFeed } from "./model";
 import { getUniverseCatalog } from "./catalog";
 
@@ -12,8 +12,9 @@ export async function getCurrentFeed(readyOnly = false): Promise<SignalFeed> {
     // Read readiness at request time: notes completed between hourly ingestions
     // become visible immediately, with reservations applied before the map cap.
     const events = readyOnly ? (await getStoredFeed(true))?.events ?? [] : prepared.events;
+    const publishedEvidence = readyOnly ? await getPublishedEvidenceCounts() : undefined;
     const stale = Date.now() - Date.parse(prepared.observedAt) > 3 * 60 * 60 * 1000;
-    return { ...prepared, events, observedAt: new Date().toISOString(), lastIngestedAt: prepared.observedAt,
+    return { ...prepared, events, publishedEvidence, observedAt: new Date().toISOString(), lastIngestedAt: prepared.observedAt,
       activity: stale ? undefined : prepared.activity, partial: stale || prepared.partial,
       scope: stale ? "archive" : "rolling" };
   }
@@ -33,6 +34,7 @@ export async function getCurrentFeed(readyOnly = false): Promise<SignalFeed> {
     partial: stale || latest?.partial || false,
     scope: stale ? "archive" : "rolling",
     catalog: await getUniverseCatalog(),
+    ...(readyOnly ? { publishedEvidence: await getPublishedEvidenceCounts() } : {}),
   };
 }
 

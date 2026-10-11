@@ -12,6 +12,7 @@ export type UniverseProps = {
   catalog: UniverseCatalog;
   entered: boolean;
   askOpen: boolean;
+  readableRelationships?: Record<string,number>;
   focusedId: string | null;
   selectedChildId: string | null;
   selectedSignalId: string | null;
@@ -373,7 +374,7 @@ function SignalCloud({ topic, reducedMotion }: { topic: Topic; reducedMotion: bo
   return <points ref={points} position={topic.position} geometry={geometry} raycast={() => null}><pointsMaterial ref={material} color={topic.color} size={.035} transparent opacity={Math.min(.58, .33 + topic.change / 1000)} sizeAttenuation depthWrite={false} /></points>;
 }
 
-function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, childCounts, countsReady, countPeriod, connectedRegionId, onConnection, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
+function World({ entered, askOpen, readableRelationships, focusedId, selectedChildId, selectedSignalId, hoveredId, signalMarkers, regionActivity, childCounts, countsReady, countPeriod, connectedRegionId, onConnection, regionRelationships, archiveRelationships, semanticRelationships, askPathIds, askSteps, onFocus, onChild, onSignal, onHover, reducedMotion, compact, catalog }: UniverseProps & { compact: boolean }) {
   const controls = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
   const { camera } = useThree();
   const topicPoints = useMemo(() => new Map(catalog.topics.map((topic) => [topic.id, new THREE.Vector3(...topic.position)])), [catalog]);
@@ -449,7 +450,7 @@ function World({ entered, askOpen, focusedId, selectedChildId, selectedSignalId,
       const color = selected ? "#f4d1a8" : inAnswer ? "#d5a878" : highlighted ? getTopic(hoveredId, catalog)?.color : establishedEdgeKeys.has(key) ? undefined : "#bfa178";
       const opacity = selected ? .85 : inAnswer ? .72 : hoveredId ? (highlighted ? Math.max(.42, strength) : .04)
         : focused ? (focused.id === a || focused.id === b ? Math.max(.19, strength) : .035) : strength;
-      return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={color} opacity={opacity} bend={2.6} onClick={entered ? () => onConnection(focusedId === b ? b : a, focusedId === b ? a : b) : undefined} />;
+      return <Filament key={`${a}-${b}`} from={first.position} to={second.position} color={color} opacity={opacity} bend={2.6} onClick={entered && (readableRelationships?.[[a,b].sort().join(":")] ?? 0)>0 ? () => onConnection(focusedId === b ? b : a, focusedId === b ? a : b) : undefined} />;
     })}
     {askSteps.map((step, index) => index > 0 && step.subtopicId && askSteps[index - 1].subtopicId ? <Filament key={`ask-${index}`} from={pathPosition(askSteps[index - 1])} to={pathPosition(step)} color="#e6b988" opacity={.82} bend={.8} /> : null)}
     {activeTopics.map((topic) => <group key={topic.id}>

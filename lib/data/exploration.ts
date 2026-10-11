@@ -4,6 +4,7 @@ import type { SignalFeed } from "./model";
 
 export function threadCounts(feed: SignalFeed | null): Record<string, number> {
   if (!feed) return {};
+  if (feed.scope !== "history" && feed.publishedEvidence) return feed.publishedEvidence.childCounts;
   if (feed.scope !== "history" && feed.childCounts) return feed.childCounts;
   const counts: Record<string, number> = {};
   for (const event of feed.events) {
@@ -29,7 +30,12 @@ export function connectionsFor(regionId: string, feed: SignalFeed | null, catalo
     const recent = relationships?.[key] ?? 0;
     const archived = feed?.scope === "history" ? 0 : feed?.knowledgeGraph?.relationships[key] ?? 0;
     const seeded = catalog.topicEdges.some(([a, b]) => relationshipKey(a, b) === key);
-    return { topic, recent, archived, seeded, visible: visible.has(topic.id) };
+    const availableRecent = feed?.scope === "history"
+      ? (feed.events.filter(event=>[regionId,topic.id].every(id=>event.topics.some(match=>match.topicId===id))).length)
+      : feed?.publishedEvidence ? feed.publishedEvidence.relationships[key] ?? 0 : recent;
+    const availableArchive = feed?.scope === "history" ? 0
+      : feed?.publishedEvidence ? feed.publishedEvidence.archiveRelationships[key] ?? 0 : archived;
+    return { topic, recent, archived, availableRecent, availableArchive, seeded, visible: visible.has(topic.id) };
   }).filter((item) => item.visible || item.recent > 0 || item.archived > 0)
     .sort((a, b) => Number(b.visible) - Number(a.visible) || b.recent - a.recent || b.archived - a.archived);
 }

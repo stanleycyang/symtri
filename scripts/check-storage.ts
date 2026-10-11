@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getCisaEntryHashes, getSignalEvidence, getArchivedSignal, withStoredEvidence, getConnectionEvents, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getPublishedEvidenceCounts, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getCisaEntryHashes, getSignalEvidence, getArchivedSignal, withStoredEvidence, getConnectionEvents, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -10,7 +10,7 @@ import { regionActivity } from "../lib/data/activity";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
-import { availableReadingNoteLanes, claimableReadingNoteCount, claimReadingNoteWorker, reserveReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION, type ReadingNote } from "../lib/data/enrichment";
+import { availableReadingNoteLanes, claimableReadingNoteCount, claimReadingNoteWorker, readingNoteCounts, reserveReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION, type ReadingNote } from "../lib/data/enrichment";
 import { enrichOwnedBatch } from "../lib/data/enrichment-worker";
 import { GET as readStory } from "../app/api/story/route";
 import { POST as askSymtri } from "../app/api/ask/route";
@@ -1043,6 +1043,11 @@ async function main() {
       await persistSignals({...feed,events:pendingBurst});
       assert.ok(!(await getStoredFeed())?.events.some(item=>item.id===id),"The raw overview cap is crowded by pending fixtures");
       assert.ok((await getStoredFeed(true))?.events.some(item=>item.id===id),"Pending stories cannot crowd a ready story out of the published overview");
+      const readable=await getPublishedEvidenceCounts();
+      const readyTopics=readySignal.topics;
+      for(const match of readyTopics) if(match.subtopicId) assert.ok((readable.childCounts[match.subtopicId]??0)>=1,"Full-window readable counts retain a story beyond the overview cap");
+      const publicFeed=await (await getPublicSignals()).json();
+      assert.ok(publicFeed.publishedEvidence,"The public API carries full-window publication counts");
       assert.ok((await getTopicPage(noteRegion,null,null,20,true)).events.some(item=>item.id===id),"Publication filtering runs before topic pagination");
       assert.ok((await getRecentTopicEvents([{id:noteRegion,childId:null}],true,true)).some(item=>item.id===id));
       await sql`delete from signal_events where id in ${sql(pendingBurst.map(item=>item.id))}`;
@@ -1127,6 +1132,18 @@ async function main() {
       const upgraded=(await sql`select version,status,note,attempts from reading_notes where signal_id=${id}`)[0];
       assert.equal(upgraded.version,ENRICHMENT_VERSION);assert.equal(upgraded.status,"pending");assert.equal(upgraded.note,null);assert.equal(upgraded.attempts,0);
       assert.equal((await sql`select version from reading_notes where signal_id=${unclassifiedId}`)[0].version,0,"Version refresh reserves bounded work for previously available reading notes before an older unprocessed backlog");
+
+      await sql`update reading_notes set status='failed',blocked=false,attempts=3,failure_code='source-too-thin',version=${ENRICHMENT_VERSION} where signal_id=${id}`;
+      const beforeRepair=await readingNoteCounts();
+      assert.ok(beforeRepair.exhausted>=1,"Exhausted retries are reported explicitly even before migration");
+      const repair=await readFile(new URL("../supabase/migrations/20261011223949_repair_reading_note_queue.sql",import.meta.url),"utf8");
+      await sql.unsafe(repair);await sql.unsafe(repair);
+      const repaired=(await sql`select blocked,attempts,failure_code from reading_notes where signal_id=${id}`)[0];
+      assert.equal(repaired.blocked,true);assert.equal(repaired.attempts,3);assert.equal(repaired.failure_code,'source-too-thin');
+      await sql`delete from signal_observations where signal_id=${unclassifiedId}`;
+      const effective=await readingNoteCounts();
+      assert.ok(effective.inactive>=1,"Inactive-source pending notes are separated from actionable backlog");
+      assert.equal(effective.pending,beforeRepair.pending-1,"An exhausted note never becomes actionable and an inactive note leaves the queue");
 
     } finally {
       if(priorGateway===undefined) delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorGateway;

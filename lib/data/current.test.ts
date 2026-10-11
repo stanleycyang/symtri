@@ -19,6 +19,7 @@ function harness(readyIds: string[], broken = false, database = true) {
     require: (name: string) => {
       if (name === "./storage") return {
         getPersistedCurrentFeed: async () => prepared,
+        getPublishedEvidenceCounts:async()=>({childCounts:{"ai-agents":7},relationships:{"ai:software":4},archiveRelationships:{"ai:software":12}}),
         getStoredFeed: async (readyOnly: boolean) => {
           calls.push(readyOnly);
           if (broken) throw new Error("Readiness unavailable");
@@ -39,6 +40,7 @@ test("public feed reads newly completed stories independently of the hourly samp
   assert.deepEqual(Array.from(feed.events, event => event.id), ["newly-ready", "older-ready"]);
   assert.deepEqual(calls, [true]);
   assert.equal(feed.archiveCount, 401);
+  assert.equal(feed.publishedEvidence?.childCounts["ai-agents"],7);
   assert.equal(feed.sources.github, "ok");
 });
 

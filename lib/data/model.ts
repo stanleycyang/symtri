@@ -53,6 +53,7 @@ export type SignalFeed = {
   archiveCount?: number;
   classifierVersion?: number;
   childCounts?: Record<string, number>;
+  publishedEvidence?: { childCounts: Record<string, number>; relationships: RegionRelationships; archiveRelationships: RegionRelationships };
   activity?: Record<string, RegionActivity>;
   relationships?: RegionRelationships;
   knowledgeGraph?: { updatedAt: string; regionCounts: Record<string, number>; relationships: RegionRelationships; recentRelationships?: RegionRelationships };

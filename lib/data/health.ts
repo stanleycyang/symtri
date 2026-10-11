@@ -36,6 +36,15 @@ export function evaluateProductionHealth(now: Date, status: Status, growth: Grow
     runStartedAt: run?.startedAt ?? null };
 }
 
+/** Keep a recorded check distinguishable from conditions already resolved by later workers. */
+export function currentHealthView(check:HealthCheck|null, embeddingBacklog:number, now=new Date()) {
+  if (!check) return null;
+  const ageSeconds=Math.max(0,Math.floor((now.getTime()-Date.parse(check.checkedAt))/1000));
+  const issues=check.issues.filter(issue=>issue!=="Embedding backlog remains" || embeddingBacklog>0);
+  return {...check,snapshotStatus:check.status,snapshotIssues:check.issues,issues,
+    status:issues.length ? "degraded" : "healthy",ageSeconds,stale:ageSeconds>75*60};
+}
+
 export async function runProductionHealthCheck(now = new Date()): Promise<HealthCheck> {
   const status = await getIngestionStatus();
   const growth = await getGrowthStatus();
@@ -49,7 +58,9 @@ export async function runProductionHealthCheck(now = new Date()): Promise<Health
   if (notes.oldestPendingAt && now.getTime()-notes.oldestPendingAt.getTime()>6*60*60_000) {
     result.warnings.push("Reading-note backlog contains work older than six hours");
   }
-  if (notes.blocked>0) result.warnings.push(`${notes.blocked} reading notes are blocked pending input or operator changes`);
+  if (notes.exhausted>0) result.warnings.push(`${notes.exhausted} reading notes exhausted their retries`);
+  const permanent=Math.max(0,notes.blocked-notes.exhausted);
+  if (permanent>0) result.warnings.push(`${permanent} reading notes are blocked pending input or operator changes`);
   if (notes.pending > 0 && (!notes.lastWorkerAt || now.getTime() - notes.lastWorkerAt.getTime() > 20 * 60_000)) {
     result.issues.push("Reading-note workers have not run in the last 20 minutes");
     result.status = "degraded";

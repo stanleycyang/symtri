@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import SourceText from "./SourceText";
 import {readAskStream} from "@/lib/ai/ask-stream";
 import type { AskResult } from "@/lib/ai/ask";
 import {sourceHasDayPrecision,sourceKindLabels} from "@/lib/data/source-presentation";
@@ -136,13 +137,13 @@ export default function AskSymtri({ open, day, subject, signalId, initialQuestio
         {result.summaryKind === "model" && <span className="ask-summary-label">SOURCE SYNTHESIS</span>}
         {result.events.length > 0 && <button type="button" onClick={() => sources.current?.scrollIntoView({ block: "nearest" })} aria-label={`Show ${result.events.length} sources`}>{result.events.length} {result.events.length === 1 ? "SOURCE" : "SOURCES"} ↓</button>}
       </div>}
-      {result.claims?.length ? <div className="ask-claims">{result.claims.slice(0, 2).map((claim, index) => <p className="ask-summary" key={index}>{claim.text} {claim.evidence.map((item, evidenceIndex) => {
+      {result.claims?.length ? <div className="ask-claims">{result.claims.slice(0, 2).map((claim, index) => <div className="ask-summary" key={index}><SourceText text={claim.text}/> {claim.evidence.map((item, evidenceIndex) => {
         const source = result.events.find((event) => event.id === item.sourceId);
         return source ? <a key={evidenceIndex} href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`Source: ${source.title}`}>[{result.events.indexOf(source) + 1}]</a> : null;
-      })}</p>)}<details className="ask-evidence"><summary>Read supporting passages{result.claims.length > 2 ? " and more detail" : ""}</summary>{result.claims.map((claim, index) => <div key={index}>{index > 1 && <p className="ask-summary">{claim.text}</p>}{claim.evidence.map((item, evidenceIndex) => {
+      })}</div>)}<details className="ask-evidence"><summary>Read supporting passages{result.claims.length > 2 ? " and more detail" : ""}</summary>{result.claims.map((claim, index) => <div key={index}>{index > 1 && <div className="ask-summary"><SourceText text={claim.text}/></div>}{claim.evidence.map((item, evidenceIndex) => {
         const source = result.events.find((event) => event.id === item.sourceId);
-        return <blockquote key={evidenceIndex}><p>{item.quote}</p>{source && <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} ↗</a>}</blockquote>;
-      })}</div>)}</details></div> : <p className="ask-summary">{result.summary}</p>}
+        return <blockquote key={evidenceIndex}><SourceText text={item.quote} baseUrl={source?.url}/>{source && <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} ↗</a>}</blockquote>;
+      })}</div>)}</details></div> : <div className="ask-summary"><SourceText text={result.summary}/></div>}
       {result.pathSteps.length > 0 && <><span className="ask-path-label">{result.regionIds.length > 1 ? "CONCEPTUAL MAP ROUTE" : "MAP LOCATION"}</span><div className="ask-path" aria-label="Highlighted map path">{result.pathSteps.map((step, index) => <span key={`${step.regionId}:${step.subtopicId ?? "region"}`}>{index > 0 && <b>↗</b>}<button type="button" onClick={() => onNavigate(step.regionId, step.subtopicId)}>{step.label.toUpperCase()}</button></span>)}</div></>}
       {result.events.length > 0 && <div className="ask-sources" ref={sources}><span>{result.scope === "knowledge" ? "FROM THE KNOWLEDGE ARCHIVE" : result.retrieval === "semantic-assisted" ? "RANKED BY MEANING" : "FROM CURRENT SOURCES"}</span>{result.events.map((event) => <a key={event.id} href={event.url} target="_blank" rel="noopener noreferrer"><small>{(sourceLabels[event.source] ?? event.source).toUpperCase()}{event.sourceKind ? ` · ${sourceKindLabels[event.sourceKind]}` : ""} · {sourceTime(event.publishedAt, result.observedAt, result.scope === "history", sourceHasDayPrecision(event.source))}{result.citedEventIds.includes(event.id) && " · CITED"}</small>{event.title}<b>↗</b></a>)}</div>}
       {result.followUps?.length ? <div className="ask-followups"><span>KEEP EXPLORING</span>{result.followUps.map(item=><button type="button" key={item.question} disabled={busy} onClick={()=>void ask(item.question,item)}>{item.label} ↗</button>)}</div> : null}

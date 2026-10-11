@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 11;
+export const CLASSIFIER_VERSION = 12;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -78,8 +78,13 @@ function strongestTerm(text: string, terms: string[]) { return terms.filter((ter
 
 function astronomicalSense(text: string): string {
   return text
+    .replace(/\bspace[ -]time[ -]trade[ -]?offs?\b/gi, "")
     .replace(/\b(?:constant|linear|logarithmic|sublinear|state|feature|latent|vector|embedding|search|parameter|phase|sample|hilbert|eigen|memory|storage|disk|free|file|workspace)[ -]space\b/gi, "")
     .replace(/\bspace[ -](?:overhead|complexity|usage|efficiency|efficient|bound|requirements?)\b/gi, "");
+}
+
+function financialSense(text: string): string {
+  return text.replace(/\btrade[ -]?offs?\b/gi, "");
 }
 
 function securitySense(text: string): string {
@@ -108,8 +113,8 @@ export function classifySignal(title: string, summary: string, categories: strin
     if (physicalEnergy && !matched(`${title} ${summary}`, terms.filter((term) => term !== "energy"))) {
       return { topicId: topic.id, subtopicId: null, score: 0 };
     }
-    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : topic.id === "security" ? securitySense(title) : regionTitle, terms);
-    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : topic.id === "security" ? securitySense(summary) : regionSummary, terms);
+    const parentInTitle = matched(topic.id === "space" ? astronomicalSense(title) : topic.id === "security" ? securitySense(title) : topic.id === "markets" ? financialSense(title) : regionTitle, terms);
+    const parentInSummary = matched(topic.id === "space" ? astronomicalSense(summary) : topic.id === "security" ? securitySense(summary) : topic.id === "markets" ? financialSense(summary) : regionSummary, terms);
     const parentInCategory = categories.some((category) => (categoryTerms[topic.id] ?? []).some((prefix) => category.startsWith(prefix)));
     const categoryWeight = topic.id === "space" && parentInCategory ? 8 : 6;
     let score = (parentInTitle ? 5 : 0) + (parentInSummary ? 1 : 0) + (parentInCategory ? categoryWeight : 0);

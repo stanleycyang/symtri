@@ -271,3 +271,11 @@ test("nearby ideas skip alternate headlines about the same incident", () => {
   ];
   assert.deepEqual(selectDistinctHeadlines(live, 3, [origin]), [live[3]]);
 });
+
+test("storage trade-offs are neither astronomy nor finance, while concrete subjects still match",()=>{
+  const negative=classifySignal('Better Space-Time Trade-Offs for LSM-Tree Based Key-Value Stores [pdf]','Hacker News discussion.');
+  assert.equal(negative.some(t=>t.topicId==='space'||t.topicId==='markets'),false);
+  assert.equal(classifySignal('Space telescope maps new galaxies','Astronomy research').some(t=>t.topicId==='space'),true);
+  assert.equal(classifySignal('International trade expands in financial markets','Economy and commerce').some(t=>t.topicId==='markets'),true);
+  assert.equal(classifySignal('AI inference tradeoffs','Latency and model quality').some(t=>t.topicId==='markets'),false);
+});

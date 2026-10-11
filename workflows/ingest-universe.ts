@@ -185,11 +185,26 @@ async function maintainArchivePhase(runId:string,phase:"discover"|"trial"|"catal
   return true;
 }
 
+async function refreshArchiveBatch(runId:string,kind:"classification"|"catalog"):Promise<number> {
+  "use step";
+  if(!await renewReadingNoteWorker(4,runId)) return -1;
+  return kind==="classification" ? refreshStoredClassifications(1000) : syncArchiveConcepts(1000);
+}
+
 export async function maintainUniverse(slot:string) {
   "use workflow";
   const runId=`maintenance:${slot}`;
   if (!await claimReadingNotes(4,runId)) return {status:"busy"};
   try {
+    // Bound a release backfill across durable steps, preserving snapshots and source text.
+    for(const kind of ["classification","catalog"] as const) {
+      for(let batch=0;batch<50;batch++) {
+        const count=await refreshArchiveBatch(runId,kind);
+        if(count<0) return {status:"lease-lost"};
+        if(count<1000) break;
+      }
+    }
+    for(let batch=0;batch<3;batch++) { if(await refreshGraph()<30) break; }
     if(!await maintainArchivePhase(runId,"discover")) return {status:"lease-lost"};
     if(!await maintainArchivePhase(runId,"trial")) return {status:"lease-lost"};
     if(!await maintainArchivePhase(runId,"catalog")) return {status:"lease-lost"};

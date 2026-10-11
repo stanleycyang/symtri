@@ -40,3 +40,10 @@ test("sample feeds derive shared evidence and explain seeded versus grown thread
   assert.match(threadOrigin("startups-product"), /starting thread/);
   assert.match(threadOrigin("organic-test"), /repeated source evidence/);
 });
+
+test("observed counts never advertise an unpublished connection or thread as readable",()=>{
+  const published={...feed,publishedEvidence:{childCounts:{'ai-agents':3},relationships:{},archiveRelationships:{}}};
+  assert.equal(threadCounts(published)['ai-agents'],3);
+  const link=connectionsFor('ai',published,seedCatalog).find(item=>item.topic.id==='software');
+  assert.equal(link?.recent,204);assert.equal(link?.availableRecent,0);assert.equal(link?.availableArchive,0);
+});

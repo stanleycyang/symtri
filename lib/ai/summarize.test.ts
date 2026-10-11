@@ -44,10 +44,10 @@ test("reading notes use low-cost independent auditors on both attempts",async()=
   const fake=(async (...args:Parameters<typeof summarizeAnswer>)=>{
     calls.push({draft:args[2],audit:args[5]});
     if(calls.length===1) throw new Error("Claim lacked a valid source passage");
-    return {summary:"Supported note",claims:[],citedEventIds:[]};
+    return {summary:"The project documents a reproducible workflow for reviewing source-backed agent outputs.",claims:[],citedEventIds:[]};
   }) as typeof summarizeAnswer;
   const result=await summarizeReadingNote(answerQuestion("Explain AI agents",feed),feed,fake);
-  assert.equal(result.summary,"Supported note");
+  assert.equal(result.summary,"The project documents a reproducible workflow for reviewing source-backed agent outputs.");
   assert.deepEqual(calls,[
     {draft:"alibaba/qwen3.7-flash",audit:"mistral/mistral-nemo"},
     {draft:"alibaba/qwen3.7-flash",audit:"mistral/mistral-small"},
@@ -62,7 +62,7 @@ test("reading-note fallback can use a separate inexpensive auditor",async()=>{
     const fake=(async (...args:Parameters<typeof summarizeAnswer>)=>{
       calls.push({draft:args[2],audit:args[5]});
       if(calls.length===1) throw new Error("Claim lacked a valid source passage");
-      return {summary:"Supported note",claims:[],citedEventIds:[]};
+      return {summary:"The project documents a reproducible workflow for reviewing source-backed agent outputs.",claims:[],citedEventIds:[]};
     }) as typeof summarizeAnswer;
     await summarizeReadingNote(answerQuestion("Explain AI agents",feed),feed,fake);
     assert.deepEqual(calls[1],{draft:"alibaba/qwen3.7-flash",audit:"custom/cheap-audit"});
@@ -254,4 +254,23 @@ test("an older arXiv excerpt still scopes an update as a preprint",async()=>{
   const model=modelResponse({claims:[{text:"The paper evaluates tool use by AI agents.",evidence:[{sourceId:event.id,quote:event.summary}]}]});
   const note=await summarizeAnswer(answerQuestion("What is happening with AI agents?",feed),feed,model);
   assert.match(note.summary,/^The cited preprint authors report:/);
+});
+
+test("extractive fallback records its method and keeps a complete sentence with exact provenance",async()=>{
+  const {extractiveReadingNote}=await import('./summarize');
+  const passage='The repository provides a documented workflow for inspecting source data, running local checks, and exporting results for review.';
+  const event={...feed.events[0],evidence:{text:passage+' A second sentence follows with additional details about configuration and deployment.',kind:'repository' as const,url:feed.events[0].url,attribution:'Project authors',license:null,retrievedAt:feed.observedAt}};
+  const scoped={...feed,events:[event]};
+  const result=extractiveReadingNote(answerQuestion('Explain AI agents',scoped),scoped);
+  assert.equal(result.synthesisMethod,'extractive');assert.equal(result.claims[0].evidence[0].quote,passage);
+});
+
+
+test("a trivial reading note falls back to a substantial original source passage",async()=>{
+  const passage="The project documents a reproducible workflow for inspecting input data, testing agent behavior, and reviewing exported results before deployment.";
+  const event={...feed.events[0],evidence:{text:passage,kind:"repository" as const,url:feed.events[0].url,attribution:"Project authors",license:null,retrievedAt:feed.observedAt}};
+  const scoped={...feed,events:[event]};
+  const fake=(async()=>({summary:"The tool is free to use.",claims:[],citedEventIds:[]})) as typeof summarizeAnswer;
+  const result=await summarizeReadingNote(answerQuestion("Explain AI agents",scoped),scoped,fake);
+  assert.equal(result.synthesisMethod,"extractive");assert.equal(result.claims[0].evidence[0].quote,passage);
 });

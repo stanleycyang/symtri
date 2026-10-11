@@ -11,7 +11,7 @@ import { unavailableSources, type SignalEvent } from "./model";
 import { evidenceSuitable, failurePolicy, noteFingerprint } from "./enrichment-policy";
 import { ENRICHMENT_VERSION } from "./reading-note-version";
 export { ENRICHMENT_VERSION } from "./reading-note-version";
-export type ReadingNote = { explanation: string; claims: GroundedClaim[]; questions: string[]; createdAt: string; sourceKind: string; evidenceSource: string; evidenceUrl: string; evidenceAttribution: string; evidenceLicense: string|null; context: BackgroundContext[] };
+export type ReadingNote = { explanation: string; claims: GroundedClaim[]; questions: string[]; createdAt: string; sourceKind: string; evidenceSource: string; evidenceUrl: string; evidenceAttribution: string; evidenceLicense: string|null; context: BackgroundContext[]; synthesisMethod?: "model" | "extractive"; fallbackReason?: string|null };
 
 export function readingNoteFailureCode(stage: "evidence" | "hydrate" | "generate" | "context" | "commit", error: unknown): string {
   const message = error instanceof Error ? error.message : "";
@@ -312,10 +312,11 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
       if (!generation.length) continue;
       const summary=await synthesize(answer,feed);
       stage = "context";
-      const note:ReadingNote={explanation:summary.summary,claims:summary.claims,questions:[`What does this source establish about ${event.title.slice(0,100)}?`,`What limitations does this source report?`],createdAt:new Date().toISOString(),sourceKind:event.evidence!.kind,evidenceSource,evidenceUrl:event.evidence!.url,evidenceAttribution:event.evidence!.attribution,evidenceLicense:event.evidence!.license,context:await loadContext(event)};
+      const note:ReadingNote={explanation:summary.summary,claims:summary.claims,questions:[`What does this source establish about ${event.title.slice(0,100)}?`,`What limitations does this source report?`],createdAt:new Date().toISOString(),sourceKind:event.evidence!.kind,evidenceSource,evidenceUrl:event.evidence!.url,evidenceAttribution:event.evidence!.attribution,evidenceLicense:event.evidence!.license,synthesisMethod:summary.synthesisMethod ?? "model",fallbackReason:summary.fallbackReason ?? null,context:await loadContext(event)};
       stage = "commit";
       const committed=await sql`update reading_notes set status='ready',note=${sql.json(note)},failure_code=null,blocked=false,input_hash=${hash},version=${ENRICHMENT_VERSION},lease_until=null,updated_at=now() where signal_id=${event.id} and revision=${revision} and claim_token=${token} and status='working' and lease_until>now() returning signal_id`;
       ready+=committed.length;
+      console.info("SYMTRI reading-note published",{source:row.source,method:note.synthesisMethod,fallbackReason:note.fallbackReason,published:committed.length});
     } catch(error) {
       const reason=readingNoteFailureCode(stage,error);
       const current=await sql<{attempts:number}[]>`select attempts from reading_notes where signal_id=${row.id} and claim_token=${token} and status='working'`;
@@ -330,21 +331,28 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
   return {processed:claimed.length,ready,failed,status:failed?"partial":"ok"};
 }
 
-export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null}> {
-  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null}[]>`select
+export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number}> {
+  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number}[]>`with queue as (
+      select reading_notes.*,exists(select 1 from signal_observations observation join source_catalog source
+        on source.id=observation.source and source.status='active' where observation.signal_id=reading_notes.signal_id) as active
+      from reading_notes
+    ) select
     count(*) filter(where status='ready' and version=${ENRICHMENT_VERSION})::int as ready,
-    count(*) filter(where status in ('pending','working') or version<>${ENRICHMENT_VERSION})::int as pending,
+    count(*) filter(where active and ((status='working' and lease_until>now()) or (not blocked and attempts<3 and status in ('pending','failed'))))::int as pending,
     count(*) filter(where status='failed' and version=${ENRICHMENT_VERSION})::int as failed,
     count(*) filter(where status='working')::int as working,
     count(*) filter(where blocked)::int as blocked,
     coalesce(sum(generation_count),0)::int as "generationCount",
     coalesce(sum(reuse_count),0)::int as "reuseCount",
     max(publication_version)::text as "publicationVersion",
-    min(reading_notes.queued_at) filter(where status in ('pending','working','failed') and not blocked) as "oldestPendingAt",
-    avg(extract(epoch from reading_notes.published_at-reading_notes.queued_at)) filter(where reading_notes.published_at>=now()-interval '1 hour')::float as "averagePublicationSeconds",
+    min(queued_at) filter(where active and ((status='working' and lease_until>now()) or (not blocked and attempts<3 and status in ('pending','failed')))) as "oldestPendingAt",
+    avg(extract(epoch from published_at-queued_at)) filter(where published_at>=now()-interval '1 hour')::float as "averagePublicationSeconds",
     count(*) filter(where status='ready' and updated_at>=now()-interval '1 hour')::int as "completedLastHour",
     (select count(*)::int from reading_note_workers where lane<4 and lease_until>now()) as "activeWorkers",
     (select max(updated_at) from reading_note_workers where lane<4) as "lastWorkerAt"
-    from reading_notes join signal_events event on event.id=reading_notes.signal_id`;
+    ,count(*) filter(where active and status='failed' and not blocked and attempts<3)::int as retryable
+    ,count(*) filter(where status='failed' and attempts>=3)::int as exhausted
+    ,count(*) filter(where not active and status in ('pending','working','failed'))::int as inactive
+    from queue`;
   return rows[0];
 }

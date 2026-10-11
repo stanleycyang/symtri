@@ -51,3 +51,11 @@ test("a later worker can clear a run's recorded embedding backlog", () => {
   const pending = { ...completed, embeddingBacklog: 1 };
   assert.ok(evaluateProductionHealth(now, pending, growth, feed, [day], "2026-09-24").issues.includes("Embedding backlog remains"));
 });
+
+test("resolved embedding warnings are separated from the timestamped monitor snapshot",async()=>{
+  const {currentHealthView}=await import('./health');
+  const view=currentHealthView({checkedAt:'2026-09-24T18:00:00Z',status:'degraded',issues:['Embedding backlog remains'],warnings:[],runStartedAt:null},0,now);
+  assert.equal(view?.status,'healthy');assert.equal(view?.stale,true);
+  assert.deepEqual(view?.snapshotIssues,['Embedding backlog remains']);
+  assert.equal(currentHealthView({...view!,status:'degraded',issues:['Embedding backlog remains']},2,now)?.status,'degraded');
+});

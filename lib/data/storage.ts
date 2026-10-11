@@ -560,6 +560,33 @@ export async function getArchiveRelationships(at = new Date(), catalog: Universe
   return Object.fromEntries(rows.map((row) => [relationshipKey(row.first_id, row.second_id), Number(row.signals)]));
 }
 
+/** Public evidence counts span the full archive, independently of the render cap. */
+export async function getPublishedEvidenceCounts(): Promise<NonNullable<SignalFeed["publishedEvidence"]>> {
+  const sql = database();
+  const rows = await sql<{kind:string;key:string;count:number}[]>`
+    with published as (
+      select event.id,event.topics,event.published_at from signal_events event
+      where ${readySignal(sql, "event.id")}
+        and (event.classifier_version >= ${CLASSIFIER_VERSION} or event.classification_input is null)
+        and exists(select 1 from signal_observations observation join source_catalog source
+          on source.id=observation.source and source.status='active' where observation.signal_id=event.id)
+    ), matches as (
+      select distinct id,published_at,topic->>'topicId' as region,topic->>'subtopicId' as child
+      from published cross join lateral jsonb_array_elements(topics) topic
+    ), pairs as (
+      select distinct a.id,a.published_at,least(a.region,b.region)||':'||greatest(a.region,b.region) as key
+      from matches a join matches b on a.id=b.id and a.region<b.region
+    )
+    select 'child' as kind,child as key,count(distinct id)::int as count from matches
+      where child is not null and published_at between now()-interval '14 days' and now()+interval '1 hour' group by child
+    union all select 'recent',key,count(*)::int from pairs
+      where published_at between now()-interval '14 days' and now()+interval '1 hour' group by key
+    union all select 'archive',key,count(*)::int from pairs group by key
+  `;
+  const select = (kind:string) => Object.fromEntries(rows.filter(row=>row.kind===kind).map(row=>[row.key,Number(row.count)]));
+  return {childCounts:select("child"),relationships:select("recent"),archiveRelationships:select("archive")};
+}
+
 export async function countNewSignalsForRun(runId: string): Promise<number> {
   const rows = await database()`
     select count(*)::int as count from signal_events as event
