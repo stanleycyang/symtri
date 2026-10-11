@@ -3,6 +3,14 @@ import { Agent, request } from "undici";
 import ipaddr from "ipaddr.js";
 import type { LookupAddress } from "node:dns";
 import type { LookupFunction } from "node:net";
+import type { Readable } from "node:stream";
+
+export function discardResponseBody(body: Readable): void {
+  // Undici can emit AbortError asynchronously after destroy(), including when
+  // the dispatcher closes. A discarded body has no iterator to handle it.
+  body.on("error", () => {});
+  body.destroy();
+}
 
 export function pinnedLookup(address: LookupAddress): LookupFunction {
   return (_hostname, options, callback) => {
@@ -46,10 +54,10 @@ export async function fetchPublicText(value: string, maxBytes = 2_000_000): Prom
       });
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         target = new URL(String(response.headers.location), url).toString();
-        response.body.destroy();
+        discardResponseBody(response.body);
         continue;
       }
-      if (response.statusCode !== 200) { response.body.destroy(); throw new Error(`Feed returned HTTP ${response.statusCode}`); }
+      if (response.statusCode !== 200) { discardResponseBody(response.body); throw new Error(`Feed returned HTTP ${response.statusCode}`); }
       const chunks: Buffer[] = [];
       let size = 0;
       for await (const chunk of response.body) {

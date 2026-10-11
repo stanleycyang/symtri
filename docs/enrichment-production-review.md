@@ -5,7 +5,12 @@
 Local verification completed on 2026-10-11 UTC. The additive production migration
 was applied through Supabase and recorded as `20261011045159_enrichment_pipeline`.
 All 32,258 existing ready notes received publication metadata and cached notes.
-Application deployment and post-deployment workflow checks are the remaining gates.
+The first production deployment (`8d336e2`) reached Ready and completed ingestion,
+maintenance, embedding recovery, and four immediate enrichment lanes. Runtime QA
+found an asynchronous AbortError on discarded HTTP bodies; the release adds a
+cleanup handler and regression test. Verify the follow-up deployment before
+considering the rollout complete. Billing acceptance requires a longer observation
+period.
 
 ## Changes reviewed
 
@@ -46,7 +51,7 @@ Application deployment and post-deployment workflow checks are the remaining gat
 
 - Production Next.js/Workflow build and TypeScript: passed (four workflows,
   thirteen unique steps). ESLint passed without warnings.
-- Full unit suite: 156 passed, including the previously blocked HTTP tests.
+- Full unit suite: 157 passed, including the previously blocked HTTP tests.
 - Isolated PostgreSQL 17/pgvector integration suite: passed using
   `SYMTRI_PG_BIN=/opt/homebrew/opt/postgresql@17/bin npm run test:storage:local`.
   This exercised all migrations, publication before result caps, ready-only Ask,
@@ -66,6 +71,27 @@ Application deployment and post-deployment workflow checks are the remaining gat
   findings and removed the queue function's mutable-search-path warning.
 - Vercel identity/project confirmed as `stanleycyang`, team `testimonio`, project
   `prj_kVMdmGGqBZ8TbRa7G3fTuQob1mmC`; GitHub remote is reachable.
+
+## Production evidence from the first deployment
+
+- Workflow and step health checks passed for
+  `dpl_B7Cqp6LqQ4L7Nw77nks5zx89mero`; every manual run and immediate enrichment
+  lane was checked against that exact deployment ID.
+- Four enrichment lanes finished: 35 ready results and five handled failures
+  across 40 admissions. These are processing results, not unique publication or
+  billing counts. Durable retries recovered the body-cleanup process errors;
+  the follow-up fix prevents those errors from terminating a worker.
+- Maintenance completed, and the initial embedding recovery reported no pending
+  inputs. Evidence hydration subsequently created a small embedding backlog;
+  verify recovery again after workers settle.
+- All 300 public overview details had current ready notes and matching publication
+  revisions. Live source notes, historical excerpts, and a cited AI Agents Ask
+  answer worked. Escape returned focus to the Ask trigger at 756×469.
+- The initial production checker passed before the manual ingestion. Its later
+  strict pass must follow recovery of the hydration embedding backlog.
+- Manual ingestion slots must be `manual:<ISO timestamp>` because OpenAlex and
+  Europe PMC parse the suffix as a date. An extra descriptive prefix in the first
+  canary caused those sources to be unavailable; rerun with the supported format.
 
 ## Required rollout gates
 
