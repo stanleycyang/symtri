@@ -9,7 +9,7 @@ export default function ConnectionEvidence({ from, to, recent, archived, seeded,
   from: Topic; to: Topic; recent: number; archived: number; seeded: boolean;
   snapshot: SignalEvent[] | null; observedEvents: SignalEvent[]; sourceLabels: Record<string, string>; onExplore: () => void;
 }) {
-  const [archive, setArchive] = useState(false);
+  const [archive, setArchive] = useState(!snapshot && recent === 0 && archived > 0);
   const [retry, setRetry] = useState(0);
   const [result, setResult] = useState<{ events: SignalEvent[]; error: boolean } | null>(null);
   useEffect(() => {
