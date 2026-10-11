@@ -6,9 +6,9 @@ import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
-import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getIngestionStatus, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
-import { catalogMatches, getUniverseCatalog, seedUniverseCatalog } from "@/lib/data/catalog";
+import { catalogMatches, getUniverseCatalog, getGrowthStatus, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
 import { discoverFeedCandidates, fetchActiveFeeds, pollTrialFeeds, recoverPausedFeeds } from "@/lib/data/feed-registry";
 import { claimReadingNoteWorker, releaseReadingNoteWorker, renewReadingNoteWorker } from "@/lib/data/enrichment";
@@ -192,24 +192,35 @@ async function refreshArchiveBatch(runId:string,kind:"classification"|"catalog")
   return kind==="classification" ? refreshStoredClassifications(1000) : syncArchiveConcepts(1000);
 }
 
+async function archiveBacklog():Promise<{classification:number;catalog:number;graph:number}> {
+  "use step";
+  const status=await getIngestionStatus();
+  const growth=await getGrowthStatus();
+  return {classification:status.classificationBacklog,catalog:growth.catalogBacklog,graph:growth.graphDirtyDays};
+}
+
 export async function maintainUniverse(slot:string) {
   "use workflow";
   const runId=`maintenance:${slot}`;
   if (!await claimReadingNotes(4,runId)) return {status:"busy"};
   try {
     // Bound a release backfill across durable steps, preserving snapshots and source text.
-    for(const kind of ["classification","catalog"] as const) {
-      for(let batch=0;batch<50;batch++) {
-        const count=await refreshArchiveBatch(runId,kind);
-        if(count<0) return {status:"lease-lost"};
-        if(count<1000) break;
-      }
+    for(let batch=0;batch<50;batch++) {
+      const count=await refreshArchiveBatch(runId,"classification");
+      if(count<0) return {status:"lease-lost"};
+      if(count<1000) break;
     }
-    for(let batch=0;batch<3;batch++) { if(await refreshGraph()<30) break; }
     if(!await maintainArchivePhase(runId,"discover")) return {status:"lease-lost"};
     if(!await maintainArchivePhase(runId,"trial")) return {status:"lease-lost"};
     if(!await maintainArchivePhase(runId,"catalog")) return {status:"lease-lost"};
-    return {status:"complete"};
+    for(let batch=0;batch<50;batch++) {
+      const count=await refreshArchiveBatch(runId,"catalog");
+      if(count<0) return {status:"lease-lost"};
+      if(count<1000) break;
+    }
+    for(let batch=0;batch<20;batch++) { if(await refreshGraph()<30) break; }
+    const pending=await archiveBacklog();
+    return {status:Object.values(pending).some(count=>count>0)?"backlog":"complete",...pending};
   } finally { await releaseReadingNotes(4,runId); }
 }
 

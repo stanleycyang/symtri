@@ -274,3 +274,12 @@ test("a trivial reading note falls back to a substantial original source passage
   const result=await summarizeReadingNote(answerQuestion("Explain AI agents",scoped),scoped,fake);
   assert.equal(result.synthesisMethod,"extractive");assert.equal(result.claims[0].evidence[0].quote,passage);
 });
+
+test("extractive notes skip README badges instead of publishing URL fragments",async()=>{
+  const {extractiveReadingNote}=await import('./summarize');
+  const prose='The project provides a reproducible toolkit for collecting source observations, validating structured outputs, and reviewing archived results before deployment.';
+  const event={...feed.events[0],title:'vivian-labs/toolkit',evidence:{text:'[![CI](https://github.com/vivian-labs/toolkit/actions/workflows/consistency.yml/badge.svg)](https://github.com/vivian-labs/toolkit/actions) ![macOS badge](https://example.com/badge.svg) '+prose,kind:'repository' as const,url:feed.events[0].url,attribution:'Maintainers',license:null,retrievedAt:feed.observedAt}};
+  const scoped={...feed,events:[event]};
+  const result=extractiveReadingNote(answerQuestion('Explain AI agents',scoped),scoped);
+  assert.equal(result.claims[0].evidence[0].quote,prose);
+});
