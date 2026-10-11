@@ -279,3 +279,9 @@ test("storage trade-offs are neither astronomy nor finance, while concrete subje
   assert.equal(classifySignal('International trade expands in financial markets','Economy and commerce').some(t=>t.topicId==='markets'),true);
   assert.equal(classifySignal('AI inference tradeoffs','Latency and model quality').some(t=>t.topicId==='markets'),false);
 });
+
+
+test("a .space website is not astronomy without an astronomical subject",()=>{
+  assert.equal(classifySignal('Tx.taxi: I forked mempool.space, but for every blockchain','Hacker News discussion.').some(match=>match.topicId==='space'),false);
+  assert.equal(classifySignal('Reflect.space launches a satellite','Orbital astronomy').some(match=>match.topicId==='space'),true);
+});
