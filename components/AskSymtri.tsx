@@ -17,6 +17,12 @@ type Props = {
   onNavigate: (regionId: string, subtopicId: string | null) => void;
 };
 
+function focusAskControl(input: HTMLElement | null, panel: HTMLElement | null) {
+  // Touch readers should see the answer instead of an automatically opened keyboard.
+  const target = window.matchMedia("(pointer: fine)").matches ? input : panel;
+  target?.focus({ preventScroll: true });
+}
+
 function sourceTime(publishedAt: string, observedAt: string, historical: boolean, dateOnly: boolean): string {
   const published = Date.parse(publishedAt);
   const observed = Date.parse(observedAt);
@@ -51,9 +57,7 @@ export default function AskSymtri({ open, day, subject, signalId, initialQuestio
     const frame = requestAnimationFrame(() => {
       if (open) {
         if (initialQuestion) setQuestion(initialQuestion);
-        // Focus touch panels without opening the software keyboard.
-        if (window.matchMedia("(pointer: fine)").matches) input.current?.focus({ preventScroll: true });
-        else panel.current?.focus({ preventScroll: true });
+        focusAskControl(input.current, panel.current);
       } else {
         setBusy(false);
         setSynthesizing(false);
@@ -67,7 +71,7 @@ export default function AskSymtri({ open, day, subject, signalId, initialQuestio
     setBusy(false);
     setSynthesizing(false);
     setError("Stopped. You can ask another question.");
-    input.current?.focus({ preventScroll: true });
+    focusAskControl(input.current, panel.current);
   };
 
   const ask = async (value: string, selected?:{signalId:string;subject:string}) => {
@@ -82,7 +86,7 @@ export default function AskSymtri({ open, day, subject, signalId, initialQuestio
     setResult(null);
     setIncomplete(true);
     panel.current?.scrollTo({ top: 0 });
-    input.current?.focus({ preventScroll: true });
+    focusAskControl(input.current, panel.current);
     setSynthesizing(false);
     setError("");
     const deadline = setTimeout(() => request.abort("timeout"), 40_000);
