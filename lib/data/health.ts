@@ -61,10 +61,10 @@ export async function runProductionHealthCheck(now = new Date()): Promise<Health
   if (notes.exhausted>0) result.warnings.push(`${notes.exhausted} reading notes exhausted their retries`);
   const permanent=Math.max(0,notes.blocked-notes.exhausted);
   if (permanent>0) result.warnings.push(`${permanent} reading notes are blocked pending input or operator changes`);
-  if (notes.pending > 0 && (!notes.lastWorkerAt || now.getTime() - notes.lastWorkerAt.getTime() > 20 * 60_000)) {
+  if (notes.eligible > 0 && (!notes.lastWorkerAt || now.getTime() - notes.lastWorkerAt.getTime() > 20 * 60_000)) {
     result.issues.push("Reading-note workers have not run in the last 20 minutes");
     result.status = "degraded";
-  } else if (notes.pending > 0 && notes.completedLastHour === 0 && notes.activeWorkers === 0) {
+  } else if (notes.eligible > 0 && notes.completedLastHour === 0 && notes.activeWorkers === 0) {
     result.warnings.push("Reading-note queue has made no progress in the last hour");
   }
   await sql`insert into production_health_checks (checked_at, status, issues, warnings, run_started_at)

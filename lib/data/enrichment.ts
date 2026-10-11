@@ -81,6 +81,9 @@ export async function claimableReadingNoteCount(limit: number): Promise<number> 
 }
 
 export async function enqueueMissingNotes(limit = 200): Promise<number> {
+  await database()`update reading_notes set status='failed',blocked=true,failure_code=coalesce(failure_code,'lease-exhausted'),updated_at=now()
+    where status='working' and lease_until<now() and attempts>=3`;
+
   const rows = await database()`insert into reading_notes(signal_id)
     select event.id from signal_events event where not exists(select 1 from reading_notes note where note.signal_id=event.id)
       and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=event.id)
@@ -331,8 +334,8 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
   return {processed:claimed.length,ready,failed,status:failed?"partial":"ok"};
 }
 
-export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number}> {
-  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number}[]>`with queue as (
+export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number;eligible:number;waiting:number}> {
+  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number;eligible:number;waiting:number}[]>`with queue as (
       select reading_notes.*,exists(select 1 from signal_observations observation join source_catalog source
         on source.id=observation.source and source.status='active' where observation.signal_id=reading_notes.signal_id) as active
       from reading_notes
@@ -340,7 +343,7 @@ export async function readingNoteCounts(): Promise<{ready:number;pending:number;
     count(*) filter(where status='ready' and version=${ENRICHMENT_VERSION})::int as ready,
     count(*) filter(where active and ((status='working' and lease_until>now()) or (not blocked and attempts<3 and status in ('pending','failed'))))::int as pending,
     count(*) filter(where status='failed' and version=${ENRICHMENT_VERSION})::int as failed,
-    count(*) filter(where status='working')::int as working,
+    count(*) filter(where active and status='working' and lease_until>now())::int as working,
     count(*) filter(where blocked)::int as blocked,
     coalesce(sum(generation_count),0)::int as "generationCount",
     coalesce(sum(reuse_count),0)::int as "reuseCount",
@@ -353,6 +356,9 @@ export async function readingNoteCounts(): Promise<{ready:number;pending:number;
     ,count(*) filter(where active and status='failed' and not blocked and attempts<3)::int as retryable
     ,count(*) filter(where status='failed' and attempts>=3)::int as exhausted
     ,count(*) filter(where not active and status in ('pending','working','failed'))::int as inactive
+    ,count(*) filter(where active and not blocked and attempts<3 and
+      ((status in ('pending','failed') and retry_at<=now()) or (status='working' and lease_until<now())))::int as eligible
+    ,count(*) filter(where active and not blocked and attempts<3 and status in ('pending','failed') and retry_at>now())::int as waiting
     from queue`;
   return rows[0];
 }
