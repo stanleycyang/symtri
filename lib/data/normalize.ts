@@ -2,6 +2,8 @@ import { XMLParser } from "fast-xml-parser";
 import { classifySignal } from "./classify";
 import type { SignalEvent } from "./model";
 import { createHash } from "node:crypto";
+import { canonicalSignalUrl, signalContentKey } from "./identity";
+export { canonicalSignalUrl, signalContentKey } from "./identity";
 
 function record(value: unknown): Record<string, unknown> | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null; }
 function text(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
@@ -141,22 +143,4 @@ export function uniqueSourceObservations(events: SignalEvent[]): SignalEvent[] {
     if (!previous || event.importance > previous.importance) byId.set(event.id, event);
   }
   return [...byId.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-}
-
-export function signalContentKey(event: Pick<SignalEvent, "title" | "summary">): string {
-  return `${event.title}\n${event.summary}`.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-export function canonicalSignalUrl(value: string): string {
-  try {
-    const url = new URL(value);
-    const base = `${url.host}${url.pathname}`.replace(/\/+$/, "").toLowerCase();
-    const query = url.search.slice(1).split("&").filter((part) => {
-      const key = part.split("=", 1)[0].toLowerCase();
-      return key && !key.startsWith("utm_") && !["ref", "ref_src", "fbclid", "gclid"].includes(key);
-    }).sort().join("&");
-    return query ? `${base}?${query}` : base;
-  } catch {
-    return value.replace(/^https?:\/\//, "").split(/[?#]/, 1)[0].replace(/\/+$/, "").toLowerCase();
-  }
 }

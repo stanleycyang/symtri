@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { ReadingNote } from "@/lib/data/enrichment";
 
 type Result={status:string;note:ReadingNote|null};
-export default function StoryReading({id,summary,onAsk}:{id:string;summary:string;onAsk:(question:string)=>void}) {
+export default function StoryReading({id,summary,onAsk,onUnavailable}:{id:string;summary:string;onAsk:(question:string)=>void;onUnavailable:(id:string)=>void}) {
   const [result,setResult]=useState<Result|null>(null);
   const [failed,setFailed]=useState(false);
   const [retry,setRetry]=useState(0);
@@ -13,12 +13,15 @@ export default function StoryReading({id,summary,onAsk}:{id:string;summary:strin
     fetch(`/api/story?id=${encodeURIComponent(id)}`,{signal:controller.signal}).then(async response=>{
       if (!response.ok) throw new Error("Unavailable");
       const value=await response.json() as Result;
-      if (!controller.signal.aborted) {setResult(value);setFailed(false);}
+      if (!controller.signal.aborted) {
+        if (value.status !== "ready" || !value.note) { onUnavailable(id); return; }
+        setResult(value);setFailed(false);
+      }
     }).catch(()=>{if(!controller.signal.aborted)setFailed(true);})
       .finally(()=>clearTimeout(timer));
     return ()=>{controller.abort();clearTimeout(timer);};
-  },[id,retry]);
-  if (!result?.note) return <><p>{summary}</p><div className="story-reading"><p role="status">{failed ? "Reading notes are temporarily unavailable." : !result ? "Loading reading notes…" : result.status==="unavailable" ? "Reading notes are not available for this source yet." : result.status==="failed" ? "This source needs another pass before a reading note is ready." : "A source-backed reading note is being prepared."}</p>{(failed || result) && <button type="button" onClick={()=>{setResult(null);setFailed(false);setRetry(value=>value+1);}}>CHECK AGAIN</button>}</div></>;
+  },[id,retry,onUnavailable]);
+  if (!result?.note) return <div className="story-reading"><p role="status">{failed ? "This story could not load." : "Loading story…"}</p>{failed && <button type="button" onClick={()=>{setResult(null);setFailed(false);setRetry(value=>value+1);}}>RETRY</button>}</div>;
   const note=result.note;
   return <div className="story-reading">
     <h3>A CLOSER READ</h3>

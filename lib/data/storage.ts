@@ -1,5 +1,4 @@
 import postgres from "postgres";
-import { createHash } from "node:crypto";
 import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_DIMENSIONS } from "../ai/embed";
 import { embeddingModelId } from "../ai/embed";
 import { seedCatalog, topicEdges, topics, type UniverseCatalog } from "../universe";
@@ -9,6 +8,8 @@ import { selectDistinctHeadlines } from "./select";
 import { knowledgeSearchQuery } from "./search";
 import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
 import { unavailableSources, type RelatedSignal, type SignalEvent, type SignalFeed, type SnapshotDay, type SourceStatus, type SourceEvidence } from "./model";
+import { evidenceFingerprint } from "./enrichment-policy";
+import { readySignal } from "./publication";
 
 let connection: ReturnType<typeof postgres> | undefined;
 let lastDatabaseUse = 0;
@@ -125,7 +126,7 @@ export async function persistSourceEvidence(events: SignalEvent[]): Promise<numb
   const rows = events.filter((event) => event.evidence?.text).map((event) => {
     const body = { ...event.evidence!, text: event.evidence!.text.slice(0, 12000) };
     return { source: event.source, external_id: event.externalId, body,
-      content_hash: createHash("sha256").update(JSON.stringify({ ...body, retrievedAt: undefined })).digest("hex"), retrieved_at: body.retrievedAt };
+      content_hash: evidenceFingerprint(body), retrieved_at: body.retrievedAt };
   });
   if (!rows.length) return 0;
   const sql = database();
@@ -147,7 +148,7 @@ export async function getSignalEvidence(id: string): Promise<{ source: string; b
     select evidence.source, evidence.body, evidence.content_hash
     from signal_evidence as evidence join source_catalog as source on source.id = evidence.source
     where evidence.signal_id = ${id} and source.status = 'active'
-    order by length(evidence.body->>'text') desc, evidence.retrieved_at desc,evidence.source limit 4
+    order by length(evidence.body->>'text') desc,evidence.source limit 4
   `;
   return rows.map((row) => ({ source: row.source, body: row.body, contentHash: row.content_hash }));
 }
@@ -160,7 +161,7 @@ export async function withStoredEvidence(events:SignalEvent[]): Promise<SignalEv
     from signal_evidence evidence join signal_events event on event.id=evidence.signal_id
     join source_catalog source on source.id=evidence.source and source.status='active'
     where evidence.signal_id in ${sql(events.map(event=>event.id))}
-    order by evidence.signal_id,length(evidence.body->>'text') desc,evidence.retrieved_at desc,evidence.source`;
+    order by evidence.signal_id,length(evidence.body->>'text') desc,evidence.source`;
   const retained=new Map(rows.map(row=>[row.signal_id,row]));
   return events.map(event=>{
     const row=retained.get(event.id);
@@ -296,7 +297,7 @@ export async function hasCurrentSignalEmbeddings(events: SignalEvent[], retained
   return rows[0].available === true;
 }
 
-export async function getStoredFeed(): Promise<SignalFeed | null> {
+export async function getStoredFeed(readyOnly = false): Promise<SignalFeed | null> {
   const sql = database();
   const rows = await sql`
     with ranked as (
@@ -305,6 +306,7 @@ export async function getStoredFeed(): Promise<SignalFeed | null> {
         row_number() over (partition by event.source order by event.published_at desc, event.first_seen_at desc) as source_rank
       from signal_events as event
       where event.published_at >= now() - interval '14 days' and jsonb_array_length(event.topics) > 0
+        and (${!readyOnly} or ${readySignal(sql, "event.id")})
         and exists (select 1 from signal_observations as observation
           join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
           where observation.signal_id = event.id)
@@ -356,7 +358,7 @@ export async function getArchiveChildCounts(at = new Date()): Promise<Record<str
   return Object.fromEntries(rows.map((row) => [row.child_id, Number(row.signals)]));
 }
 
-export async function getRecentTopicEvents(references: { id: string; childId: string | null }[], reserveEvidence = false): Promise<SignalEvent[]> {
+export async function getRecentTopicEvents(references: { id: string; childId: string | null }[], reserveEvidence = false, readyOnly = false): Promise<SignalEvent[]> {
   const sql = database();
   const found = new Map<string, SignalEvent>();
   for (const reference of references.slice(0, 2)) {
@@ -368,6 +370,7 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
         select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
         from signal_events
         where published_at >= now() - interval '14 days'
+          and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
           and exists (select 1 from signal_observations as observation
             join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
             where observation.signal_id = signal_events.id)
@@ -384,6 +387,7 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
               event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version
             from signal_events event
             where event.source = source.id and event.published_at >= now() - interval '14 days'
+              and (${!readyOnly} or ${readySignal(sql, "event.id")})
               and event.topics @> ${sql.json([filter])}::jsonb
               and exists (select 1 from signal_evidence evidence
                 join source_catalog owner on owner.id=evidence.source and owner.status='active'
@@ -408,12 +412,13 @@ export async function getRecentTopicEvents(references: { id: string; childId: st
   return [...found.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }
 
-export async function getConnectionEvents(firstId: string, secondId: string, archive = false, children:{topicId:string;subtopicId:string}[]=[]): Promise<SignalEvent[]> {
+export async function getConnectionEvents(firstId: string, secondId: string, archive = false, children:{topicId:string;subtopicId:string}[]=[], readyOnly = false): Promise<SignalEvent[]> {
   const sql = database();
   const rows = await sql`
     select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
     from signal_events
     where topics @> ${sql.json([{ topicId: firstId }, { topicId: secondId }])}::jsonb
+      and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
       and topics @> ${sql.json(children)}::jsonb
       and (${archive} or published_at >= now() - interval '14 days')
       and exists (select 1 from signal_observations as observation
@@ -442,7 +447,7 @@ function parseTopicCursor(value: string | null): TopicPageCursor | null {
   } catch { return null; }
 }
 
-export async function getTopicPage(topicId: string, childId: string | null, cursor: string | null, limit = 20): Promise<TopicPage> {
+export async function getTopicPage(topicId: string, childId: string | null, cursor: string | null, limit = 20, readyOnly = false): Promise<TopicPage> {
   const position = parseTopicCursor(cursor);
   if (cursor && !position) throw new Error("Invalid topic cursor");
   const size = Math.max(1, Math.min(40, Math.floor(limit)));
@@ -453,6 +458,7 @@ export async function getTopicPage(topicId: string, childId: string | null, curs
       event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version
     from signal_events as event
     where event.topics @> ${sql.json([filter])}::jsonb
+      and (${!readyOnly} or ${readySignal(sql, "event.id")})
       and jsonb_array_length(event.topics) > 0
       and (${position?.publishedAt ?? null}::timestamptz is null or
         (event.published_at, event.id) < (${position?.publishedAt ?? null}::timestamptz, ${position?.id ?? null}::text))
@@ -756,7 +762,7 @@ export async function getLatestIngestionFeedMetadata(): Promise<Pick<SignalFeed,
   };
 }
 
-export async function searchKnowledge(query: string, vector: number[] | null): Promise<{ event: SignalEvent; similarity: number | null }[]> {
+export async function searchKnowledge(query: string, vector: number[] | null, readyOnly = false): Promise<{ event: SignalEvent; similarity: number | null }[]> {
   if (vector && (vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value)))) throw new Error("Invalid query embedding");
   const sql = database();
   const lexicalQuery = knowledgeSearchQuery(query);
@@ -768,6 +774,7 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
         from signal_events cross join request
         where to_tsvector('english', title || ' ' || summary) @@ request.terms
+          and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
           and exists (select 1 from signal_observations as observation join source_catalog as active_source
             on active_source.id = observation.source and active_source.status = 'active'
             where observation.signal_id = signal_events.id)
@@ -777,6 +784,7 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
           ts_rank_cd(to_tsvector('english', title || ' ' || summary), request.terms) as rank
         from signal_events cross join request
         where to_tsvector('english', title || ' ' || summary) @@ request.terms
+          and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
           and exists (select 1 from signal_observations as observation join source_catalog as active_source
             on active_source.id = observation.source and active_source.status = 'active'
             where observation.signal_id = signal_events.id)
@@ -787,6 +795,7 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
         from signal_evidence evidence join signal_events event on event.id=evidence.signal_id
         join source_catalog source on source.id=evidence.source and source.status='active' cross join request
         where to_tsvector('english', evidence.body->>'text') @@ request.terms
+          and (${!readyOnly} or ${readySignal(sql, "event.id")})
         order by rank desc,event.published_at desc limit 30
       )
       select distinct on (id) * from (select * from ranked union all select * from recent union all select * from retained) as candidates
@@ -797,6 +806,7 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
         1 - (embedding <=> ${literal}::vector(256)) as similarity
       from signal_events
       where embedding is not null and embedding_model = ${embeddingModelId()}
+        and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
         and exists (select 1 from signal_observations as observation join source_catalog as active_source
           on active_source.id = observation.source and active_source.status = 'active'
           where observation.signal_id = signal_events.id)
@@ -826,12 +836,13 @@ export async function searchKnowledge(query: string, vector: number[] | null): P
   return selected.map((item,index)=>({...item,event:enriched[index]}));
 }
 
-export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
+export async function getRelatedSignals(id: string, readyOnly = false): Promise<RelatedSignal[]> {
   const sql = database();
   const origin = await sql<{vector:string;topics:SignalEvent["topics"];title:string;classifier_version:number;classification_input:SignalEvent["classificationInput"]}[]>`
     select embedding::text as vector, topics, title, classifier_version, classification_input
     from signal_events
     where id = ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
+      and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
       and exists (select 1 from signal_observations as observation join source_catalog as active_source
         on active_source.id = observation.source and active_source.status = 'active'
         where observation.signal_id = signal_events.id)
@@ -844,6 +855,7 @@ export async function getRelatedSignals(id: string): Promise<RelatedSignal[]> {
       1 - (embedding <=> ${origin[0].vector}::vector(256)) as similarity
     from signal_events
     where id <> ${id} and embedding is not null and embedding_model = ${embeddingModelId()}
+      and (${!readyOnly} or ${readySignal(sql, "signal_events.id")})
       and jsonb_array_length(topics) > 0
       and exists (select 1 from signal_observations as observation join source_catalog as active_source
         on active_source.id = observation.source and active_source.status = 'active'
@@ -934,10 +946,12 @@ export async function getSnapshotFeed(day: string): Promise<SignalFeed | null> {
     observedAt: capturedAt.toISOString(), scope: "history" };
 }
 
-
-export async function getArchivedSignal(id:string): Promise<SignalEvent|null> {
-  const rows=await database()<{id:string;source:string;external_id:string;title:string;url:string;summary:string;published_at:Date;importance:number;topics:SignalEvent["topics"];classifier_version:number;classification_input:unknown}[]>`
-    select event.* from signal_events event where event.id=${id} and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=event.id)`;
+export async function getArchivedSignal(id:string, readyOnly = false): Promise<SignalEvent|null> {
+  const sql = database();
+  const rows=await sql<{id:string;source:string;external_id:string;title:string;url:string;summary:string;published_at:Date;importance:number;topics:SignalEvent["topics"];classifier_version:number;classification_input:unknown}[]>`
+    select event.* from signal_events event where event.id=${id}
+    and (${!readyOnly} or ${readySignal(sql, "event.id")})
+      and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=event.id)`;
   const row=rows[0];
   return row ? {id:row.id,source:row.source,externalId:row.external_id,title:row.title,url:row.url,summary:row.summary,publishedAt:row.published_at.toISOString(),importance:row.importance,topics:currentTopics(row)} : null;
 }

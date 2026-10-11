@@ -141,21 +141,48 @@ Generation uses Haiku by default; the independent support audit uses Sonnet via
 `SYMTRI_SUPPORT_MODEL`. Claims with numbers absent from their quoted passages
 are rejected before model verification. Both calls share the model deadline.
 
-Reading notes use migrations `20260928001000_reading_notes.sql` and
-`20261001000000_reading_note_workers.sql`. `/api/enrich` runs every five minutes
-and starts four independent Workflow lanes. Each lane processes at most ten
-notes, for a maximum of 40 per scheduled run. One lane reserves its first three
-notes for due retries, one gives older pending records priority, and the remaining
-capacity prioritizes new notes. A database
-lease prevents lanes from overlapping,
-and a completed slot cannot run twice if Vercel delivers the same cron again. Each
-note uses retained source text, exact supporting passages, and a separate model
-support check; absent implications and limitations are omitted. Source changes
-requeue notes and invalidate in-flight results using a revision check. Failed notes
-retry after six hours, with at most three attempts per input revision. `/api/status`
-reports ready, pending, and failed note counts; `/api/story?id=...` serves cached
+Reading notes use migrations `20260928001000_reading_notes.sql`,
+`20261001000000_reading_note_workers.sql`, and the `enrichment_pipeline` migration.
+Apply the pipeline migration before deploying these functions. It adds worker
+reservations, cached successful notes, failure admission, and publication revisions.
+After persisting source observations, ingestion immediately dispatches available
+reading-note workers. `/api/enrich` remains a five-minute recovery sweep for missed
+dispatches and due retries. Four lanes each process up to ten notes: two durable
+steps of up to five notes, with a two-minute budget per step. Each note is claimed
+just before processing, and each claim rechecks and renews worker ownership.
+Lane zero reserves its first five notes for due retries; lane three prioritizes
+older work. Source and thread balancing apply within the queue. Reservations
+precede workflow dispatch; a failed dispatch releases its reservation, and a lost
+dispatch expires after five minutes. A completed slot cannot run twice.
+A full enrichment lane now uses four durable steps (claim, two processing steps,
+release), compared with twelve previously, excluding embedding work. Completed
+notes commit individually and are skipped when a processing step replays.
+Each note uses retained source text, exact supporting passages, and a separate
+model support check. Insufficient or restricted evidence is rejected before model
+generation. Meaningful source changes requeue notes and invalidate in-flight
+results. Fingerprints retain text, title, summary, publication date and its meaning, source ownership, provenance,
+license, and note version; they ignore collection timestamps, tracking parameters,
+whitespace, and transport metadata. An unchanged effective fingerprint reuses its
+last verified note without another draft, audit, or background lookup.
+Temporary failures retry after 15 minutes, then one hour, with a three-attempt
+ceiling. Support rejection waits six hours. Permanent evidence and configuration
+failures remain blocked until evidence, note version, or operator state changes.
+After resolving a source/provider problem, `npm run enrichment:manage -- retry
+<signal-id>` resets one failed note. It never resets a ready or working note.
+`/api/status` reports ready, pending, failed, blocked, oldest pending time,
+publication latency, generation count, reuse count, and publication version.
+Counters introduced by this migration begin at zero; historical model spend
+cannot be reconstructed from them. Compare billing with publication throughput
+and queue age before asserting cost savings. `/api/story?id=...` serves cached
 notes without generating them during a visit. Ask questions about “this source”
 use the selected story identity rather than a broad topic search.
+Ingestion and enrichment have independent leases and can overlap. Live stories
+are published only after a reading note is ready for the current enrichment
+version and its supporting source is active. The map, topic browsing,
+connections, nearby stories, and live Ask enforce this before result limits.
+Public feed reads pick up newly completed notes between hourly ingestions;
+the archive retains pending observations and full-window activity for workers
+and historical analysis. Saved historical views retain their original excerpts.
 Ready notes lead the source detail; the original excerpt is expandable below the
 supported explanation. World Bank context labels each geography separately.
 Background reading notes use hosted `alibaba/qwen3.7-flash` with reasoning disabled
@@ -167,9 +194,16 @@ before the database marks it failed. Set `SYMTRI_READING_NOTE_MODEL`,
 keeps its separate summary and support model settings.
 The `enrichReadingNotes` Workflow runs independently of the hourly ingestion
 lease, so source fetching can proceed while notes are generated. It does not poll
-news sources. The new-note lane refreshes a bounded embedding backlog after
-hydration so newly retained text remains searchable. Check `/api/status` for note queue counts after
-deployment, then verify the ready count rises after a scheduled enrichment run.
+news sources. `/api/embed` checks for changed evidence every fifteen minutes and
+starts a bounded embedding workflow only when work exists. It shares a separate
+embedding lease with the hourly embedding pass, preventing duplicate model work.
+`/api/maintenance` runs every six hours, moving feed discovery, trial promotion,
+concept discovery/retirement, rate-limit cleanup, and historical metadata repair
+out of the hourly persistence step. Discovery, trial polling, and catalog repair
+have separate bounded steps with renewed ownership. Current archive membership,
+full-window activity, relationships, and snapshots still update hourly.
+Check `/api/status` after deployment and confirm publication throughput, queue age,
+embedding backlog, source coverage, and the first completed maintenance run.
 
 Background context uses one Wikipedia intro/revision request per selected subject
 and one World Bank indicator request for energy or markets. Results are cached for

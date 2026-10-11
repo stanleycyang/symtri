@@ -84,7 +84,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
     if (process.env.DATABASE_URL && selectedId && /\bthis (?:source|story|paper|project)\b/i.test(question)) {
       const snapshot=day ? await getSnapshotFeed(day) : null;
       if(day && !snapshot) return new Response("Snapshot not found",{status:404});
-      const event=day ? snapshot?.events.find(item=>item.id===selectedId) ?? null : await getArchivedSignal(selectedId);
+      const event=day ? snapshot?.events.find(item=>item.id===selectedId) ?? null : await getArchivedSignal(selectedId, true);
       const results=event ? [{event,similarity:null}] : [];
       const selectedFeed:SignalFeed={observedAt:snapshot?.observedAt ?? new Date().toISOString(),events:event?[event]:[],sources:snapshot?.sources ?? unavailableSources(),partial:snapshot?.partial ?? false,scope:snapshot ? "history" : "knowledge"};
       const answer={...answerKnowledgeQuestion(question.trim(),results,catalog),intent:"explanation" as const,subjects:event?[event.title]:[],sourceSignalId:event?.id,scope:selectedFeed.scope,observedAt:selectedFeed.observedAt};
@@ -97,7 +97,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
           try { [vector] = await embedTexts([trimmed], undefined, deadline); }
           catch (error) { console.warn("SYMTRI knowledge embedding unavailable", error instanceof Error ? error.message : "unknown error"); }
         }
-        const results = await searchKnowledge(trimmed, vector);
+        const results = await searchKnowledge(trimmed, vector, true);
         const knowledgeFeed: SignalFeed = { observedAt: new Date().toISOString(), events: results.map((item) => item.event),
           sources: unavailableSources(), partial: true, scope: "knowledge" };
         return Response.json(await withSourceSummary(answerKnowledgeQuestion(trimmed, results, catalog), knowledgeFeed,context as AskContext|undefined,deadline), { headers: { "Cache-Control": "no-store" } });
@@ -105,13 +105,13 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
     }
     let feed = day && process.env.DATABASE_URL ? await getSnapshotFeed(day) : null;
     if (day && !feed) return new Response("Snapshot not found", { status: 404 });
-    if (!feed) feed = await getCurrentFeed();
+    if (!feed) feed = await getCurrentFeed(true);
     feed = { ...feed, catalog: day ? await getUniverseCatalog(new Date(feed.observedAt)) : catalog };
     if(!day && process.env.DATABASE_URL && plan.intent==="connection") {
       const references=questionTopics(trimmed,catalog);
       if(references.length===2) {
         const children=references.flatMap(reference=>reference.childId?[{topicId:reference.id,subtopicId:reference.childId}]:[]);
-        const direct=await withStoredEvidence(await getConnectionEvents(references[0].id,references[1].id,true,children));
+        const direct=await withStoredEvidence(await getConnectionEvents(references[0].id,references[1].id,true,children,true));
         const events=new Map(feed.events.map(event=>[event.id,event]));
         for(const event of direct) events.set(event.id,event);
         feed={...feed,events:[...events.values()],scope:"knowledge"};
@@ -121,9 +121,9 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
       const events = new Map(feed.events.map((event) => [event.id, event]));
       // Keep DB reads sequential: the shared Postgres client has one connection.
       for (const subject of plan.subjects) {
-        for (const { event } of await searchKnowledge(subject, null)) events.set(event.id, event);
+        for (const { event } of await searchKnowledge(subject, null, true)) events.set(event.id, event);
         const references = questionTopics(subject, catalog);
-        if (references.length) for (const event of await getRecentTopicEvents(references, true)) {
+        if (references.length) for (const event of await getRecentTopicEvents(references, true, true)) {
           if(!events.has(event.id)) events.set(event.id,event);
         }
       }
@@ -133,7 +133,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
       const references = questionTopics(trimmed, feed.catalog);
       if (references.length) {
         try {
-          const recent = await getRecentTopicEvents(references, true);
+          const recent = await getRecentTopicEvents(references, true, true);
           const seen = new Set(feed.events.map((event) => event.id));
           const seenUrls = new Set(feed.events.map((event) => canonicalSignalUrl(event.url)));
           const seenContent = new Set(feed.events.map(signalContentKey));
@@ -167,7 +167,7 @@ async function handleAsk(request: Request, deadline:AbortSignal) {
     if (!day && process.env.DATABASE_URL && !answer.evidenceCount && questionSpecificWords(trimmed, feed.catalog).length) {
       try {
         const seen = new Set(feed.events.map((event) => event.id));
-        const archived = (await searchKnowledge(trimmed, null)).map(({ event }) => event).filter((event) => !seen.has(event.id));
+        const archived = (await searchKnowledge(trimmed, null, true)).map(({ event }) => event).filter((event) => !seen.has(event.id));
         if (archived.length) {
           feed = { ...feed, events: [...feed.events, ...archived] };
           answer = answerQuestion(trimmed, feed, semanticMatches);

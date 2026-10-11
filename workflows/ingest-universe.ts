@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { start } from "workflow/api";
+import { dispatchReadingNotes } from "@/lib/data/enrichment-dispatch";
 import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
@@ -7,7 +10,8 @@ import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { catalogMatches, getUniverseCatalog, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
 import { discoverFeedCandidates, fetchActiveFeeds, pollTrialFeeds, recoverPausedFeeds } from "@/lib/data/feed-registry";
-import { claimReadingNoteWorker, enrichBatch, releaseReadingNoteWorker, renewReadingNoteWorker } from "@/lib/data/enrichment";
+import { claimReadingNoteWorker, releaseReadingNoteWorker, renewReadingNoteWorker } from "@/lib/data/enrichment";
+import { enrichOwnedBatch } from "@/lib/data/enrichment-worker";
 import { pruneAskRateLimits } from "@/lib/data/ask-limit";
 
 async function begin(slot: string): Promise<boolean> {
@@ -42,14 +46,12 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
 async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]>; archiveCount: number; childCounts: Record<string, number> }> {
   "use step";
   await seedUniverseCatalog();
-  await pruneAskRateLimits(new Date(feed.observedAt));
   await persistSignals(feed);
+  // The queue is committed by database triggers before dispatch. Failure to
+  // wake a worker never loses work or fails source persistence.
+  try { await dispatchReadingNotes(`ingest-enrich:${slot}`,(wakeSlot,lane)=>start(enrichReadingNotes,[wakeSlot,lane])); }
+  catch { console.warn("SYMTRI enrichment wake-up deferred to recovery sweep"); }
   await refreshStoredClassifications();
-  await discoverFeedCandidates(new Date(feed.observedAt));
-  await pollTrialFeeds(new Date(feed.observedAt));
-  await syncArchiveConcepts();
-  await discoverConcepts(new Date(feed.observedAt));
-  await retireInactiveConcepts(new Date(feed.observedAt));
   await syncArchiveConcepts();
   const catalog = await getUniverseCatalog();
   const activity = await getArchiveActivity(new Date(feed.observedAt), catalog);
@@ -59,26 +61,30 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   const mapped = selectFeedEvents(feed.events.map((event) => ({ ...event, topics: catalogMatches(event, catalog) })), 300);
   const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), archiveCount);
   await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships, catalog });
-  await backfillSnapshotMetadata();
   await persistCurrentFeed({ ...snapshot, observedAt: feed.observedAt, archiveCount, activity, childCounts,
     catalog, sources: feed.sources, partial: feed.partial });
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity, archiveCount, childCounts };
 }
 
-async function embedBacklog(): Promise<{ embedded: number; embeddingStatus: string; hasMore: boolean }> {
+async function embedBacklog(owner?:string): Promise<{ embedded: number; embeddingStatus: string; hasMore: boolean }> {
   "use step";
   if (!gatewayConfigured()) return { embedded: 0, embeddingStatus: "not-configured", hasMore: false };
-  const pending = await getPendingEmbeddingEvents();
-  const embedded = await persistEmbeddings({
-    observedAt: new Date().toISOString(), events: pending, scope: "archive", partial: false,
-    sources: unavailableSources(),
-  }, embedTexts);
-  return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
+  const runId=owner ?? `embedding:${randomUUID()}`;
+  const owned=owner ? await renewReadingNoteWorker(5,runId) : await claimReadingNoteWorker(5,runId);
+  if(!owned) return {embedded:0,embeddingStatus:"backlog",hasMore:true};
+  try {
+    const pending = await getPendingEmbeddingEvents();
+    const embedded = await persistEmbeddings({
+      observedAt: new Date().toISOString(), events: pending, scope: "archive", partial: false,
+      sources: unavailableSources(),
+    }, embedTexts);
+    return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
+  } finally { if(!owner) await releaseReadingNoteWorker(5,runId); }
 }
 
-async function enrichSources(preferRetries = false, preferOldest = false): Promise<Awaited<ReturnType<typeof enrichBatch>>> {
+async function enrichSources(lane: number, runId: string, preferRetries = false, preferOldest = false): Promise<Awaited<ReturnType<typeof enrichOwnedBatch>>> {
   "use step";
-  return enrichBatch(2, undefined, undefined, preferRetries, preferOldest);
+  return enrichOwnedBatch(lane, runId, preferRetries, preferOldest);
 }
 
 async function refreshGraph():Promise<number> {
@@ -89,11 +95,6 @@ async function refreshGraph():Promise<number> {
 async function claimReadingNotes(lane:number, runId:string):Promise<boolean> {
   "use step";
   return claimReadingNoteWorker(lane, runId);
-}
-
-async function renewReadingNotes(lane:number, runId:string):Promise<boolean> {
-  "use step";
-  return renewReadingNoteWorker(lane, runId);
 }
 
 async function releaseReadingNotes(lane:number, runId:string):Promise<void> {
@@ -107,31 +108,16 @@ export async function enrichReadingNotes(slot:string, lane:number) {
   if (!await claimReadingNotes(lane, runId)) return {status:"busy",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
   const result={status:"complete",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
   try {
-    for(let batch=0;batch<5;batch++) {
-      if (!await renewReadingNotes(lane, runId)) { result.status="lease-lost"; break; }
-      const next=await enrichSources(lane === 0 && batch < 3, lane === 3);
+    for(let batch=0;batch<2;batch++) {
+      const next=await enrichSources(lane, runId, lane === 0 && batch === 0, lane === 3);
+      // Return through finally so cleanup still runs, without letting failed-note
+      // or embedding status overwrite lease loss or continuing work unowned.
       result.processed+=next.processed;result.ready+=next.ready;result.failed+=next.failed;
+      if(next.status==="lease-lost") { result.status="lease-lost"; return result; }
       if(next.status==="not-configured") {result.status="not-configured";break;}
       if(!next.processed) break;
     }
     if(result.failed) result.status="partial";
-    // Hydrating a source invalidates its previous vector. Keep this pass bounded;
-    // the next scheduled run picks up anything changed after this lane finishes.
-    if (lane === 1) {
-      try {
-        for (let batch=0;batch<3;batch++) {
-          const embedding = await embedBacklog();
-          result.embedded += embedding.embedded;
-          result.embeddingStatus = embedding.hasMore ? "backlog" : embedding.embeddingStatus;
-          if (embedding.embeddingStatus !== "ok" || !embedding.hasMore) break;
-        }
-        if (result.embeddingStatus !== "ok") result.status = "partial";
-      } catch (error) {
-        result.embeddingStatus = "unavailable";
-        result.status = "partial";
-        console.warn("SYMTRI reading-note embeddings unavailable",error instanceof Error ? error.message : "unknown error");
-      }
-    }
   } finally {await releaseReadingNotes(lane, runId);}
   return result;
 }
@@ -153,7 +139,7 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
     for(let batch=0;batch<3;batch++) {
       if(await refreshGraph()<30) break;
     }
-    // Reading notes run on their own schedule so source ingestion remains bounded.
+    // Reading notes were dispatched after persistence and proceed independently.
     const embedding = { embedded: 0, embeddingStatus: "unavailable" };
     try {
       for (let batch = 0; batch < 3; batch++) {
@@ -180,4 +166,48 @@ export async function ingestUniverse(slot: string): Promise<IngestionResult> {
   }
   await finish(slot, result);
   return result;
+}
+
+async function maintainArchivePhase(runId:string,phase:"discover"|"trial"|"catalog"):Promise<boolean> {
+  "use step";
+  if(!await renewReadingNoteWorker(4,runId)) return false;
+  const now=new Date();
+  if(phase==="discover") await discoverFeedCandidates(now);
+  else if(phase==="trial") await pollTrialFeeds(now);
+  else {
+    await pruneAskRateLimits(now);
+    await syncArchiveConcepts();
+    await discoverConcepts(now);
+    await retireInactiveConcepts(now);
+    await syncArchiveConcepts();
+    await backfillSnapshotMetadata();
+  }
+  return true;
+}
+
+export async function maintainUniverse(slot:string) {
+  "use workflow";
+  const runId=`maintenance:${slot}`;
+  if (!await claimReadingNotes(4,runId)) return {status:"busy"};
+  try {
+    if(!await maintainArchivePhase(runId,"discover")) return {status:"lease-lost"};
+    if(!await maintainArchivePhase(runId,"trial")) return {status:"lease-lost"};
+    if(!await maintainArchivePhase(runId,"catalog")) return {status:"lease-lost"};
+    return {status:"complete"};
+  } finally { await releaseReadingNotes(4,runId); }
+}
+
+export async function refreshEvidenceEmbeddings(slot:string) {
+  "use workflow";
+  const runId=`embed:${slot}`;
+  if (!await claimReadingNotes(5,runId)) return {status:"busy"};
+  let embedded=0;
+  try {
+    for(let batch=0;batch<3;batch++) {
+      const next=await embedBacklog(runId);
+      embedded+=next.embedded;
+      if(next.embeddingStatus!=="ok" || !next.hasMore) return {...next,embedded};
+    }
+    return {embedded,embeddingStatus:"backlog",hasMore:true};
+  } finally { await releaseReadingNotes(5,runId); }
 }

@@ -1,5 +1,5 @@
 import type { SignalEvent } from "./model";
-import { canonicalSignalUrl, signalContentKey } from "./normalize";
+import { canonicalSignalUrl, signalContentKey } from "./identity";
 
 export function selectRegionHighlights(events: SignalEvent[], regionId: string, limit = 3): SignalEvent[] {
   return events.filter((event) => event.topics.some((match) => match.topicId === regionId))

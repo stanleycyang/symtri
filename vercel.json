@@ -4,6 +4,8 @@
   "crons": [
     { "path": "/api/ingest", "schedule": "0 * * * *" },
     { "path": "/api/enrich", "schedule": "*/5 * * * *" },
+    { "path": "/api/maintenance", "schedule": "30 */6 * * *" },
+    { "path": "/api/embed", "schedule": "7,22,37,52 * * * *" },
     { "path": "/api/verify", "schedule": "12 * * * *" }
   ]
 }

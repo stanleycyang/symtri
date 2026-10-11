@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   let result: SignalFeed;
-  try { result = await getCurrentFeed(); }
+  try { result = await getCurrentFeed(true); }
   catch (error) {
     console.warn("SYMTRI archive unavailable", error instanceof Error ? error.message : "unknown error");
     return Response.json({ error: "Signal archive unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });

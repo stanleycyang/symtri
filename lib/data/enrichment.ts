@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { database, getArchivedSignal, getSignalEvidence, persistSourceEvidence } from "./storage";
 import { fetchPublicText } from "./public-fetch";
 import { cleanSourceText } from "./normalize";
@@ -8,7 +8,9 @@ import { answerKnowledgeQuestion } from "../ai/ask";
 import { summarizeReadingNote, type GroundedClaim } from "../ai/summarize";
 import { unavailableSources, type SignalEvent } from "./model";
 
-export const ENRICHMENT_VERSION = 5;
+import { evidenceSuitable, failurePolicy, noteFingerprint } from "./enrichment-policy";
+import { ENRICHMENT_VERSION } from "./reading-note-version";
+export { ENRICHMENT_VERSION } from "./reading-note-version";
 export type ReadingNote = { explanation: string; claims: GroundedClaim[]; questions: string[]; createdAt: string; sourceKind: string; evidenceSource: string; evidenceUrl: string; evidenceAttribution: string; evidenceLicense: string|null; context: BackgroundContext[] };
 
 export function readingNoteFailureCode(stage: "evidence" | "hydrate" | "generate" | "context" | "commit", error: unknown): string {
@@ -33,9 +35,18 @@ export function readingNoteFailureCode(stage: "evidence" | "hydrate" | "generate
 }
 
 export async function claimReadingNoteWorker(lane: number, runId: string): Promise<boolean> {
-  const rows = await database()`insert into reading_note_workers(lane,run_id,lease_until)
-    values(${lane},${runId},now()+interval '15 minutes')
-    on conflict(lane) do update set run_id=excluded.run_id,lease_until=excluded.lease_until,updated_at=now()
+  const rows = await database()`insert into reading_note_workers(lane,run_id,lease_until,started)
+    values(${lane},${runId},now()+interval '15 minutes',true)
+    on conflict(lane) do update set run_id=excluded.run_id,lease_until=excluded.lease_until,started=true,updated_at=now()
+    where (reading_note_workers.lease_until<=now() and reading_note_workers.run_id<>excluded.run_id)
+      or (reading_note_workers.run_id=excluded.run_id and not reading_note_workers.started and reading_note_workers.lease_until>now()) returning lane`;
+  return rows.length === 1;
+}
+
+export async function reserveReadingNoteWorker(lane: number, runId: string): Promise<boolean> {
+  const rows = await database()`insert into reading_note_workers(lane,run_id,lease_until,started)
+    values(${lane},${runId},now()+interval '5 minutes',false)
+    on conflict(lane) do update set run_id=excluded.run_id,lease_until=excluded.lease_until,started=false,updated_at=now()
     where reading_note_workers.lease_until<=now() and reading_note_workers.run_id<>excluded.run_id returning lane`;
   return rows.length === 1;
 }
@@ -61,7 +72,7 @@ export async function availableReadingNoteLanes(workerCount: number): Promise<nu
 export async function claimableReadingNoteCount(limit: number): Promise<number> {
   const rows = await database()<{count:number}[]>`select count(*)::int as count from (
     select 1 from reading_notes note where
-      ((note.status in ('pending','failed') and note.retry_at<=now() and note.attempts<3)
+      ((note.status in ('pending','failed') and not note.blocked and note.retry_at<=now() and note.attempts<3)
         or (note.status='working' and note.lease_until<now() and note.attempts<3))
       and exists(select 1 from signal_observations observation join source_catalog source
         on source.id=observation.source and source.status='active' where observation.signal_id=note.signal_id)
@@ -81,14 +92,13 @@ export async function enqueueMissingNotes(limit = 200): Promise<number> {
           and not exists(select 1 from source_catalog source where source.id=note.note->>'evidenceSource' and source.status='active')
           and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=note.signal_id))
       order by case when note.status='ready' then 0 else 1 end,note.updated_at limit ${limit})
-    update reading_notes note set version=${ENRICHMENT_VERSION},status='pending',note=null,input_hash=null,attempts=0,retry_at=now(),lease_until=null,failure_code=null,revision=revision+1,updated_at=now()
+    update reading_notes note set version=${ENRICHMENT_VERSION},status='pending',note=null,input_hash=null,attempts=0,blocked=false,queued_at=now(),retry_at=now(),lease_until=null,failure_code=null,revision=revision+1,updated_at=now()
     from stale where note.signal_id=stale.signal_id returning note.signal_id`;
   return rows.length+refreshed.length;
 }
 
 export function evidenceHash(event: SignalEvent): string {
-  return createHash("sha256").update(JSON.stringify({version:ENRICHMENT_VERSION,title:event.title,summary:event.summary,
-    evidence:event.evidence ? {...event.evidence,retrievedAt:undefined}:null})).digest("hex");
+  return noteFingerprint(event, event.source);
 }
 
 export async function getCachedContext(key: string): Promise<BackgroundContext[] | null> {
@@ -228,7 +238,7 @@ export async function retrieveStoryEvidence(event: SignalEvent, load:typeof fetc
 }
 
 export async function getReadingNote(id: string): Promise<{status:string;note:ReadingNote|null}|null> {
-  const rows=await database()<{status:string;version:number;note:ReadingNote|null;title:string;summary:string;topics:SignalEvent["topics"]}[]>`select note.status,note.version,event.title,event.summary,event.topics,case when note.status='ready' and note.version=${ENRICHMENT_VERSION} then note.note else null end as note from reading_notes note join signal_events event on event.id=note.signal_id
+  const rows=await database()<{status:string;version:number;note:ReadingNote|null;title:string;summary:string;topics:SignalEvent["topics"]}[]>`select note.status,note.version,event.title,event.summary,event.topics,case when note.status='ready' and note.version=${ENRICHMENT_VERSION} and note.published_revision=note.revision then note.note else null end as note from reading_notes note join signal_events event on event.id=note.signal_id
     where note.signal_id=${id} and (note.status <> 'ready' or exists(select 1 from source_catalog where id=note.note->>'evidenceSource' and status='active')) and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=${id})`;
   const row=rows[0];
   if(!row) return null;
@@ -239,9 +249,9 @@ export async function getReadingNote(id: string): Promise<{status:string;note:Re
 export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNote=summarizeReadingNote, loadContext:typeof contextFor=contextFor, preferRetries=false, preferOldest=false): Promise<{processed:number;ready:number;failed:number;status:string}> {
   if (!gatewayConfigured()) return {processed:0,ready:0,failed:0,status:"not-configured"};
   const sql=database();
-  await sql`update reading_notes set status='failed',lease_until=null,updated_at=now() where status='working' and lease_until<now() and attempts>=3`;
+  await sql`update reading_notes set status='failed',blocked=true,lease_until=null,updated_at=now() where status='working' and lease_until<now() and attempts>=3`;
   const token=randomUUID();
-  const claimed=await sql<{id:string;source:string;external_id:string;title:string;url:string;summary:string;published_at:Date;importance:number;topics:SignalEvent["topics"]}[]>`
+  const claimed=await sql<{id:string;source:string;external_id:string;title:string;url:string;summary:string;published_at:Date;importance:number;topics:SignalEvent["topics"];input_revision:number}[]>`
     with served as (select previous.source,count(*) as count from reading_notes completed
       join signal_events previous on previous.id=completed.signal_id
       where completed.status='ready' and completed.version=${ENRICHMENT_VERSION} and completed.updated_at>=date_trunc('hour',now()) group by previous.source),
@@ -256,14 +266,14 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
         event.importance desc,event.first_seen_at desc) as queue_rank,
       coalesce(served.count,0) as recently_served
       from reading_notes note join signal_events event on event.id=note.signal_id left join served on served.source=event.source
-      where ((note.status in ('pending','failed') and note.retry_at<=now() and note.attempts<3) or (note.status='working' and note.lease_until<now() and note.attempts<3))
+      where ((note.status in ('pending','failed') and not note.blocked and note.retry_at<=now() and note.attempts<3) or (note.status='working' and note.lease_until<now() and note.attempts<3))
         and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=event.id)),
     balanced as (select eligible.*,row_number() over(partition by source order by queue_rank,attempts,importance desc,first_seen_at desc) as source_rank from eligible),
     candidates as (select note.signal_id from balanced join reading_notes note on note.signal_id=balanced.signal_id
       order by balanced.source_rank,balanced.recently_served,balanced.queue_rank,balanced.attempts,balanced.importance desc,balanced.first_seen_at desc
       limit ${Math.min(5,Math.max(1,limit))} for update of note skip locked),
-    claimed as (update reading_notes note set claim_token=${token},status='working',note=null,failure_code=null,attempts=case when note.version<>${ENRICHMENT_VERSION} then 1 else note.attempts+1 end,version=${ENRICHMENT_VERSION},lease_until=now()+interval '10 minutes' from candidates where note.signal_id=candidates.signal_id returning note.signal_id)
-    select event.* from signal_events event join claimed on claimed.signal_id=event.id`;
+    claimed as (update reading_notes note set claim_token=${token},status='working',note=null,failure_code=null,blocked=false,attempts=case when note.version<>${ENRICHMENT_VERSION} then 1 else note.attempts+1 end,version=${ENRICHMENT_VERSION},lease_until=now()+interval '10 minutes' from candidates where note.signal_id=candidates.signal_id returning note.signal_id,note.revision)
+    select event.*,claimed.revision as input_revision from signal_events event join claimed on claimed.signal_id=event.id`;
   let ready=0,failed=0;
   for (const row of claimed) {
     let stage: "evidence" | "hydrate" | "generate" | "context" | "commit" = "evidence";
@@ -273,7 +283,10 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
       stage = "hydrate";
       // Source hydration may requeue this item. Capture the new revision before generation;
       // a later source change or another worker invalidates the conditional commit.
-      const ownership=await sql<{revision:number}[]>`update reading_notes set status='working',attempts=greatest(attempts,1),lease_until=now()+interval '10 minutes' where signal_id=${event.id} and claim_token=${token} returning revision`;
+      const ownership=await sql<{revision:number;attempts:number;cached_note:ReadingNote|null;cached_hash:string|null}[]>`update reading_notes set status='working',attempts=greatest(attempts,1),lease_until=now()+interval '10 minutes'
+        where signal_id=${event.id} and claim_token=${token}
+          and ((status='working' and lease_until>now()) or (status='pending' and revision>${row.input_revision}))
+        returning revision,attempts,cached_note,cached_hash`;
       if (!ownership.length) continue;
       const revision=ownership[0].revision;
       const fresh=await getArchivedSignal(event.id);
@@ -281,21 +294,35 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
       if (!fresh || !retained[0]) throw new Error("Source evidence unavailable");
       event={...fresh,evidence:retained[0].body};
       const evidenceSource=retained[0].source;
-      const hash=evidenceHash(event);
+      const hash=noteFingerprint(event,evidenceSource);
+      stage = "evidence";
+      if (!evidenceSuitable(event)) throw new Error("Insufficient source text");
+      const cached = ownership[0];
+      if (cached.cached_hash === hash && cached.cached_note?.evidenceSource === evidenceSource) {
+        const reused=await sql`update reading_notes set status='ready',note=${sql.json(cached.cached_note)},reuse_count=reuse_count+1,input_hash=${hash},failure_code=null,blocked=false,lease_until=null,updated_at=now()
+          where signal_id=${event.id} and revision=${revision} and claim_token=${token} and status='working' and lease_until>now() returning signal_id`;
+        ready+=reused.length;
+        console.info("SYMTRI reading-note reused",{source:row.source,reused:reused.length});
+        continue;
+      }
       const feed={observedAt:new Date().toISOString(),events:[event],sources:unavailableSources(),partial:true,scope:"knowledge" as const};
       const answer=answerKnowledgeQuestion(`Explain this source: ${event.title}`, [{event,similarity:null}]);
       stage = "generate";
+      const generation=await sql`update reading_notes set generation_count=generation_count+1 where signal_id=${event.id} and revision=${revision} and claim_token=${token} and status='working' and lease_until>now() returning signal_id`;
+      if (!generation.length) continue;
       const summary=await synthesize(answer,feed);
       stage = "context";
       const note:ReadingNote={explanation:summary.summary,claims:summary.claims,questions:[`What does this source establish about ${event.title.slice(0,100)}?`,`What limitations does this source report?`],createdAt:new Date().toISOString(),sourceKind:event.evidence!.kind,evidenceSource,evidenceUrl:event.evidence!.url,evidenceAttribution:event.evidence!.attribution,evidenceLicense:event.evidence!.license,context:await loadContext(event)};
       stage = "commit";
-      const committed=await sql`update reading_notes set status='ready',note=${sql.json(note)},failure_code=null,input_hash=${hash},version=${ENRICHMENT_VERSION},lease_until=null,updated_at=now() where signal_id=${event.id} and revision=${revision} and claim_token=${token} returning signal_id`;
+      const committed=await sql`update reading_notes set status='ready',note=${sql.json(note)},failure_code=null,blocked=false,input_hash=${hash},version=${ENRICHMENT_VERSION},lease_until=null,updated_at=now() where signal_id=${event.id} and revision=${revision} and claim_token=${token} and status='working' and lease_until>now() returning signal_id`;
       ready+=committed.length;
     } catch(error) {
       const reason=readingNoteFailureCode(stage,error);
+      const current=await sql<{attempts:number}[]>`select attempts from reading_notes where signal_id=${row.id} and claim_token=${token} and status='working'`;
+      const policy=failurePolicy(reason,current[0]?.attempts ?? 3);
       // Do not log provider responses, source bodies, request headers, or credentials.
       console.warn("Reading note failed",{source:row.source,stage,reason,errorName:error instanceof Error ? error.name : "unknown"});
-      await sql`update reading_notes set status='failed',failure_code=${reason},retry_at=now()+interval '6 hours',lease_until=null,updated_at=now() where signal_id=${row.id} and claim_token=${token} and status='working'`;
+      await sql`update reading_notes set status='failed',failure_code=${reason},blocked=${policy.blocked},retry_at=now()+${policy.delaySeconds}*interval '1 second',lease_until=null,updated_at=now() where signal_id=${row.id} and claim_token=${token} and status='working'`;
       failed++;
     }
   }
@@ -303,15 +330,21 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
   return {processed:claimed.length,ready,failed,status:failed?"partial":"ok"};
 }
 
-export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null}> {
-  const rows=await database()<{ready:number;pending:number;failed:number;working:number;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null}[]>`select
+export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null}> {
+  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null}[]>`select
     count(*) filter(where status='ready' and version=${ENRICHMENT_VERSION})::int as ready,
     count(*) filter(where status in ('pending','working') or version<>${ENRICHMENT_VERSION})::int as pending,
     count(*) filter(where status='failed' and version=${ENRICHMENT_VERSION})::int as failed,
     count(*) filter(where status='working')::int as working,
+    count(*) filter(where blocked)::int as blocked,
+    coalesce(sum(generation_count),0)::int as "generationCount",
+    coalesce(sum(reuse_count),0)::int as "reuseCount",
+    max(publication_version)::text as "publicationVersion",
+    min(reading_notes.queued_at) filter(where status in ('pending','working','failed') and not blocked) as "oldestPendingAt",
+    avg(extract(epoch from reading_notes.published_at-reading_notes.queued_at)) filter(where reading_notes.published_at>=now()-interval '1 hour')::float as "averagePublicationSeconds",
     count(*) filter(where status='ready' and updated_at>=now()-interval '1 hour')::int as "completedLastHour",
-    (select count(*)::int from reading_note_workers where lease_until>now()) as "activeWorkers",
-    (select max(updated_at) from reading_note_workers) as "lastWorkerAt"
-    from reading_notes`;
+    (select count(*)::int from reading_note_workers where lane<4 and lease_until>now()) as "activeWorkers",
+    (select max(updated_at) from reading_note_workers where lane<4) as "lastWorkerAt"
+    from reading_notes join signal_events event on event.id=reading_notes.signal_id`;
   return rows[0];
 }

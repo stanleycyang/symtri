@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     if (!first || !second || first === second || ![first, second].every((id) => catalog.topics.some((topic) => topic.id === id))) {
       return Response.json({ error: "Unknown connection" }, { status: 400 });
     }
-    const events = process.env.DATABASE_URL ? await getConnectionEvents(first, second, params.get("archive") === "1") : [];
+    const events = process.env.DATABASE_URL ? await getConnectionEvents(first, second, params.get("archive") === "1", [], true) : [];
     return Response.json({ events }, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json({ error: "Connection sources unavailable" }, { status: 503 });

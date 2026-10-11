@@ -15,7 +15,8 @@
     "test:scale:local": "bash scripts/check-growth-scale-local.sh",
     "check:production": "node scripts/check-production.mjs",
     "evaluate:ask": "node scripts/evaluate-ask.mjs",
-    "growth:manage": "tsx scripts/manage-growth.ts"
+    "growth:manage": "tsx scripts/manage-growth.ts",
+    "enrichment:manage": "tsx scripts/manage-enrichment.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

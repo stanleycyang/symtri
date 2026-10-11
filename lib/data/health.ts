@@ -46,6 +46,10 @@ export async function runProductionHealthCheck(now = new Date()): Promise<Health
     where status in ('complete', 'partial')`;
   const result = evaluateProductionHealth(now, status, growth, feed, days, firstRun[0]?.day ?? null);
   const notes = await readingNoteCounts();
+  if (notes.oldestPendingAt && now.getTime()-notes.oldestPendingAt.getTime()>6*60*60_000) {
+    result.warnings.push("Reading-note backlog contains work older than six hours");
+  }
+  if (notes.blocked>0) result.warnings.push(`${notes.blocked} reading notes are blocked pending input or operator changes`);
   if (notes.pending > 0 && (!notes.lastWorkerAt || now.getTime() - notes.lastWorkerAt.getTime() > 20 * 60_000)) {
     result.issues.push("Reading-note workers have not run in the last 20 minutes");
     result.status = "degraded";

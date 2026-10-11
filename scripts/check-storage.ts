@@ -10,7 +10,8 @@ import { regionActivity } from "../lib/data/activity";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
-import { availableReadingNoteLanes, claimableReadingNoteCount, claimReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION } from "../lib/data/enrichment";
+import { availableReadingNoteLanes, claimableReadingNoteCount, claimReadingNoteWorker, reserveReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION, type ReadingNote } from "../lib/data/enrichment";
+import { enrichOwnedBatch } from "../lib/data/enrichment-worker";
 import { GET as readStory } from "../app/api/story/route";
 import { POST as askSymtri } from "../app/api/ask/route";
 import { getUniverseCatalog, recordCatalogRevision, seedUniverseCatalog } from "../lib/data/catalog";
@@ -42,6 +43,22 @@ const knowledgePrefix = `github:${externalId}-knowledge-`;
 const organicPrefix = `organic-check-${externalId}`;
 const runId = randomUUID();
 const competingRunId = randomUUID();
+
+// Public-route fixtures explicitly model completed enrichment. Archive-only
+// fixtures remain pending unless a test publishes them.
+async function publishFixtures(ids?: string[]) {
+  const rows = await sql<{ id: string; source: string; url: string }[]>`select id, source, url from signal_events
+    where ${ids === undefined} or id in ${sql(ids ?? ["__no_fixture__"])}`;
+  const notes = rows.map(row => ({ id: row.id, note: {
+    explanation: "A completed source-backed fixture note.", claims: [], questions: [], context: [],
+    createdAt: new Date().toISOString(), sourceKind: "feed", evidenceSource: row.source,
+    evidenceUrl: row.url, evidenceAttribution: row.source, evidenceLicense: null,
+  } }));
+  if (!notes.length) return;
+  await sql`update reading_notes target set status='ready',version=${ENRICHMENT_VERSION},note=incoming.note
+    from jsonb_to_recordset(${sql.json(notes)}::jsonb) as incoming(id text,note jsonb)
+    where target.signal_id=incoming.id`;
+}
 
 async function main() {
   const migration = await readFile(new URL("../db/001_signals.sql", import.meta.url), "utf8");
@@ -120,6 +137,7 @@ async function main() {
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20260928001000_reading_notes.sql", import.meta.url), "utf8"));
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261001000000_reading_note_workers.sql", import.meta.url), "utf8"));
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261004000000_reading_note_failure_code.sql", import.meta.url), "utf8"));
+  await sql.unsafe(await readFile(new URL("../supabase/migrations/20261011045159_enrichment_pipeline.sql", import.meta.url), "utf8"));
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
@@ -362,6 +380,8 @@ async function main() {
     assert.ok(recent.some((item) => item.id === relatedId));
     await sql`update signal_events set published_at = now() - interval '20 days' where id = ${relatedId}`;
     assert.ok(!(await getRecentTopicEvents([{ id: "science", childId: "science-materials" }])).some((item) => item.id === relatedId));
+    await publishFixtures([relatedId]);
+    await persistEmbeddings({ ...feed, events: [related] }, fakeEmbedder);
     assert.equal((await getRelatedSignals(id))[0]?.id, relatedId);
     assert.ok(!(await getRelatedSignals(id)).some((item) => item.id === id));
     assert.deepEqual(await getRelatedSignals(unclassifiedId), []);
@@ -481,6 +501,7 @@ async function main() {
     process.env.AI_GATEWAY_API_KEY = "";
     process.env.VERCEL = "";
     try {
+      await publishFixtures();
       const response = await askSymtri(new Request("http://localhost/api/ask", {
         method: "POST", body: JSON.stringify({ question: "What is new in battery recycling?" }),
       }));
@@ -508,6 +529,7 @@ async function main() {
           topics: [{ topicId: "ai", subtopicId: "ai-language-models", relevance: 1 }] },
       ];
       await persistSignals({ ...feed, events: comparisonSources });
+      await publishFixtures(comparisonSources.map(item => item.id));
       const comparison = await askSymtri(new Request("http://localhost/api/ask", {
         method: "POST", body: JSON.stringify({ question: "Compare coding agents and language models" }),
       }));
@@ -600,9 +622,13 @@ async function main() {
       sources: feed.sources, partial: feed.partial, activity, archiveCount: await getArchiveCount(),
       childCounts: await getArchiveChildCounts(), catalog: await getUniverseCatalog() });
     assert.equal((await getPersistedCurrentFeed())?.archiveCount, await getArchiveCount());
+    await sql`update reading_notes set status='pending',note=null where signal_id=${id}`;
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => { throw new Error("Public feed contacted a source"); };
     try {
+      const pendingPublic = await (await getPublicSignals()).json() as SignalFeed;
+      assert.ok(!pendingPublic.events.some(item => item.id === id), "A pending note is not published");
+      await publishFixtures([id]);
       const response = await getPublicSignals();
       assert.equal(response.status, 200);
       const publicFeed = await response.json() as SignalFeed;
@@ -919,6 +945,7 @@ async function main() {
     const connectionId=`github:${externalId}-civil-connection`;
     const connectionEvent:SignalEvent={...event,id:connectionId,externalId:`${externalId}-civil-connection`,url:`https://example.org/${externalId}-civil-connection`,title:"Nuclear reactors provide electricity for AI data centers",summary:"A civil nuclear power project supplies electricity to AI infrastructure in a data center.",publishedAt:hubCreated,topics:[{topicId:"energy",subtopicId:"energy-nuclear",relevance:1},{topicId:"ai",subtopicId:"ai-infrastructure",relevance:1}]};
     await persistSignals({...feed,events:[connectionEvent]});
+    await publishFixtures([connectionId]);
     const connectionAnswer=await askSymtri(new Request("http://localhost/api/ask",{method:"POST",body:JSON.stringify({question:"What connects nuclear energy and AI?"})}));
     assert.equal(connectionAnswer.status,200);
     assert.deepEqual((await connectionAnswer.json()).events.map((item:SignalEvent)=>item.id),[connectionId]);
@@ -980,11 +1007,80 @@ async function main() {
       assert.equal((await sql`select status from reading_notes where signal_id=${olderId}`)[0].status,"ready","The age lane visits an older low-importance note before a newer one");
       assert.equal((await sql`select status from reading_notes where signal_id=${newerId}`)[0].status,"pending");
       await sql`delete from signal_events where id in (${olderId},${newerId})`;
+      await sql`update reading_notes set status='ready' where signal_id<>${id}`;
       await sql`update reading_notes set status='pending',attempts=0,retry_at=now() where signal_id=${id}`;
-      const generated=await enrichBatch(1,synthesize,async()=>[]);
+      const noteWorkerSlot=`${externalId}:owned-batch`;
+      assert.equal(await claimReadingNoteWorker(3,noteWorkerSlot),true);
+      const wrongOwner=await enrichOwnedBatch(3,`${noteWorkerSlot}:other`,false,false,renewReadingNoteWorker,
+        async()=>{throw new Error("A foreign worker must not process notes");});
+      assert.equal(wrongOwner.status,"lease-lost");
+      assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"pending");
+      await sql`update reading_note_workers set lease_until=now()-interval '1 minute' where lane=3`;
+      assert.equal((await enrichOwnedBatch(3,noteWorkerSlot,false,false,renewReadingNoteWorker,
+        async()=>{throw new Error("An expired worker must not process notes");})).status,"lease-lost");
+      const replacementSlot=`${noteWorkerSlot}:replacement`;
+      assert.equal(await claimReadingNoteWorker(3,replacementSlot),true);
+      const generated=await enrichOwnedBatch(3,replacementSlot,false,false,renewReadingNoteWorker,
+        (limit,_synthesize,_context,retries,oldest)=>enrichBatch(limit,synthesize,async()=>[],retries,oldest));
+      // A departing old worker cannot release the replacement owner's lease.
+      await releaseReadingNoteWorker(3,noteWorkerSlot);
+      assert.equal(await renewReadingNoteWorker(3,replacementSlot),true);
+      await releaseReadingNoteWorker(3,replacementSlot);
       assert.equal(generated.ready,1);
       assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"ready");
+      assert.ok((await getStoredFeed(true))?.events.some(item => item.id === id));
+      const noteTopics=(await getArchivedSignal(id))!.topics;
+      const noteRegion=noteTopics[0].topicId;
+      assert.ok((await getRecentTopicEvents([{id:noteRegion,childId:null}],true,true)).some(item=>item.id===id));
+      assert.ok((await getTopicPage(noteRegion,null,null,20,true)).events.some(item=>item.id===id));
+      assert.ok(await getArchivedSignal(id,true));
+      const readySignal=await getArchivedSignal(id);
+      assert.ok(readySignal);
+      const pendingBurst:SignalEvent[]=Array.from({length:305},(_,index)=>({...readySignal,
+        id:`github:${externalId}-pending-${index}`,externalId:`${externalId}-pending-${index}`,
+        url:`https://example.org/${externalId}/pending/${index}`,title:`${readySignal.title} pending fixture ${index}`,
+        publishedAt:new Date(Math.max(Date.now(),Date.parse(readySignal.publishedAt))+3_600_000-index*1000).toISOString()}));
+      await persistSignals({...feed,events:pendingBurst});
+      assert.ok(!(await getStoredFeed())?.events.some(item=>item.id===id),"The raw overview cap is crowded by pending fixtures");
+      assert.ok((await getStoredFeed(true))?.events.some(item=>item.id===id),"Pending stories cannot crowd a ready story out of the published overview");
+      assert.ok((await getTopicPage(noteRegion,null,null,20,true)).events.some(item=>item.id===id),"Publication filtering runs before topic pagination");
+      assert.ok((await getRecentTopicEvents([{id:noteRegion,childId:null}],true,true)).some(item=>item.id===id));
+      await sql`delete from signal_events where id in ${sql(pendingBurst.map(item=>item.id))}`;
+      await sql`update reading_notes set version=${ENRICHMENT_VERSION-1} where signal_id=${id}`;
+      assert.equal(await getArchivedSignal(id,true),null,"A stale enrichment version is hidden");
+      await sql`update reading_notes set version=${ENRICHMENT_VERSION} where signal_id=${id}`;
+      const publishedNote=(await sql<{note:ReadingNote}[]>`select note from reading_notes where signal_id=${id}`)[0].note;
+      await sql`update reading_notes set note=null where signal_id=${id}`;
+      assert.equal(await getArchivedSignal(id,true),null,"Ready status alone cannot publish a missing note");
+      await sql`update reading_notes set note=${sql.json(publishedNote)} where signal_id=${id}`;
+      const publicationBefore=(await sql`select publication_version from reading_notes where signal_id=${id}`)[0].publication_version;
+      await sql`update reading_notes set status='pending',note=null,revision=revision+1,attempts=0,blocked=false,retry_at=now() where signal_id=${id}`;
+      const reused=await enrichBatch(1,async()=>{throw new Error("Unchanged evidence must not call a model");},async()=>{throw new Error("Cached context must be reused");});
+      assert.equal(reused.ready,1,"The previous verified note is reusable after a harmless requeue");
+      const reuseState=(await sql`select reuse_count,publication_version,published_revision,revision from reading_notes where signal_id=${id}`)[0];
+      assert.equal(reuseState.reuse_count,1);
+      assert.ok(BigInt(reuseState.publication_version)>BigInt(publicationBefore));
+      assert.equal(reuseState.published_revision,reuseState.revision);
+      const chosenEvidence=(await getSignalEvidence(id))[0];
+      const mirrorSource=chosenEvidence.source==="hacker-news"?"github":"hacker-news";
+      const mirror={...readySignal,id:`${mirrorSource}:${externalId}-short-mirror`,source:mirrorSource,
+        externalId:`${externalId}-short-mirror`,evidence:{...chosenEvidence.body,text:chosenEvidence.body.text.slice(0,120),attribution:"A shorter mirror"}};
+      await persistSignals({...feed,events:[mirror]});
+      const mirrorState=(await sql`select status,revision from reading_notes where signal_id=${id}`)[0];
+      assert.equal(mirrorState.status,"ready","A shorter mirror must not hide verified primary evidence");
+      assert.equal(mirrorState.revision,reuseState.revision);
+      assert.equal(Number((await sql`select count(*)::int as count from signal_observations where source=${mirrorSource} and external_id=${mirror.externalId}`)[0].count),1,"The skipped enrichment still retains the observation");
+      const reservedSlot=`${noteWorkerSlot}:dispatch`;
+      assert.equal(await reserveReadingNoteWorker(2,reservedSlot),true);
+      assert.equal(await reserveReadingNoteWorker(2,`${reservedSlot}:other`),false);
+      assert.equal(await claimReadingNoteWorker(2,reservedSlot),true,"A dispatched workflow can consume its reservation once");
+      assert.equal(await claimReadingNoteWorker(2,reservedSlot),false,"A duplicate start cannot share ownership");
+      await releaseReadingNoteWorker(2,reservedSlot);
+      await sql`update source_catalog set status='paused' where id=${publishedNote.evidenceSource}`;
+      assert.equal(await getArchivedSignal(id,true),null,"An inactive note owner cannot publish a story");
+      await sql`update source_catalog set status='active' where id=${publishedNote.evidenceSource}`;
       await sql`update signal_events set summary=summary || ' Next revision.' where id=${id}`;
+      assert.equal(await getArchivedSignal(id,true),null,"A source revision hides its old note immediately");
       const stale=await enrichBatch(1,async()=>{
         await sql`update signal_events set summary=summary || ' Concurrent revision.' where id=${id}`;
         return synthesize();
@@ -1001,6 +1097,19 @@ async function main() {
       const retried=await enrichBatch(1,synthesize,async()=>[],true);
       assert.equal(retried.ready,1,"A retry lane can claim a due failed note");
       assert.equal((await sql`select failure_code from reading_notes where signal_id=${id}`)[0].failure_code,null);
+      await sql`update signal_events set summary=summary || ' Another changed result.' where id=${id}`;
+      const permanent=await enrichBatch(1,async()=>{throw Object.assign(new Error("Billing rejected"),{statusCode:402});},async()=>[]);
+      assert.equal(permanent.failed,1);
+      assert.equal((await sql`select blocked from reading_notes where signal_id=${id}`)[0].blocked,true);
+      await sql`update reading_notes set retry_at=now()-interval '1 minute' where signal_id=${id}`;
+      assert.equal((await enrichBatch(1,synthesize,async()=>[],true)).processed,0,"Permanent failure cannot spend another model attempt");
+      await sql`update signal_events set summary=summary || ' Evidence was revised.' where id=${id}`;
+      assert.equal((await sql`select blocked from reading_notes where signal_id=${id}`)[0].blocked,false,"Changed inputs unblock enrichment");
+      const expired=await enrichBatch(1,async()=>{
+        await sql`update reading_notes set lease_until=now()-interval '1 minute' where signal_id=${id}`;
+        return synthesize();
+      },async()=>[]);
+      assert.equal(expired.ready,0,"An expired note claim cannot publish");
       await sql`update reading_notes set status='working',attempts=3,lease_until=now()-interval '1 minute' where signal_id=${id}`;
       assert.equal((await enrichBatch(1,synthesize,async()=>[])).processed,0);
       assert.equal((await sql`select status from reading_notes where signal_id=${id}`)[0].status,"failed");

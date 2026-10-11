@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   }
   if (!process.env.DATABASE_URL) return Response.json({ signals: [] }, { headers: { "Cache-Control": "no-store" } });
   try {
-    return Response.json({ signals: await getRelatedSignals(id) }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ signals: await getRelatedSignals(id, true) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.warn("SYMTRI related signals unavailable", error instanceof Error ? error.message : "unknown error");
     return Response.json({ error: "Related signals unavailable" }, { status: 503 });
