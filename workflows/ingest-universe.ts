@@ -6,7 +6,7 @@ import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
 import { rollingFeed } from "@/lib/data/rolling";
-import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getIngestionStatus, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getIngestionStatus, getPersistedCurrentFeed, getKnowledgeGraph, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { catalogMatches, getUniverseCatalog, getGrowthStatus, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
@@ -199,6 +199,17 @@ async function archiveBacklog():Promise<{classification:number;catalog:number;gr
   return {classification:status.classificationBacklog,catalog:growth.catalogBacklog,graph:growth.graphDirtyDays};
 }
 
+async function publishArchiveMetadata():Promise<void> {
+  "use step";
+  // The reader returns only a feed from the current classifier. Preserve its
+  // sample, coverage and ingestion timestamp while publishing refreshed links.
+  const feed=await getPersistedCurrentFeed();
+  if(!feed) return;
+  const catalog=await getUniverseCatalog();
+  const knowledgeGraph=await getKnowledgeGraph();
+  await persistCurrentFeed({...feed,catalog,knowledgeGraph:knowledgeGraph ?? undefined});
+}
+
 export async function maintainUniverse(slot:string) {
   "use workflow";
   const runId=`maintenance:${slot}`;
@@ -220,6 +231,7 @@ export async function maintainUniverse(slot:string) {
     }
     for(let batch=0;batch<20;batch++) { if(await refreshGraph()<30) break; }
     const pending=await archiveBacklog();
+    if(Object.values(pending).every(count=>count===0)) await publishArchiveMetadata();
     return {status:Object.values(pending).some(count=>count>0)?"backlog":"complete",...pending};
   } finally { await releaseReadingNotes(4,runId); }
 }
