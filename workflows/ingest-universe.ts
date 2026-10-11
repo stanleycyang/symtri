@@ -1,3 +1,4 @@
+import { runProductionHealthCheck } from "@/lib/data/health";
 import { randomUUID } from "node:crypto";
 import { start } from "workflow/api";
 import { dispatchReadingNotes } from "@/lib/data/enrichment-dispatch";
@@ -225,4 +226,14 @@ export async function refreshEvidenceEmbeddings(slot:string) {
     }
     return {embedded,embeddingStatus:"backlog",hasMore:true};
   } finally { await releaseReadingNotes(5,runId); }
+}
+
+// Authenticated release tooling can verify the current archive without source fetches or model calls.
+async function verifyArchive():Promise<Awaited<ReturnType<typeof runProductionHealthCheck>>> {
+  "use step";
+  return runProductionHealthCheck();
+}
+export async function verifyUniverse() {
+  "use workflow";
+  return verifyArchive();
 }
