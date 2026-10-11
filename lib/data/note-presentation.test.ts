@@ -11,6 +11,7 @@ test("source Markdown formats text while rejecting HTML, images and executable l
   assert.doesNotMatch(html,/<script|<img|href="javascript:/);
   assert.equal(sourceLink('README.fr.md','https://github.com/a/b/blob/main/README.md'),'https://github.com/a/b/blob/main/README.fr.md');
   assert.equal(sourceLink('data:text/html,test'),undefined);
+  assert.equal(sourceLink('README.md','https://github.com/a/b'),undefined,'An unknown repository branch cannot become a broken file link');
 });
 test("legacy excerpt recognition leaves evidence and original-language text intact",()=>{
   const raw='The source states: “# Модель **результат**”';

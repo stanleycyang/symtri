@@ -1144,6 +1144,16 @@ async function main() {
       const effective=await readingNoteCounts();
       assert.ok(effective.inactive>=1,"Inactive-source pending notes are separated from actionable backlog");
       assert.equal(effective.pending,beforeRepair.pending-1,"An exhausted note never becomes actionable and an inactive note leaves the queue");
+      const beforeWaiting=await readingNoteCounts();
+      await sql`update reading_notes set status='failed',blocked=false,attempts=1,retry_at=now()+interval '6 hours' where signal_id=${id}`;
+      const waiting=await readingNoteCounts();
+      assert.equal(waiting.eligible,beforeWaiting.eligible,"A future retry does not demand a worker now");
+      assert.equal(waiting.waiting,beforeWaiting.waiting+1,"Delayed retries have a separate count");
+      await sql`update reading_notes set status='working',attempts=3,failure_code=null,lease_until=now()-interval '1 minute' where signal_id=${id}`;
+      await enqueueMissingNotes(1);
+      const terminal=(await sql`select status,blocked,failure_code from reading_notes where signal_id=${id}`)[0];
+      assert.equal(terminal.status,'failed');assert.equal(terminal.blocked,true);assert.equal(terminal.failure_code,'lease-exhausted');
+
 
     } finally {
       if(priorGateway===undefined) delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorGateway;

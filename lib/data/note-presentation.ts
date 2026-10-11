@@ -8,6 +8,12 @@ export function presentationText(text: string): string {
 }
 export function sourceLink(href: string, base?: string): string | undefined {
   try {
+    // Resolve relative links only when the source identifies an actual document,
+    // not a repository landing page with an unknown branch or file route.
+    if(base && !/^https?:\/\//i.test(href)) {
+      const path=new URL(base).pathname;
+      if(!/\.[a-z0-9]{1,8}$/i.test(path) && !path.endsWith("/")) return undefined;
+    }
     const url = base ? new URL(href, base) : new URL(href);
     return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
   } catch { return undefined; }
