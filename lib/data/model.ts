@@ -34,6 +34,9 @@ export type SignalEvent = {
   evidence?: SourceEvidence;
 };
 
+export type TopicSource = Pick<SignalEvent, "id" | "source" | "title" | "url" | "publishedAt" | "topics" | "importance">;
+export type TopicSourcePage = { events: TopicSource[]; nextCursor: string | null; revision: string };
+
 export type RelatedSignal = Pick<SignalEvent, "id" | "source" | "title" | "url" | "summary" | "publishedAt" | "topics">;
 
 export type SourceStatus = Record<SourceId, "ok" | "partial" | "unavailable">;

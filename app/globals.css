@@ -287,3 +287,5 @@ a:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(
 
 
 .entrance-about{color:var(--copper);text-underline-offset:3px;padding:6px 8px}
+.source-feed-refresh{width:100%;min-height:44px;padding:12px;margin:0 0 14px;border:1px solid var(--copper);background:rgba(213,168,120,.08);color:var(--copper);font:10px var(--mono);letter-spacing:.06em;text-align:left}
+.virtual-source-list{contain:layout style;overflow-anchor:none}

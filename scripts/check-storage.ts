@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { GET as getPublicTopic } from "../app/api/topic/route";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import postgres from "postgres";
-import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getPublishedEvidenceCounts, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getCisaEntryHashes, getSignalEvidence, getArchivedSignal, withStoredEvidence, getConnectionEvents, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, claimIngestionSlot, countNewSignalsForRun, findSemanticSignals, finishIngestionRun, getArchiveActivity, getPublishedEvidenceCounts, getArchiveChildCounts, getArchiveCount, getArchiveRelationships, getCisaEntryHashes, getSignalEvidence, getArchivedSignal, withStoredEvidence, getConnectionEvents, getIngestionStatus, getKnowledgeGraph, getLatestIngestionFeedMetadata, getPendingEmbeddingEvents, getPersistedCurrentFeed, getRecentTopicEvents, getRelatedSignals, getSemanticRelationships, getSnapshotDays, getSnapshotFeed, getStoredFeed, getTopicPage, getTopicFeedRevision, hasCurrentSignalEmbeddings, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, releaseQueuedIngestionSlot, searchKnowledge, startIngestionRun } from "../lib/data/storage";
 import { EMBEDDING_DIMENSIONS, embeddingModelId } from "../lib/ai/embed";
 import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
@@ -1033,9 +1034,42 @@ async function main() {
       const noteRegion=noteTopics[0].topicId;
       assert.ok((await getRecentTopicEvents([{id:noteRegion,childId:null}],true,true)).some(item=>item.id===id));
       assert.ok((await getTopicPage(noteRegion,null,null,20,true)).events.some(item=>item.id===id));
+      const slim = await getTopicPage(noteRegion,null,null,12,true,true);
+      assert.ok(slim.events.some(item=>item.id===id));
+      assert.ok(slim.events.every(item=>item.summary==="" && item.externalId===""),"List SQL excludes heavy detail fields");
+      const revisionBefore = await getTopicFeedRevision(1);
+      const publicPage = await (await getPublicTopic(new Request(`https://symtri.test/api/topic?regionId=${noteRegion}&browse=1&view=list`))).json();
+      assert.ok(publicPage.events.length<=12);
+      assert.ok(typeof publicPage.revision==="string");
+      assert.ok(publicPage.events.every((item:Record<string,unknown>)=>!("summary" in item) && !("externalId" in item)),"List API does not send story excerpts");
+      const legacyPage = await (await getPublicTopic(new Request(`https://symtri.test/api/topic?regionId=${noteRegion}&browse=1`))).json();
+      assert.ok(legacyPage.events.some((item:Record<string,unknown>)=>item.id===id && typeof item.summary==="string"),"Already-open clients retain the original full event contract");
+      assert.ok(!("revision" in legacyPage));
       assert.ok(await getArchivedSignal(id,true));
       const readySignal=await getArchivedSignal(id);
       assert.ok(readySignal);
+      const browsingFixtures: SignalEvent[] = Array.from({length:35},(_,index)=>({...readySignal,
+        id:`github:${externalId}-browse-${index}`,externalId:`${externalId}-browse-${index}`,
+        title:`Cursor browsing fixture ${index}`,url:`https://example.org/${externalId}/browse/${index}`,
+        publishedAt:new Date(Date.now()-index*1000).toISOString()}));
+      await persistSignals({...feed,events:browsingFixtures});
+      const paginationFixtureNote=(await sql<{note:ReadingNote}[]>`select note from reading_notes where signal_id=${id}`)[0].note;
+      await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},note=${sql.json(paginationFixtureNote)} where signal_id in ${sql(browsingFixtures.map(item=>item.id))}`;
+      const firstSlimPage = await getTopicPage(noteRegion,null,null,12,true,true);
+      assert.equal(firstSlimPage.events.length,12);
+      assert.ok(firstSlimPage.nextCursor);
+      await assert.rejects(getTopicPage(noteRegion==='space'?'software':'space',null,firstSlimPage.nextCursor,20,true,true),/Invalid topic cursor/);
+      const lateFixture={...browsingFixtures[0],id:`github:${externalId}-browse-late`,externalId:`${externalId}-browse-late`,
+        title:'Backdated late source fixture',url:`https://example.org/${externalId}/browse/late`,
+        publishedAt:new Date(Date.parse(firstSlimPage.events.at(-1)!.publishedAt)-500).toISOString()};
+      await persistSignals({...feed,events:[lateFixture]});
+      await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},note=${sql.json(paginationFixtureNote)} where signal_id=${lateFixture.id}`;
+      const nextSlimPage = await getTopicPage(noteRegion,null,firstSlimPage.nextCursor,20,true,true);
+      assert.equal(nextSlimPage.events.length,20);
+      assert.ok(!nextSlimPage.events.some(item=>firstSlimPage.events.some(previous=>previous.id===item.id)),"The 12-to-20 page transition does not repeat sources");
+      assert.ok(!nextSlimPage.events.some(item=>item.id===lateFixture.id),"Browsing cutoff excludes late backdated arrivals until refresh");
+      const browsingFixtureIds: string[] = browsingFixtures.map(item=>item.id).concat(lateFixture.id);
+      await sql`delete from signal_events where id in ${sql(browsingFixtureIds)}`;
       const pendingBurst:SignalEvent[]=Array.from({length:305},(_,index)=>({...readySignal,
         id:`github:${externalId}-pending-${index}`,externalId:`${externalId}-pending-${index}`,
         url:`https://example.org/${externalId}/pending/${index}`,title:`${readySignal.title} pending fixture ${index}`,
@@ -1052,6 +1086,7 @@ async function main() {
       assert.ok((await getRecentTopicEvents([{id:noteRegion,childId:null}],true,true)).some(item=>item.id===id));
       await sql`delete from signal_events where id in ${sql(pendingBurst.map(item=>item.id))}`;
       await sql`update reading_notes set version=${ENRICHMENT_VERSION-1} where signal_id=${id}`;
+      assert.notEqual(await getTopicFeedRevision(1),revisionBefore,"Removing a published note invalidates list caches");
       assert.equal(await getArchivedSignal(id,true),null,"A stale enrichment version is hidden");
       await sql`update reading_notes set version=${ENRICHMENT_VERSION} where signal_id=${id}`;
       const publishedNote=(await sql<{note:ReadingNote}[]>`select note from reading_notes where signal_id=${id}`)[0].note;

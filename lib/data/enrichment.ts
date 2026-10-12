@@ -240,13 +240,13 @@ export async function retrieveStoryEvidence(event: SignalEvent, load:typeof fetc
   return enriched;
 }
 
-export async function getReadingNote(id: string): Promise<{status:string;note:ReadingNote|null}|null> {
+export async function getReadingNote(id: string): Promise<{status:string;note:ReadingNote|null;summary?:string}|null> {
   const rows=await database()<{status:string;version:number;note:ReadingNote|null;title:string;summary:string;topics:SignalEvent["topics"]}[]>`select note.status,note.version,event.title,event.summary,event.topics,case when note.status='ready' and note.version=${ENRICHMENT_VERSION} and note.published_revision=note.revision then note.note else null end as note from reading_notes note join signal_events event on event.id=note.signal_id
     where note.signal_id=${id} and (note.status <> 'ready' or exists(select 1 from source_catalog where id=note.note->>'evidenceSource' and status='active')) and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=${id})`;
   const row=rows[0];
   if(!row) return null;
   const expected=backgroundSubjectFor(row);
-  return {status:row.version!==ENRICHMENT_VERSION || row.status==="ready" && !row.note ? "pending" : row.status,note:row.note?{...row.note,context:row.note.context.filter(context=>context.kind!=="background" || context.title===expected)}:null};
+  return {summary: row.note ? row.summary : undefined,status:row.version!==ENRICHMENT_VERSION || row.status==="ready" && !row.note ? "pending" : row.status,note:row.note?{...row.note,context:row.note.context.filter(context=>context.kind!=="background" || context.title===expected)}:null};
 }
 
 export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNote=summarizeReadingNote, loadContext:typeof contextFor=contextFor, preferRetries=false, preferOldest=false): Promise<{processed:number;ready:number;failed:number;status:string}> {

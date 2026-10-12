@@ -4,7 +4,7 @@ import {extractivePassage,excerptDisplay} from "@/lib/data/note-presentation";
 import { useEffect, useState } from "react";
 import type { ReadingNote } from "@/lib/data/enrichment";
 
-type Result={status:string;note:ReadingNote|null};
+type Result={status:string;note:ReadingNote|null;summary?:string};
 export default function StoryReading({id,summary,onAsk,onUnavailable}:{id:string;summary:string;onAsk:(question:string)=>void;onUnavailable:(id:string)=>void}) {
   const [result,setResult]=useState<Result|null>(null);
   const [failed,setFailed]=useState(false);
@@ -34,7 +34,7 @@ export default function StoryReading({id,summary,onAsk,onUnavailable}:{id:string
     <a href={note.evidenceUrl} target="_blank" rel="noopener noreferrer">{note.evidenceAttribution} · Supporting source ↗</a><small>{note.evidenceLicense ?? "Reuse terms not supplied"}</small>
     <small>{extracted ? "Excerpt from the" : "Generated from the"} {note.sourceKind.replace(/-/g," ")} · {new Date(note.createdAt).toLocaleDateString()}</small>
     <details><summary>Claims and source passages</summary>{note.claims.map((claim,index)=><div className="reading-claim" key={index}><small>{(claim.kind ?? "fact").toUpperCase()}</small><SourceText text={extractivePassage(claim.text) ?? claim.text} baseUrl={note.evidenceUrl}/>{claim.evidence.map((evidence,i)=><blockquote key={i}><SourceText text={evidence.quote} baseUrl={note.evidenceUrl}/></blockquote>)}</div>)}</details>
-    <details><summary>Source excerpt</summary><SourceText text={summary} baseUrl={note.evidenceUrl}/></details>
+    <details><summary>Source excerpt</summary><SourceText text={result.summary ?? summary} baseUrl={note.evidenceUrl}/></details>
     {note.context.map(context=><details key={`${context.url}:${context.geography ?? context.revision ?? ""}`}><summary>{context.kind==="indicator" ? "IN NUMBERS" : "BACKGROUND"} · {context.title}{context.geography ? ` · ${context.geography}` : ""}</summary><SourceText text={context.text} baseUrl={context.url}/><a href={context.url} target="_blank" rel="noopener noreferrer">{context.attribution} ↗</a><small>{context.license ?? "Reuse terms not supplied"} · Retrieved {context.retrievedAt.slice(0,10)}{context.revision ? ` · Revision ${context.revision}` : ""}</small></details>)}
     <div className="reading-questions">{note.questions.map(question=><button type="button" key={question} onClick={()=>onAsk(question)}>{question} ↗</button>)}</div>
   </div>;

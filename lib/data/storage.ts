@@ -10,6 +10,7 @@ import { deduplicateSignals, uniqueSourceObservations } from "./normalize";
 import { unavailableSources, type RelatedSignal, type SignalEvent, type SignalFeed, type SnapshotDay, type SourceStatus, type SourceEvidence } from "./model";
 import { evidenceFingerprint } from "./enrichment-policy";
 import { readySignal } from "./publication";
+import { ENRICHMENT_VERSION } from "./reading-note-version";
 
 let connection: ReturnType<typeof postgres> | undefined;
 let lastDatabaseUse = 0;
@@ -433,33 +434,45 @@ export async function getConnectionEvents(firstId: string, secondId: string, arc
   }).slice(0, 20);
 }
 
-type TopicPageCursor = { publishedAt: string; id: string };
+type TopicPageCursor = { publishedAt: string; id: string; topicId?: string; childId?: string | null; asOf?: string };
 export type TopicPage = { events: SignalEvent[]; nextCursor: string | null };
 
 function parseTopicCursor(value: string | null): TopicPageCursor | null {
   if (!value) return null;
   try {
-    if (value.length > 600) return null;
+    if (value.length > 1200) return null;
     const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as TopicPageCursor;
     if (typeof parsed.id !== "string" || !parsed.id || parsed.id.length > 300 ||
       typeof parsed.publishedAt !== "string" || !Number.isFinite(Date.parse(parsed.publishedAt))) return null;
+    if (parsed.asOf !== undefined && (typeof parsed.asOf !== "string" || !Number.isFinite(Date.parse(parsed.asOf)) || Date.parse(parsed.asOf) > Date.now()+60_000)) return null;
     return parsed;
   } catch { return null; }
 }
 
-export async function getTopicPage(topicId: string, childId: string | null, cursor: string | null, limit = 20, readyOnly = false): Promise<TopicPage> {
+export async function getTopicFeedRevision(catalogRevision: number): Promise<string> {
+  const rows = await database()<{ publication: string; sources: string }[]>`
+    select (select last_value::text from reading_note_publication_version) as publication,
+      (select md5(string_agg(id||':'||status,',' order by id)) from source_catalog) as sources`;
+  return `${CLASSIFIER_VERSION}:${ENRICHMENT_VERSION}:${catalogRevision}:${rows[0].publication}:${rows[0].sources}`;
+}
+
+export async function getTopicPage(topicId: string, childId: string | null, cursor: string | null, limit = 20, readyOnly = false, lightweight = false): Promise<TopicPage> {
   const position = parseTopicCursor(cursor);
-  if (cursor && !position) throw new Error("Invalid topic cursor");
+  if (cursor && (!position || position.topicId !== undefined && (position.topicId !== topicId || position.childId !== childId))) throw new Error("Invalid topic cursor");
+  const asOf = lightweight ? position?.asOf ?? new Date().toISOString() : null;
   const size = Math.max(1, Math.min(40, Math.floor(limit)));
   const sql = database();
   const filter = childId ? { topicId, subtopicId: childId } : { topicId };
   const rows = await sql`
-    select event.id, event.source, event.external_id, event.title, event.url, event.summary,
-      event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version
+    select event.id, event.source, case when ${lightweight} then '' else event.external_id end as external_id,
+      event.title, event.url, case when ${lightweight} then '' else event.summary end as summary,
+      event.published_at, event.importance, event.topics,
+      case when ${lightweight} and event.classifier_version >= ${CLASSIFIER_VERSION} then null else event.classification_input end as classification_input, event.classifier_version
     from signal_events as event
     where event.topics @> ${sql.json([filter])}::jsonb
-      and (${!readyOnly} or ${readySignal(sql, "event.id")})
+      and (${!readyOnly} or ${readySignal(sql, "event.id", asOf)})
       and jsonb_array_length(event.topics) > 0
+      and (${asOf}::timestamptz is null or event.first_seen_at <= ${asOf}::timestamptz)
       and (${position?.publishedAt ?? null}::timestamptz is null or
         (event.published_at, event.id) < (${position?.publishedAt ?? null}::timestamptz, ${position?.id ?? null}::text))
       and exists (select 1 from signal_observations as observation
@@ -475,7 +488,7 @@ export async function getTopicPage(topicId: string, childId: string | null, curs
   })).filter((event) => event.topics.some((match) => match.topicId === topicId && (!childId || match.subtopicId === childId)));
   const last = pageRows.at(-1);
   const nextCursor = rows.length > size && last
-    ? Buffer.from(JSON.stringify({ publishedAt: new Date(last.published_at).toISOString(), id: last.id })).toString("base64url") : null;
+    ? Buffer.from(JSON.stringify({ publishedAt: new Date(last.published_at).toISOString(), id: last.id, ...(lightweight ? { topicId, childId, asOf } : {}) })).toString("base64url") : null;
   return { events, nextCursor };
 }
 

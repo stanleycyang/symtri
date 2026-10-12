@@ -18,11 +18,13 @@
     "growth:manage": "tsx scripts/manage-growth.ts",
     "enrichment:manage": "tsx scripts/manage-enrichment.ts",
     "digest:build": "tsx --env-file-if-exists=.env.local scripts/build-digest.ts",
-    "check:gtm": "node scripts/check-gtm.mjs"
+    "check:gtm": "node scripts/check-gtm.mjs",
+    "check:topic-performance": "tsx scripts/check-topic-performance.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.0",
+    "@tanstack/react-virtual": "3.14.15",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "ai": "^7.0.113",
