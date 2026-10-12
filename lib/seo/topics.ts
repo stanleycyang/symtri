@@ -3,18 +3,14 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { getUniverseCatalog } from "@/lib/data/catalog";
 import {getCurrentFeed} from "@/lib/data/current";
 import { getTopicPage } from "@/lib/data/storage";
-import { seedCatalog, type UniverseCatalog } from "@/lib/universe";
 import type { Metadata } from "next";
-export function pointPath(id: string, catalog: UniverseCatalog = seedCatalog): string | null {
-  for (const region of catalog.topics) {
-    if (region.id === id) return `/${id}`;
-    if (region.children.some(child => child.id === id)) return `/${region.id}/${id.slice(region.id.length + 1)}`;
-  }
-  return null;
-}
+import {pointPath,topicSlug as childSlug} from "./paths";
+export {pointPath} from "./paths";
 export const resolvePage = cache(async (regionSlug: string, topicSlug?: string) => {
   const catalog = await getUniverseCatalog();
-  const requested = topicSlug ? `${regionSlug}-${topicSlug}` : regionSlug;
+  const sourceRegion = catalog.topics.find(item => item.id === regionSlug);
+  const requested = topicSlug ? sourceRegion?.children.find(child => childSlug(regionSlug,child.id) === topicSlug)?.id
+    ?? (catalog.redirects?.[topicSlug] ? topicSlug : `${regionSlug}-${topicSlug}`) : regionSlug;
   let id = requested;
   for (let i = 0; i < 8 && catalog.redirects?.[id]; i++) id = catalog.redirects[id];
   const path = pointPath(id, catalog);

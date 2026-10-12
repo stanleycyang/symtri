@@ -1,3 +1,4 @@
+import {pointPath} from "../seo/paths";
 import type {SignalFeed} from "./model";
 import {seedCatalog} from "../universe";
 
@@ -21,7 +22,7 @@ export function buildWeeklyDigest(weekEnd: Date, snapshots: SignalFeed[]) {
   // Snapshot details are capped; count only this saved sample rather than claiming full weekly coverage.
   const counts = (items: typeof events) => { const result: Record<string,number> = {}; for (const event of items) for (const id of new Set(event.topics.flatMap(match => [match.topicId, ...(match.subtopicId ? [match.subtopicId] : [])]))) result[id] = (result[id] ?? 0) + 1; return result; };
   const nowCounts = counts(events); const beforeCounts = counts(priorEvents);
-  const topics = catalog.topics.flatMap(region => [{id:region.id,name:region.name,path:`/${region.id}`}, ...region.children.map(child => ({id:child.id,name:child.name,path:`/${region.id}/${child.id.slice(region.id.length+1)}`}))]);
+  const topics = catalog.topics.flatMap(region => [{id:region.id,name:region.name,path:`/${region.id}`}, ...region.children.map(child => ({id:child.id,name:child.name,path:pointPath(child.id,catalog)!}))]);
   const growth = topics.map(topic => ({...topic,count:nowCounts[topic.id] ?? 0, previous:beforeCounts[topic.id] ?? 0, delta:(nowCounts[topic.id] ?? 0) - (beforeCounts[topic.id] ?? 0)})).filter(topic => topic.delta > 0).sort((a,b) => b.delta-a.delta || a.id.localeCompare(b.id));
   // Relationships are full-window snapshot aggregates, never reconstructed from capped details.
   const latest = current.at(-1); const baseline = previous.at(-1);

@@ -3,6 +3,7 @@
 import {sourceHasDayPrecision} from "@/lib/data/source-presentation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import {pointPath} from "@/lib/seo/paths";
 import {trackEvent} from "@/lib/analytics";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopicSourceFeed from "@/components/TopicSourceFeed";
@@ -222,8 +223,7 @@ export default function Experience() {
   useEffect(() => {if(askOpen)trackEvent("ask_symtri_open");},[askOpen]);
   const copyPointLink = async () => {
     if (!sharePointId) return;
-    const shareRegion = catalog.topics.find(item => item.id === sharePointId || item.children.some(child => child.id === sharePointId));
-    const path = shareRegion && !connectionId && !signalId && !selectedDay ? `/${shareRegion.id}${sharePointId === shareRegion.id ? "" : "/" + sharePointId.slice(shareRegion.id.length + 1)}` : "/";
+    const path = !connectionId && !signalId && !selectedDay ? pointPath(sharePointId,catalog) ?? "/" : "/";
     const url = new URL(path, window.location.origin);
     if (path === "/") url.searchParams.set("point", sharePointId);
     if (connectionId) url.searchParams.set("connection", connectionId);

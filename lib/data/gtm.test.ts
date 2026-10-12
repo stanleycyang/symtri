@@ -1,3 +1,5 @@
+import {pointPath,topicSlug} from "../seo/paths";
+import {seedCatalog} from "../universe";
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {serializeJsonLd, datasetSchema} from "../seo/jsonld";
@@ -16,3 +18,11 @@ test("digest deduplicates snapshot signals, excludes future observations, compar
  const rendered = renderWeeklyDigest(result); assert.ok(!rendered.html.includes("<script>"));assert.ok(rendered.html.includes("utm_campaign=signal-2026-41"));assert.ok(rendered.text.includes(event.url));assert.equal(result.coverage.currentDays,2);
 });
 test("empty digest does not invent evidence", () => {const result=buildWeeklyDigest(new Date("2026-10-10"),[]);assert.deepEqual(result.signals,[]);assert.deepEqual(result.rising,[]);assert.equal(result.quiet,null);});
+
+test("public URLs preserve generated concept IDs without a region prefix",()=>{
+ const hardware=seedCatalog.topics.find(topic=>topic.id==="hardware")!;
+ const catalog={...seedCatalog,topics:[{...hardware,children:[{...hardware.children[0],id:"concept-03f423627e74e4c"}]}]};
+ assert.equal(pointPath("concept-03f423627e74e4c",catalog),"/hardware/concept-03f423627e74e4c");
+ assert.equal(topicSlug("ai","ai-agents"),"agents");
+ assert.equal(topicSlug("hardware","concept-03f423627e74e4c"),"concept-03f423627e74e4c");
+});
