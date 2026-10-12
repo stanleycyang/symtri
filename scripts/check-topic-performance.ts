@@ -20,6 +20,7 @@ async function sample(cursor?: string) {
   if (page.events.some(event=>"summary" in event || "classificationInput" in event || "externalId" in event)) throw new Error("List payload includes heavy detail fields");
   return {page,metrics:{rows:page.events.length,ttfbMs:Math.round(ttfb),totalMs:Math.round(performance.now()-started),bytes:Buffer.byteLength(text),estimatedGzipBytes:gzipSync(text).length}};
 }
+async function main() {
 try {
   const samples = [];
   for(let i=0;i<3;i++) samples.push(await sample());
@@ -31,3 +32,6 @@ try {
   console.error(`Topic performance check failed: ${error instanceof Error?error.message:"unknown error"}`);
   process.exitCode=1;
 }
+
+}
+void main();
