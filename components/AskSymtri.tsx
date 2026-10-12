@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {trackEvent} from "@/lib/analytics";
 import SourceText from "./SourceText";
 import {readAskStream} from "@/lib/ai/ask-stream";
 import type { AskResult } from "@/lib/ai/ask";
@@ -78,6 +79,7 @@ export default function AskSymtri({ open, day, subject, signalId, initialQuestio
   const ask = async (value: string, selected?:{signalId:string;subject:string}) => {
     const trimmed = value.trim();
     if (trimmed.length < 3 || busy) return;
+    trackEvent("ask_symtri_submit");
     const previous = completed.current;
     controller.current?.abort();
     const request = new AbortController();

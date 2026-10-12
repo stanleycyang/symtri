@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import {Analytics} from "@vercel/analytics/next";
+import {SpeedInsights} from "@vercel/speed-insights/next";
+import {websiteSchema, serializeJsonLd} from "@/lib/seo/jsonld";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://symtri.com"),
@@ -12,6 +15,7 @@ export const metadata: Metadata = {
     siteName: "SYMTRI",
     url: "/",
     type: "website",
+    images: [{url: "/opengraph-image.png", width:1200, height:630}],
   },
   twitter: {
     card: "summary_large_image",
@@ -25,5 +29,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<Analytics /><SpeedInsights /><script type="application/ld+json" dangerouslySetInnerHTML={{__html: serializeJsonLd(websiteSchema())}} /></body></html>;
 }
