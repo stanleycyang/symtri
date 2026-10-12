@@ -915,6 +915,26 @@ async function main() {
     assert.equal(recoveredDiscussion.evidence?.url,"https://news.ycombinator.com/item?id=123456789");
     assert.equal((await getSignalEvidence(discussionId))[0].body.kind,"discussion");
     await sql`delete from signal_events where id=${discussionId}`;
+    {
+      const excerptId=`github:${organicPrefix}-excerpt`;
+      const article="Microsoft today has formally launched its Surface Laptop Ultra, the first in a series of developer-focused machines. The report describes its hardware and the development environment.";
+      const menu="Mobile News Facebook X Pinterest Linkedin ReddIt Email Print Copy URL Surface-Laptop-Ultra-and-Surface-RTX-Spark-Dev-Box ";
+      const body=menu+article;
+      const excerptEvent:SignalEvent={...event,id:excerptId,externalId:`${organicPrefix}-excerpt`,url:`https://example.org/${organicPrefix}/excerpt`,title:"A source article",evidence:{text:body,kind:"article",url:`https://example.org/${organicPrefix}/excerpt`,attribution:"Publisher",license:null,retrievedAt:new Date().toISOString()}};
+      await persistSignals({...feed,events:[excerptEvent]});
+      const explanation=`The source states: “${body.slice(0,230)}”`;
+      const saved:ReadingNote={explanation,claims:[{text:explanation,evidence:[{sourceId:excerptId,quote:body.slice(0,230)}]}],questions:[],context:[],createdAt:new Date().toISOString(),sourceKind:"article",evidenceSource:"github",evidenceUrl:excerptEvent.url,evidenceAttribution:"Publisher",evidenceLicense:null};
+      try {
+        await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},note=${sql.json(saved)} where signal_id=${excerptId}`;
+        const response=await readStory(new Request(`http://localhost/api/story?id=${encodeURIComponent(excerptId)}`));
+        const result=await response.json();
+        assert.match(result.note.explanation,/states: “Microsoft today/);
+        assert.equal(result.note.synthesisMethod,"extractive");
+        assert.ok(body.includes(result.note.claims[0].evidence[0].quote),"Repaired quote is still an exact source passage");
+        assert.equal((await sql`select note->>'explanation' as explanation from reading_notes where signal_id=${excerptId}`)[0].explanation,explanation,"Serving a readable excerpt never mutates saved quotations");
+        assert.equal((await getSignalEvidence(excerptId))[0].body.text,body,"The original source archive is retained");
+      } finally {await sql`delete from signal_events where id=${excerptId}`;}
+    }
     // An unchanged observation keeps a ready note; changed content invalidates it
     // and prevents a worker holding the old revision from publishing stale prose.
     const noteRevision=Number((await sql`select revision from reading_notes where signal_id=${id}`)[0].revision);

@@ -1,3 +1,5 @@
+import {needsExcerptRepair, readableExcerptNote} from "./excerpt-note";
+import {articleText} from "./article-text";
 import { randomUUID } from "node:crypto";
 import { database, getArchivedSignal, getSignalEvidence, persistSourceEvidence } from "./storage";
 import { fetchPublicText } from "./public-fetch";
@@ -225,10 +227,9 @@ export async function retrieveStoryEvidence(event: SignalEvent, load:typeof fetc
     const page=await load(event.url,600_000);
     // Do not extract pages with an explicit crawler/republication restriction.
     if (/<meta[^>]+(?:robots|googlebot)[^>]+(?:noai|nosnippet|noindex)/i.test(page.text)) throw new Error("Publisher restricts extraction");
-    content=page.text.replace(/<(script|style|nav|header|footer)\b[^>]*>[\s\S]*?<\/\1>/gi,"");
-    content=/<article\b[^>]*>([\s\S]*?)<\/article>/i.exec(content)?.[1] ?? /<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(content)?.[1] ?? "";
+    content=articleText(page.text);
   }
-  const cleaned=cleanSourceText(content).slice(0,12000);
+  const cleaned=(kind==="article" ? content.replace(/\s+/g," ").trim() : cleanSourceText(content)).slice(0,12000);
   if (cleaned.length<150) throw new Error("Insufficient source text");
   evidence={text:cleaned,kind,url:evidenceUrl,attribution,license:null,retrievedAt:new Date().toISOString(),...(metadata?{metadata}:{})};
   } catch (error) {
@@ -246,7 +247,13 @@ export async function getReadingNote(id: string): Promise<{status:string;note:Re
   const row=rows[0];
   if(!row) return null;
   const expected=backgroundSubjectFor(row);
-  return {summary: row.note ? row.summary : undefined,status:row.version!==ENRICHMENT_VERSION || row.status==="ready" && !row.note ? "pending" : row.status,note:row.note?{...row.note,context:row.note.context.filter(context=>context.kind!=="background" || context.title===expected)}:null};
+  let note=row.note;
+  if(note && needsExcerptRepair(note)) {
+    const original=note;
+    const retained=(await getSignalEvidence(id)).find(item=>item.body.url===original.evidenceUrl && item.body.kind===original.sourceKind);
+    note=readableExcerptNote(note,row.title,retained?.body.text);
+  }
+  return {summary: row.note ? row.summary : undefined,status:row.version!==ENRICHMENT_VERSION || row.status==="ready" && !row.note ? "pending" : row.status,note:note?{...note,context:note.context.filter(context=>context.kind!=="background" || context.title===expected)}:null};
 }
 
 export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNote=summarizeReadingNote, loadContext:typeof contextFor=contextFor, preferRetries=false, preferOldest=false): Promise<{processed:number;ready:number;failed:number;status:string}> {

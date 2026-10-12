@@ -1,3 +1,4 @@
+import {sourcePassage} from "../data/source-passage";
 import { generateText, Output, type LanguageModel } from "ai";
 import { z } from "zod";
 import { awaitWithinDeadline } from "./deadline";
@@ -112,31 +113,8 @@ export function extractiveReadingNote(answer: AskResult, feed: SignalFeed): Summ
   if (!event?.evidence?.text || event.evidence.text.length<100) throw new Error("No direct evidence for an extractive reading note");
   // This last resort repeats a source passage verbatim, without adding a
   // model's unsupported inference. The richer model note remains the default.
-  const text=normalize(event.evidence.text);
-  const overview=event.evidence.kind==="repository"
-    ? /(?:^|\s)#{1,3}\s+(?:[^\w\s]+\s*)?(?:Project\s+)?(?:Overview|Introduction|About)\s+/i.exec(text)
-    : null;
-  const titleAt=text.toLowerCase().indexOf(normalize(event.title).toLowerCase());
-  const passageText=overview && text.length-overview.index-overview[0].length>=100
-    ? text.slice(overview.index+overview[0].length)
-    : titleAt>0 && titleAt<2000 && /\s/.test(text[titleAt-1]) && text.length-titleAt>=100 ? text.slice(titleAt) : text;
-  const starts=[0,...[...passageText.slice(0,8000).matchAll(/(?:^|\s)#{1,3}\s+|\b(?:The|This|It|We|A|An|[A-Z][a-z]{2,})\s/g)].map(match=>match.index!)].slice(0,100);
-  let quote="";
-  for(const start of starts) {
-    const candidate=passageText.slice(start).trim();
-    const sentence=candidate.match(/^.{99,229}?[.!?。！？](?=\s|$)/u)?.[0];
-    const words:string[]=[];
-    if(!sentence) for(const word of candidate.split(" ")) {
-      if(words.length>=40 || [...words,word].join(" ").length>230) break;
-      words.push(word);
-    }
-    const passage=sentence ?? words.join(" ");
-    const prose=passage.replace(/https?:\/\/\S+/g,"").replace(/[#[\]()*`|>]/g," ");
-    if(passage.length<100 || (prose.split(/\s+/).filter(word=>word.length>1).length<12 && (prose.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu)?.length ?? 0)<60)
-      || /!\[|badge\.svg|shields\.io|actions\/workflows|[a-z0-9_/.:-]{70,}/i.test(passage)) continue;
-    quote=passage;break;
-  }
-  if(quote.length<100) throw new Error("No direct evidence passage suitable for an extractive reading note");
+  const quote=sourcePassage(event.evidence.text,event.title,event.evidence.kind);
+  if(!quote) throw new Error("No direct evidence passage suitable for an extractive reading note");
   const claim:GroundedClaim={text:`The ${event.evidence.kind === "discussion" ? "discussion" : "source"} states: “${quote}”`,kind:"fact",evidence:[{sourceId:event.id,quote}]};
   return {summary:claim.text,synthesisMethod:"extractive",fallbackReason:"source-excerpt",citedEventIds:[event.id],claims:validatePassages([claim],[{id:event.id,title:event.title,summary:event.evidence.text}])};
 }
