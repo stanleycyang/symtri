@@ -26,13 +26,13 @@
     "benchmark:record": "node scripts/record-search-observation.mjs"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
+    "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "@tanstack/react-virtual": "3.14.15",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "ai": "^7.0.137",
-    "fast-xml-parser": "^5.11.1",
+    "fast-xml-parser": "^5.11.2",
     "ipaddr.js": "2.5.0",
     "next": "16.3.8",
     "parse5": "^8.0.1",
