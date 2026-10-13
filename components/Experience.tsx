@@ -3,8 +3,8 @@
 import {sourceHasDayPrecision} from "@/lib/data/source-presentation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import {pointPath} from "@/lib/seo/paths";
 import {trackEvent} from "@/lib/analytics";
+import {viewPath, referralUrl} from "@/lib/seo/share";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopicSourceFeed from "@/components/TopicSourceFeed";
 import ConnectionEvidence from "@/components/ConnectionEvidence";
@@ -226,16 +226,16 @@ export default function Experience() {
   useEffect(() => {if(askOpen)trackEvent("ask_symtri_open");},[askOpen]);
   const copyPointLink = async () => {
     if (!sharePointId) return;
-    const path = !connectionId && !signalId && !selectedDay ? pointPath(sharePointId,catalog) ?? "/" : "/";
-    const url = new URL(path, window.location.origin);
-    if (path === "/") url.searchParams.set("point", sharePointId);
-    if (connectionId) url.searchParams.set("connection", connectionId);
-    if (signalId) url.searchParams.set("signal", signalId);
-    if (selectedDay) url.searchParams.set("day", selectedDay);
-    const channel = typeof navigator.share === "function" ? "native" : "clipboard";
-    url.searchParams.set("utm_source", "share"); url.searchParams.set("utm_medium", "referral");
-    try { if (typeof navigator.share === "function") await navigator.share({title: `${child?.name ?? focus?.name} | SYMTRI`, url: url.toString()}); else await navigator.clipboard.writeText(url.toString()); trackEvent("share", {point: sharePointId, channel}); setCopiedPoint(sharePointId); }
-    catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setCopiedPoint("error"); }
+    const url = referralUrl(viewPath({point:sharePointId,connection:connectionId ?? undefined,signal:signalId ?? undefined,day:selectedDay ?? undefined},catalog),window.location.origin);
+    const title = `${signal?.title ?? (connection ? `${focus?.name} × ${connection.topic.name}` : child?.name ?? focus?.name)} | SYMTRI`;
+    try {
+      let channel = "clipboard";
+      if (typeof navigator.share === "function") {
+        try {await navigator.share({title,url});channel="native";}
+        catch(error) {if(error instanceof DOMException && error.name==="AbortError")return;await navigator.clipboard.writeText(url);}
+      } else await navigator.clipboard.writeText(url);
+      trackEvent("share", {point: sharePointId, channel}); setCopiedPoint(channel === "native" ? `shared:${sharePointId}` : sharePointId);
+    } catch {setCopiedPoint("error");}
   };
 
   useEffect(() => {
@@ -417,7 +417,7 @@ export default function Experience() {
         <p className="eyebrow">A LIVING MAP OF IDEAS</p>
         <h1>THE INTERNET<br /><em>IS THINKING.</em></h1>
         <p className="intro-copy">A place to see what technology is becoming.<br />Follow the signals. Find the connections.</p>
-        <button className="enter-button" onClick={() => {trackEvent("enter_universe"); setEntered(true);}}><span>ENTER THE UNIVERSE</span><span className="enter-arrow">↗</span></button><Link className="entrance-about" href="/about">About SYMTRI ↗</Link>
+        <button className="enter-button" onClick={() => {trackEvent("enter_universe"); setEntered(true);}}><span>ENTER THE UNIVERSE</span><span className="enter-arrow">↗</span></button><Link className="entrance-about" href="/about">About SYMTRI ↗</Link><Link className="entrance-about" href="/signal">Weekly report ↗</Link>
       </div>
       <div className="entrance-bottom"><span>{topics.length} REGIONS · {topics.reduce((count, topic) => count + topic.children.length, 0)} TOPICS · LIVE SOURCES</span><a href="https://github.com/stanleycyang/symtri" target="_blank" rel="noopener noreferrer">OPEN SOURCE · CONTRIBUTE ON GITHUB ↗</a></div>
     </section>
@@ -430,7 +430,7 @@ export default function Experience() {
 
       {hover && !focus && <div className="hover-card" aria-live="polite"><span className="hover-card-label">REGION IN FOCUS · {hoverActivity ? feedProvenance : "AWAITING OBSERVATIONS"}</span><strong>{hover.name}</strong><span><b>{hoverActivity ? hoverActivity.momentum.toUpperCase() : "PENDING"}</b> activity <i /> {hoverActivity ? hoverActivity.count : 0} signals</span></div>}
       {focus && <aside ref={detailPanel} key={`${topicKey}:${selectedDay ?? "now"}`} className="detail-panel">
-        <div className="panel-top"><span className="eyebrow">{connection ? "CONNECTION / SHARED SOURCES" : signal ? "SIGNAL / SOURCE" : child ? topicLoading && !liveForChild.length ? "TOPIC / CHECKING SOURCES" : liveForChild.length ? selectedDay ? "TOPIC / HISTORICAL SIGNALS" : "TOPIC / LIVE SIGNALS" : selectedDay ? "TOPIC / NO HISTORICAL SIGNALS" : "TOPIC / NO OBSERVED SIGNALS" : "REGION / ACTIVE TOPICS"}</span><div className="panel-actions">{<button type="button" className="share-point" onClick={() => void copyPointLink()} aria-label={`Copy link to ${child?.name ?? focus.name}`}>{copiedPoint === sharePointId ? "COPIED" : copiedPoint === "error" ? "COPY FAILED" : "SHARE"}</button>}<button className="icon-button" onClick={goBack} aria-label="Go back">↗</button></div></div>
+        <div className="panel-top"><span className="eyebrow">{connection ? "CONNECTION / SHARED SOURCES" : signal ? "SIGNAL / SOURCE" : child ? topicLoading && !liveForChild.length ? "TOPIC / CHECKING SOURCES" : liveForChild.length ? selectedDay ? "TOPIC / HISTORICAL SIGNALS" : "TOPIC / LIVE SIGNALS" : selectedDay ? "TOPIC / NO HISTORICAL SIGNALS" : "TOPIC / NO OBSERVED SIGNALS" : "REGION / ACTIVE TOPICS"}</span><div className="panel-actions">{<button type="button" className="share-point" onClick={() => void copyPointLink()} aria-label={`Share ${signal?.title ?? child?.name ?? focus.name}`}>{copiedPoint === sharePointId ? "COPIED" : copiedPoint === `shared:${sharePointId}` ? "SHARED" : copiedPoint === "error" ? "COPY FAILED" : "SHARE"}</button>}<button className="icon-button" onClick={goBack} aria-label="Go back">↗</button></div></div>
         <h3 ref={panelHeading} tabIndex={-1}>{connection ? `${focus.short} × ${connection.topic.short}` : signal ? signal.title : child ? child.name : focus.name}</h3>
         {signal?.live && signal.url && <a className="mobile-read-source" onClick={() => trackEvent("outbound_source", {sourceId: signal.source})} href={signal.url} target="_blank" rel="noopener noreferrer">READ SOURCE <span aria-hidden="true">↗</span></a>}
         {!connection && !signal && (child ? <p className="panel-description">{liveForChild.length ? `${selectedDay ? "Observed then" : "Sources"} about ${child.name.toLowerCase()}.` : selectedDay ? `No source for ${child.name.toLowerCase()} appears in the ${shortDay(selectedDay)} snapshot.` : topicArchive?.key !== topicKey ? "Looking for matching sources…" : topicArchive.error ? "Matching sources could not load. Retry to check this thread." : `No matching sources ${displayFeed?.childCounts ? "in the past 14 days" : "in this source sample"}. ${threadOrigin(child.id)}`}</p> : <><p className="panel-description">{focusActivity ? focusedSignals.length ? `Research, code, and conversation matched to ${focus.name.toLowerCase()}${selectedDay ? ` on ${shortDay(selectedDay)}` : ""}.` : `No source for ${focus.name.toLowerCase()} appears ${selectedDay ? `in the ${shortDay(selectedDay)} snapshot` : "in the current view"}. ${selectedDay ? "Explore another date or region." : "Browse the archive or explore its topics."}` : focus.description}</p><div className="activity-readout"><span>{focusActivity ? displayFeed?.partial ? feedProvenance : "OBSERVED · PAST 14 DAYS" : "AWAITING OBSERVATIONS"}</span><strong>{focusActivity ? focusActivity.momentum.toUpperCase() : "PENDING"}</strong><span>{focusActivity ? focusActivity.count : 0} SIGNALS</span></div></>)}

@@ -1,17 +1,19 @@
 # GTM implementation status
 
-Newsletter signup and provider automation are deferred at the owner's request. No newsletter provider account or migration is needed for this release.
+Newsletter signup and email delivery remain deferred. Vercel Analytics is the selected provider; the owner will enable it in the dashboard.
 
-| Issue | Release scope | Follow-up |
+| Issue | Release scope | Remaining external step |
 | --- | --- | --- |
-| #12 Indexable pages | 10 region pages and 66 thread pages, hourly ISR, public catalog and merged-ID redirects, readable sources, activity, sibling/connection links, canonical metadata, 78-entry sitemap | Sitemap submission |
-| #13 Signup | Deferred; no form or subscription endpoint | Select an affordable provider |
-| #14 Sharing | Canonical topic URLs; connection/signal/day map links; native share and clipboard; point-specific OG images and query metadata; archive lookup | External social unfurl inspectors |
-| #15 Analytics | Vercel Analytics and Speed Insights, interaction events without question text or email, UTM conventions | Dashboard activation and event/attribution verification |
-| #16 About | Methodology, source/licenses, Ask limits, GitHub and creator referral links, map/entrance navigation | Content review |
-| #17 Structured data | Escaped WebSite/Person, AboutPage, Dataset and BreadcrumbList JSON-LD | External rich-result/schema validation |
-| #18 Digest | Provider-independent HTML/plain-text/JSON export, snapshot comparisons, top signals, sample growth, quiet topics, full-window connections; optional grounded intro helper | Sending and scheduled provider integration deferred |
+| #12 Indexable pages | Seed and public catalog pages, hourly ISR, redirects, readable sources, full-window activity, canonical metadata, sitemap | Submit sitemap in Search Console |
+| #13 Signup | Deferred; no form or subscription endpoint | Choose a provider later |
+| #14 Sharing | Topic, region, connection, signal, and historical links; native share with clipboard fallback; topic-page share controls; specific titles and 1200×630 cards with activity windows, momentum where available, and source headlines | Social platforms control their preview caches |
+| #15 Analytics | Vercel Web Analytics and Speed Insights; privacy-filtered URLs, map/Ask/share/outbound events; UTM conventions | Owner enables dashboard, then confirms pageviews and event properties |
+| #16 About | Methodology, source/license scope, Ask limits, creator/GitHub links, weekly report navigation | None |
+| #17 Structured data | Escaped WebSite/Person, AboutPage, Dataset, BreadcrumbList, report Article; full fourteen-day temporal coverage and actual activity values when available | Search engines decide indexing and presentation |
+| #18 Digest | Automatic public weekly report, permanent archive pages, source links, share cards, RSS; authenticated Monday cron; immutable per-week JSONB records and empty-evidence protection | Email/provider drafts intentionally deferred |
 
-Validation includes unit tests, lint, typecheck, production build, isolated PostgreSQL checks, a smoke check across all 78 sitemap URLs, and production browser inspection. Local About and Agents Lighthouse checks scored 100 for accessibility and SEO. Production verification is performed during release.
+Weekly reports cover the last completed Monday-to-Monday UTC week. Publication runs Monday at 14:00 UTC. Retries leave the saved edition unchanged. Topic comparisons use deduplicated saved samples; connections compare full-window snapshot aggregates. The report explicitly states missing-day coverage. Publication uses deterministic source-grounded copy without a model call or provider dependency.
 
-See `docs/growth-utm.md` for attribution and the local digest export command. There is no email sending or newsletter cron in this release.
+Verification commands: `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`, `npm run test:storage:local`, and `SYMTRI_CHECK_URL=https://symtri.com npm run check:gtm`. The storage runner includes report JSONB, idempotency, RLS, authentication, empty-evidence, and completed-week checks.
+
+See `docs/growth-utm.md` for attribution and dashboard activation. There is no email sending or subscription route.

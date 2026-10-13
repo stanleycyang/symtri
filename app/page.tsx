@@ -1,17 +1,11 @@
-import {getUniverseCatalog} from "@/lib/data/catalog";
-import {pointPath, topicMetadata} from "@/lib/seo/topics";
+import {parseShareView} from "@/lib/seo/share";
+import {viewMetadata} from "@/lib/seo/views";
 import dynamic from "next/dynamic";
-
 const Experience = dynamic(() => import("@/components/Experience"));
-
-export async function generateMetadata({searchParams}: {searchParams: Promise<{point?: string}>}) {
- const {point} = await searchParams;
- if (!point) return {};
- const path = pointPath(point, await getUniverseCatalog());
- if (!path) return {};
- const [region, topic] = path.slice(1).split("/");
- return topicMetadata(region,topic);
+export async function generateMetadata({searchParams}: {searchParams: Promise<Record<string,string | string[] | undefined>>}) {
+  const values=await searchParams;
+  const params=new URLSearchParams();
+  for(const key of ["point","connection","signal","day"])if(typeof values[key]==="string")params.set(key,values[key]);
+  return viewMetadata(parseShareView(params));
 }
-export default function Home() {
-  return <Experience />;
-}
+export default function Home() {return <Experience />;}

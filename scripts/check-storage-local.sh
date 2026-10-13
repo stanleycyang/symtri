@@ -17,3 +17,5 @@ trap cleanup EXIT
 started=1
 
 SYMTRI_TEST_DATABASE_URL="postgres://$(id -un)@127.0.0.1:$port/postgres" npm run test:storage
+
+SYMTRI_TEST_DATABASE_URL="postgres://$(id -un)@127.0.0.1:$port/postgres" npx tsx scripts/check-reports.ts

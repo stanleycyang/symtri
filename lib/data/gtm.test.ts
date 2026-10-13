@@ -26,3 +26,28 @@ test("public URLs preserve generated concept IDs without a region prefix",()=>{
  assert.equal(topicSlug("ai","ai-agents"),"agents");
  assert.equal(topicSlug("hardware","concept-03f423627e74e4c"),"concept-03f423627e74e4c");
 });
+
+
+test("share URLs preserve exact views and reject malformed state", async()=>{
+ const {parseShareView,viewPath,referralUrl}=await import("../seo/share");
+ const view=parseShareView(new URLSearchParams("point=ai&connection=software&signal=hacker-news:123&day=2026-10-11"));
+ const path=viewPath(view,seedCatalog);
+ assert.equal(path,"/?point=ai&connection=software&signal=hacker-news%3A123&day=2026-10-11");
+ assert.equal(viewPath({point:"ai-agents"},seedCatalog),"/ai/agents");
+ assert.equal(new URL(referralUrl(path)).searchParams.get("utm_medium"),"referral");
+ assert.equal(parseShareView(new URLSearchParams("day=2026-02-30&point=%3Cscript%3E")).day,undefined);
+ assert.equal(parseShareView(new URLSearchParams("day=2026-02-30&point=%3Cscript%3E")).point,undefined);
+});
+test("weekly reports use the last completed UTC week",async()=>{
+ const {completedWeekEnd}=await import("./reports");
+ assert.equal(completedWeekEnd(new Date("2026-10-12T14:00:00Z")).toISOString(),"2026-10-12T00:00:00.000Z");
+ assert.equal(completedWeekEnd(new Date("2026-10-11T23:59:59Z")).toISOString(),"2026-10-05T00:00:00.000Z");
+ assert.equal(isoWeek(new Date(completedWeekEnd(new Date("2026-10-12")).getTime()-1)),"2026-41");
+});
+
+test("analytics keeps campaign attribution without freeform queries",async()=>{
+ const {analyticsUrl}=await import("../analytics-url");
+ const url=new URL(analyticsUrl("https://symtri.com/?point=ai&utm_source=x&utm_campaign=launch-2026-10&question=private&email=a@example.com#private"));
+ assert.equal(url.searchParams.get("point"),"ai");assert.equal(url.searchParams.get("utm_source"),"x");
+ assert.equal(url.searchParams.has("question"),false);assert.equal(url.searchParams.has("email"),false);assert.equal(url.hash,"");
+});

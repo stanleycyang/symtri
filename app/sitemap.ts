@@ -1,5 +1,6 @@
 import type {MetadataRoute} from "next";
 import {getUniverseCatalog} from "@/lib/data/catalog";
+import {listWeeklyReports} from "@/lib/data/reports";
 import {pageFeed, pointPath} from "@/lib/seo/topics";
 export const revalidate = 3600;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -7,6 +8,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const feed = await pageFeed();
   const modified = new Map<string,string>();
   for (const event of feed?.events ?? []) for(const match of event.topics) for(const id of [match.topicId,match.subtopicId].filter(Boolean) as string[]) {const path=pointPath(id,catalog);if(path && (!modified.has(path) || modified.get(path)! < event.publishedAt))modified.set(path,event.publishedAt);}
-  const paths = ["/", "/about", ...catalog.topics.flatMap(region => [pointPath(region.id, catalog)!, ...region.children.map(child => pointPath(child.id, catalog)!)])];
+  const reports=await listWeeklyReports();
+  for(const report of reports)modified.set(`/signal/${report.week}`,report.publishedAt);
+  const paths = ["/", "/about", "/signal", ...reports.map(report=>`/signal/${report.week}`), ...catalog.topics.flatMap(region => [pointPath(region.id, catalog)!, ...region.children.map(child => pointPath(child.id, catalog)!)])];
   return paths.map(path => ({url: `https://symtri.com${path}`, ...(modified.has(path) ? {lastModified: modified.get(path)} : {}), changeFrequency: path === "/about" ? "monthly" : "daily", priority: path === "/" ? 1 : .7}));
 }

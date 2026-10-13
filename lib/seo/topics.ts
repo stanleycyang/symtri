@@ -18,7 +18,7 @@ export const resolvePage = cache(async (regionSlug: string, topicSlug?: string) 
   const child = topicSlug ? region?.children.find(item => item.id === id) : undefined;
   if (!region || (topicSlug && !child)) notFound();
   const name = child?.name ?? region.name;
-  const description = `Follow recent ${name.toLowerCase()} research, projects, and news in SYMTRI. Explore original sources and how these ideas connect across technology.`;
+  const description = `Follow ${name.toLowerCase()} research, projects, and news in SYMTRI. Explore original sources and connected ideas.`;
   return {catalog, region, child, name, description, path: path!, id};
 });
 export const pageEvidence = cache(async (regionId: string, childId: string | null) => {
@@ -29,9 +29,9 @@ export const pageEvidence = cache(async (regionId: string, childId: string | nul
 export async function topicMetadata(region: string, topic?: string): Promise<Metadata> {
   const page = await resolvePage(region, topic);
   const title = `${page.name} — what tech is paying attention to | SYMTRI`;
-  const image = `/api/og?point=${encodeURIComponent(page.id)}`;
+  const image = `/api/og?point=${encodeURIComponent(page.id)}&v=2`;
   return {title, description: page.description, alternates: {canonical: page.path},
-    openGraph: {title, description: page.description, url: page.path, images: [{url: image, width: 1200, height: 630}]},
+    openGraph: {title, description: page.description, url: page.path, siteName: "SYMTRI", type: "website", images: [{url: image, width: 1200, height: 630, alt: `${page.name} sources and activity in SYMTRI`}]},
     twitter: {card: "summary_large_image", title, description: page.description, images: [image]}};
 }
 
