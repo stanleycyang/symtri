@@ -1,8 +1,7 @@
 import { cache } from "react";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getUniverseCatalog } from "@/lib/data/catalog";
-import {getCurrentFeed} from "@/lib/data/current";
-import { getTopicPage } from "@/lib/data/storage";
+import { getPersistedCurrentFeed, getTopicPage } from "@/lib/data/storage";
 import type { Metadata } from "next";
 import {pointPath,topicSlug as childSlug} from "./paths";
 export {pointPath} from "./paths";
@@ -37,5 +36,13 @@ export async function topicMetadata(region: string, topic?: string): Promise<Met
 }
 
 export const pageFeed = cache(async () => {
-  try {return await getCurrentFeed(true);} catch {return null;}
+  if(!process.env.DATABASE_URL)return null;
+  try {
+    const feed=await getPersistedCurrentFeed();
+    if(!feed)return null;
+    // SEO pages revalidate hourly. Reuse the full-window ingestion statistics;
+    // rebuilding readiness across the archive for every page overloads builds.
+    const stale=Date.now()-Date.parse(feed.observedAt)>3*60*60*1000;
+    return stale ? {...feed,activity:undefined,childCounts:undefined,publishedEvidence:undefined} : feed;
+  } catch {return null;}
 });

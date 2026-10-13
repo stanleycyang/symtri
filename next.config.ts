@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 
 const config: NextConfig = {
+  // One Postgres connection per worker; concurrent prerenders otherwise queue
+  // their archive reads behind each other and hit Next's page deadline.
+  experimental: { staticGenerationMaxConcurrency: 1 },
   async headers() {
     return [{
       source: "/:path*",
