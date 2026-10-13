@@ -10,3 +10,10 @@ updates:
       # in ESLint 10. Revisit when the Next lint stack supports that major.
       - dependency-name: eslint
         update-types: ["version-update:semver-major"]
+      # The native TS 7 compiler omits compiler APIs used by tests and falls
+      # outside the current Next lint stack's supported TypeScript range.
+      - dependency-name: typescript
+        versions: [">=7"]
+      # Workflow 5 needs a durable-runtime migration, not a lockfile-only bump.
+      - dependency-name: workflow
+        versions: [">=5"]
