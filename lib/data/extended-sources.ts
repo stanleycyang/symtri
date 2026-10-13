@@ -78,7 +78,10 @@ export async function fetchEuropePmc(slot: string, load: PublicLoader = fetchPub
   return { events, status: events.length < items.length ? "partial" : "ok" };
 }
 
-export async function fetchHuggingFace(load: PublicLoader = fetchPublicText): Promise<Sample> {
+const loadHuggingFace: PublicLoader = (url, maxBytes) => fetchPublicText(url, maxBytes,
+  process.env.HF_TOKEN?.trim() ? { origin: "https://huggingface.co", token: process.env.HF_TOKEN.trim() } : undefined);
+
+export async function fetchHuggingFace(load: PublicLoader = loadHuggingFace): Promise<Sample> {
   const events: SignalEvent[] = []; let failed = 0;
   for (const kind of ["models", "datasets"] as const) {
     try {

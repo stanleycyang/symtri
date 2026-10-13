@@ -41,7 +41,14 @@ export async function publicHttpsUrl(value: string): Promise<URL> {
   return (await resolvePublicUrl(value, AbortSignal.timeout(12_000))).url;
 }
 
-export async function fetchPublicText(value: string, maxBytes = 2_000_000): Promise<{ url: string; text: string; contentType: string }> {
+type ScopedAuthorization = { origin: string; token: string };
+
+export function scopedAuthorizationHeaders(url: URL, authorization?: ScopedAuthorization): Record<string, string> {
+  return authorization?.token && url.origin === authorization.origin && url.protocol === "https:"
+    ? { authorization: `Bearer ${authorization.token}` } : {};
+}
+
+export async function fetchPublicText(value: string, maxBytes = 2_000_000, authorization?: ScopedAuthorization): Promise<{ url: string; text: string; contentType: string }> {
   let target = value;
   const deadline = AbortSignal.timeout(12_000);
   for (let redirects = 0; redirects <= 2; redirects++) {
@@ -50,7 +57,7 @@ export async function fetchPublicText(value: string, maxBytes = 2_000_000): Prom
     try {
       const response = await request(url, {
         dispatcher: agent, signal: deadline, headersTimeout: 8_000, bodyTimeout: 8_000,
-        headers: { "user-agent": "SYMTRI/0.1 (https://symtri.com)", accept: "application/rss+xml, application/atom+xml, application/xml, application/json, text/plain, text/xml, text/html" },
+        headers: { "user-agent": "SYMTRI/0.1 (https://symtri.com)", accept: "application/rss+xml, application/atom+xml, application/xml, application/json, text/plain, text/xml, text/html", ...scopedAuthorizationHeaders(url, authorization) },
       });
       if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
         target = new URL(String(response.headers.location), url).toString();
