@@ -1067,10 +1067,15 @@ async function main() {
       const noteTopics=(await getArchivedSignal(id))!.topics;
       const noteRegion=noteTopics[0].topicId;
       assert.ok((await getRecentTopicEvents([{id:noteRegion,childId:null}],true,true)).some(item=>item.id===id));
-      assert.ok((await getTopicPage(noteRegion,null,null,20,true)).events.some(item=>item.id===id));
+      const detailedPage = await getTopicPage(noteRegion,null,null,20,true);
+      const detailedSignal = detailedPage.events.find(item=>item.id===id);
+      assert.ok(detailedSignal);
+      const recordedDate = (await sql<{first_seen_at:Date}[]>`select first_seen_at from signal_events where id=${id}`)[0].first_seen_at;
+      assert.equal(detailedSignal.firstSeenAt,recordedDate.toISOString(),"Readable source details expose the recorded archive discovery time");
       const slim = await getTopicPage(noteRegion,null,null,12,true,true);
       assert.ok(slim.events.some(item=>item.id===id));
       assert.ok(slim.events.every(item=>item.summary==="" && item.externalId===""),"List SQL excludes heavy detail fields");
+      assert.ok(slim.events.every(item=>!("firstSeenAt" in item)),"Discovery timestamps do not expand the lightweight list payload");
       const revisionBefore = await getTopicFeedRevision(1);
       const publicPage = await (await getPublicTopic(new Request(`https://symtri.test/api/topic?regionId=${noteRegion}&browse=1&view=list`))).json();
       assert.ok(publicPage.events.length<=12);
@@ -1088,7 +1093,7 @@ async function main() {
         publishedAt:new Date(Date.now()-index*1000).toISOString()}));
       await persistSignals({...feed,events:browsingFixtures});
       const paginationFixtureNote=(await sql<{note:ReadingNote}[]>`select note from reading_notes where signal_id=${id}`)[0].note;
-      await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},note=${sql.json(paginationFixtureNote)} where signal_id in ${sql(browsingFixtures.map(item=>item.id))}`;
+      await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},published_revision=revision,published_at=now(),note=${sql.json(paginationFixtureNote)} where signal_id in ${sql(browsingFixtures.map(item=>item.id))}`;
       const firstSlimPage = await getTopicPage(noteRegion,null,null,12,true,true);
       assert.equal(firstSlimPage.events.length,12);
       assert.ok(firstSlimPage.nextCursor);
@@ -1097,7 +1102,7 @@ async function main() {
         title:'Backdated late source fixture',url:`https://example.org/${externalId}/browse/late`,
         publishedAt:new Date(Date.parse(firstSlimPage.events.at(-1)!.publishedAt)-500).toISOString()};
       await persistSignals({...feed,events:[lateFixture]});
-      await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},note=${sql.json(paginationFixtureNote)} where signal_id=${lateFixture.id}`;
+      await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},published_revision=revision,published_at=now(),note=${sql.json(paginationFixtureNote)} where signal_id=${lateFixture.id}`;
       const nextSlimPage = await getTopicPage(noteRegion,null,firstSlimPage.nextCursor,20,true,true);
       assert.equal(nextSlimPage.events.length,20);
       assert.ok(!nextSlimPage.events.some(item=>firstSlimPage.events.some(previous=>previous.id===item.id)),"The 12-to-20 page transition does not repeat sources");

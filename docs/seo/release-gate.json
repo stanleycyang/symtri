@@ -1,0 +1,64 @@
+{
+  "observedAt": "2026-10-13T19:41:47.638890+00:00",
+  "releaseStatus": "deployed-and-verified",
+  "liveRevalidation": {
+    "firstArchiveDates": true,
+    "repositoryCreationLabels": true,
+    "visibleReportByline": true,
+    "organizationArticleAuthor": true,
+    "wwwStatus": 308,
+    "wwwQueryPreserved": true,
+    "wwwDigestUnauthorizedStatus": 401,
+    "browseFocusRestored": true,
+    "askEscapeFocusRestored": true,
+    "noCanvasBeforeEntry": true,
+    "productionHealth": "passed",
+    "gtm": "passed",
+    "crawlPages": 137,
+    "sitemapPages": 66,
+    "crawlIssues": [],
+    "runtimeErrorScan": "No logs found for this deployment",
+    "sourceLimitations": {
+      "hugging-face": "unavailable in latest completed ingestion"
+    },
+    "noWebglFallback": "Confirmed null context before entry; fallback region and live source navigation usable after entry"
+  },
+  "localVerification": {
+    "crawlPages": 85,
+    "crawlIssues": [],
+    "unitTestsPassed": 222,
+    "build": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "isolatedStorage": "passed"
+  },
+  "fileHashes": {
+    "app/page.tsx": "33490156e30d5acc93154c0d72b1d75a352a8635920a4b44a7346e392f3a98f4",
+    "app/layout.tsx": "f340fbf1db3a703756df8df1e13029bdc2d8c2621f26bc899b767098c3305ec7",
+    "app/robots.ts": "a300809511f6d7077b7cbac6ebbb535e742cd2b52066d1bce65a962385bca4d2",
+    "app/sitemap.ts": "929ded24df9f2434546e24ded07b6929bb77c045a1fa59a2ce2f80be48b49ce6",
+    "app/about/page.tsx": "40edbd103e19c7f66e1993cc14120ae7586fcbd08ce24b504801d0fb30970068",
+    "components/Experience.tsx": "9a0b0ea5bc2c0ad22fe65da204ee95a687578e150cb1486feaab57bcb0011ba6",
+    "components/KnowledgeDirectory.tsx": "fb16c6676e2da8a7eb13bd2e5d04dc263dd64f5e03ed8ca713b264902fcc1c6a",
+    "components/TopicLanding.tsx": "d78805022e0fa34b772e1b1ca02835cf4e70a902d28795523114080149a095e2",
+    "lib/seo/content.ts": "a91c280ca60fb94a539961cafdb6d6779d5c9a6936905cc6793850047cdaccf6",
+    "lib/seo/jsonld.ts": "737069fa967830d47e14e442bf7e694d2b58c2c9c4b21ae665e24c916cd52b2a",
+    "lib/seo/topics.ts": "cd191f9a268fbff269e32bbcf36a1db19005c27515c11d2daf049085c80afdcc",
+    "lib/data/source-presentation.ts": "357b475fe0f41599a7222ffa5950120b7d0c66f1f7d80084822089dd1d195bc6",
+    "lib/data/topic-cursor.ts": "15edbf24c461b91eadde7431ac9fc98c42fa2b9341be974504a438e5dd5868f1",
+    "lib/data/storage.ts": "995c596420e968f8f3fe123ecfbd5ea72cd48715965f56719cf3e5c1265e9262",
+    "next.config.ts": "36d97e954388cf5875dc0520ac0c0d7c623e9dfeb6204fe8e57995136a043041",
+    "scripts/check-seo.mjs": "b2409d7408bb4cba164086b758d7442d012c1edef29272d802daabc16db6cf1b",
+    "scripts/record-search-observation.mjs": "7b23134544095761145a57336745122f987f3267d0d41347278305d2274e082b",
+    "docs/seo/query-benchmark.json": "b7ed347de62251b6061fe50b62961b8008751057890eb3d25f2e762b979d75c9"
+  },
+  "deployment": {
+    "id": "dpl_XDeEkdEhiwyXsrSzzSPSe7wWvYCZ",
+    "url": "https://symtri-rlrm4fv79-testimonio.vercel.app",
+    "productionUrl": "https://symtri.com",
+    "scope": "testimonio",
+    "readyState": "READY",
+    "freshProductionBuild": true,
+    "buildDurationSeconds": 74
+  }
+}

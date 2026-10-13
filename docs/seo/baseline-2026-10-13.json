@@ -1,0 +1,4442 @@
+{
+  "observedAt": "2026-10-13",
+  "base": "https://symtri.com",
+  "pages": [
+    {
+      "url": "https://symtri.com/",
+      "status": 200,
+      "seconds": 0.196,
+      "h1": 1,
+      "title": [
+        "SYMTRI \u2014 The Internet Is Thinking"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Enter a living map of technology and the ideas connecting it.",
+        "canonical": "https://symtri.com",
+        "og:title": "SYMTRI \u2014 The Internet Is Thinking",
+        "og:description": "Enter a living map of technology and the ideas connecting it.",
+        "og:url": "https://symtri.com",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/opengraph-image.png",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "SYMTRI \u2014 The Internet Is Thinking",
+        "twitter:description": "Enter a living map of technology and the ideas connecting it.",
+        "twitter:image": "https://symtri.com/opengraph-image.png",
+        "twitter:image:alt": "SYMTRI \u2014 The Internet Is Thinking, a constellation of connected ideas"
+      },
+      "internalLinks": [
+        "/about",
+        "/about"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/about",
+      "status": 200,
+      "seconds": 0.083,
+      "h1": 1,
+      "title": [
+        "About SYMTRI \u2014 sources and methodology"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "How SYMTRI maps technology, connects public sources, and grounds Ask answers in evidence.",
+        "canonical": "https://symtri.com/about",
+        "og:title": "About SYMTRI \u2014 sources and methodology",
+        "og:description": "How SYMTRI maps technology and connects public sources.",
+        "og:url": "https://symtri.com/about",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/opengraph-image.png",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "About SYMTRI \u2014 sources and methodology",
+        "twitter:description": "How SYMTRI maps technology and connects public sources.",
+        "twitter:image": "https://symtri.com/opengraph-image.png"
+      },
+      "internalLinks": [
+        "/",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "AboutPage",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/signal",
+      "status": 200,
+      "seconds": 0.079,
+      "h1": 1,
+      "title": [
+        "Symtri Signal \u2014 weekly technology reports"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Technology developments worth your attention, their evidence, and what to investigate next.",
+        "canonical": "https://symtri.com/signal",
+        "og:title": "Symtri Signal \u2014 weekly technology reports",
+        "og:description": "Read the evidence. Find a useful next step.",
+        "og:url": "https://symtri.com/signal",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/opengraph-image.png",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Symtri Signal \u2014 weekly technology reports",
+        "twitter:description": "Read the evidence. Find a useful next step.",
+        "twitter:image": "https://symtri.com/opengraph-image.png"
+      },
+      "internalLinks": [
+        "/",
+        "/about",
+        "/signal/feed.xml",
+        "/signal/feed.xml",
+        "/about",
+        "/signal/2026-41",
+        "/",
+        "/signal/feed.xml"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/signal/2026-41",
+      "status": 200,
+      "seconds": 0.446,
+      "h1": 1,
+      "title": [
+        "Symtri Signal \u00b7 2026-41 \u2014 what matters and what to investigate"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "The preprint authors report: LAFT combines structured translation prompts with numerical validation and profiling-guided feedback to convert Fortran atmospheric physics to GPU-accelerated JAX while preserving floating-point agreement.",
+        "canonical": "https://symtri.com/signal/2026-41",
+        "og:title": "Symtri Signal \u00b7 2026-41 \u2014 what matters and what to investigate",
+        "og:description": "The preprint authors report: LAFT combines structured translation prompts with numerical validation and profiling-guided feedback to convert Fortran atmospheric physics to GPU-accelerated JAX while preserving floating-point agreement.",
+        "og:url": "https://symtri.com/signal/2026-41",
+        "og:image": "https://symtri.com/api/og?week=2026-41&v=3",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Symtri Signal \u00b7 2026-41 \u2014 what matters and what to investigate",
+        "og:type": "article",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Symtri Signal \u00b7 2026-41 \u2014 what matters and what to investigate",
+        "twitter:description": "The preprint authors report: LAFT combines structured translation prompts with numerical validation and profiling-guided feedback to convert Fortran atmospheric physics to GPU-accelerated JAX while preserving floating-point agreement.",
+        "twitter:image": "https://symtri.com/api/og?week=2026-41&v=3"
+      },
+      "internalLinks": [
+        "/",
+        "/signal",
+        "/signal/2026-41",
+        "/signal/feed.xml",
+        "/about",
+        "/signal",
+        "/about",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Article",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai",
+      "status": 200,
+      "seconds": 0.066,
+      "h1": 1,
+      "title": [
+        "Artificial Intelligence \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow artificial intelligence research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai",
+        "og:title": "Artificial Intelligence \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow artificial intelligence research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Artificial Intelligence sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Artificial Intelligence \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow artificial intelligence research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/?point=ai",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/agents",
+      "status": 200,
+      "seconds": 0.065,
+      "h1": 1,
+      "title": [
+        "Agents \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow agents research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/agents",
+        "og:title": "Agents \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow agents research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/agents",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-agents&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Agents sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Agents \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow agents research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-agents&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/agents",
+        "/?point=ai-agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/ai-infrastructure",
+      "status": 200,
+      "seconds": 0.538,
+      "h1": 1,
+      "title": [
+        "AI Infrastructure \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow ai infrastructure research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/ai-infrastructure",
+        "og:title": "AI Infrastructure \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow ai infrastructure research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/ai-infrastructure",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-ai-infrastructure&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "AI Infrastructure sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "AI Infrastructure \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow ai infrastructure research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-ai-infrastructure&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/ai-infrastructure",
+        "/?point=ai-ai-infrastructure",
+        "/ai/agents",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/coding-agents",
+      "status": 200,
+      "seconds": 0.639,
+      "h1": 1,
+      "title": [
+        "Coding Agents \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow coding agents research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/coding-agents",
+        "og:title": "Coding Agents \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow coding agents research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/coding-agents",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-coding-agents&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Coding Agents sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Coding Agents \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow coding agents research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-coding-agents&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/coding-agents",
+        "/?point=ai-coding-agents",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/computer-vision",
+      "status": 200,
+      "seconds": 0.374,
+      "h1": 1,
+      "title": [
+        "Computer Vision \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow computer vision research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/computer-vision",
+        "og:title": "Computer Vision \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow computer vision research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/computer-vision",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-computer-vision&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Computer Vision sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Computer Vision \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow computer vision research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-computer-vision&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/computer-vision",
+        "/?point=ai-computer-vision",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/language-models",
+      "status": 200,
+      "seconds": 0.666,
+      "h1": 1,
+      "title": [
+        "Language Models \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow language models research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/language-models",
+        "og:title": "Language Models \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow language models research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/language-models",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-language-models&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Language Models sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Language Models \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow language models research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-language-models&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/language-models",
+        "/?point=ai-language-models",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/multimodal-systems",
+      "status": 200,
+      "seconds": 0.376,
+      "h1": 1,
+      "title": [
+        "Multimodal Systems \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow multimodal systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/multimodal-systems",
+        "og:title": "Multimodal Systems \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow multimodal systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/multimodal-systems",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-multimodal-systems&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Multimodal Systems sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Multimodal Systems \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow multimodal systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-multimodal-systems&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/multimodal-systems",
+        "/?point=ai-multimodal-systems",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/research",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/research",
+      "status": 200,
+      "seconds": 0.326,
+      "h1": 1,
+      "title": [
+        "Research \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow research research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/research",
+        "og:title": "Research \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow research research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/research",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-research&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Research sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Research \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow research research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-research&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/research",
+        "/?point=ai-research",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/robotics",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/ai/robotics",
+      "status": 200,
+      "seconds": 0.352,
+      "h1": 1,
+      "title": [
+        "Robotics \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow robotics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/ai/robotics",
+        "og:title": "Robotics \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow robotics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/ai/robotics",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=ai-robotics&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Robotics sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Robotics \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow robotics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=ai-robotics&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/ai",
+        "/ai/robotics",
+        "/?point=ai-robotics",
+        "/ai/agents",
+        "/ai/ai-infrastructure",
+        "/ai/coding-agents",
+        "/ai/computer-vision",
+        "/ai/language-models",
+        "/ai/multimodal-systems",
+        "/ai/research",
+        "/software",
+        "/hardware",
+        "/energy",
+        "/science",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto",
+      "status": 200,
+      "seconds": 0.406,
+      "h1": 1,
+      "title": [
+        "Crypto \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow crypto research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto",
+        "og:title": "Crypto \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow crypto research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Crypto sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Crypto \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow crypto research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/?point=crypto",
+        "/crypto/bitcoin",
+        "/crypto/digital-identity",
+        "/crypto/ethereum",
+        "/crypto/onchain-apps",
+        "/crypto/protocols",
+        "/crypto/stablecoins",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto/bitcoin",
+      "status": 200,
+      "seconds": 0.369,
+      "h1": 1,
+      "title": [
+        "Bitcoin \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow bitcoin research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto/bitcoin",
+        "og:title": "Bitcoin \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow bitcoin research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto/bitcoin",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto-bitcoin&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Bitcoin sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Bitcoin \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow bitcoin research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto-bitcoin&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/crypto/bitcoin",
+        "/?point=crypto-bitcoin",
+        "/crypto/digital-identity",
+        "/crypto/ethereum",
+        "/crypto/onchain-apps",
+        "/crypto/protocols",
+        "/crypto/stablecoins",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto/digital-identity",
+      "status": 200,
+      "seconds": 0.358,
+      "h1": 1,
+      "title": [
+        "Digital Identity \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow digital identity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto/digital-identity",
+        "og:title": "Digital Identity \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow digital identity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto/digital-identity",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto-digital-identity&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Digital Identity sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Digital Identity \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow digital identity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto-digital-identity&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/crypto/digital-identity",
+        "/?point=crypto-digital-identity",
+        "/crypto/bitcoin",
+        "/crypto/ethereum",
+        "/crypto/onchain-apps",
+        "/crypto/protocols",
+        "/crypto/stablecoins",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto/ethereum",
+      "status": 200,
+      "seconds": 0.4,
+      "h1": 1,
+      "title": [
+        "Ethereum \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow ethereum research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto/ethereum",
+        "og:title": "Ethereum \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow ethereum research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto/ethereum",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto-ethereum&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Ethereum sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Ethereum \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow ethereum research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto-ethereum&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/crypto/ethereum",
+        "/?point=crypto-ethereum",
+        "/crypto/bitcoin",
+        "/crypto/digital-identity",
+        "/crypto/onchain-apps",
+        "/crypto/protocols",
+        "/crypto/stablecoins",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto/onchain-apps",
+      "status": 200,
+      "seconds": 0.278,
+      "h1": 1,
+      "title": [
+        "Onchain Apps \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow onchain apps research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto/onchain-apps",
+        "og:title": "Onchain Apps \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow onchain apps research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto/onchain-apps",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto-onchain-apps&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Onchain Apps sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Onchain Apps \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow onchain apps research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto-onchain-apps&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/crypto/onchain-apps",
+        "/?point=crypto-onchain-apps",
+        "/crypto/bitcoin",
+        "/crypto/digital-identity",
+        "/crypto/ethereum",
+        "/crypto/protocols",
+        "/crypto/stablecoins",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto/protocols",
+      "status": 200,
+      "seconds": 0.363,
+      "h1": 1,
+      "title": [
+        "Protocols \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow protocols research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto/protocols",
+        "og:title": "Protocols \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow protocols research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto/protocols",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto-protocols&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Protocols sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Protocols \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow protocols research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto-protocols&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/crypto/protocols",
+        "/?point=crypto-protocols",
+        "/crypto/bitcoin",
+        "/crypto/digital-identity",
+        "/crypto/ethereum",
+        "/crypto/onchain-apps",
+        "/crypto/stablecoins",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/crypto/stablecoins",
+      "status": 200,
+      "seconds": 0.445,
+      "h1": 1,
+      "title": [
+        "Stablecoins \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow stablecoins research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/crypto/stablecoins",
+        "og:title": "Stablecoins \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow stablecoins research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/crypto/stablecoins",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=crypto-stablecoins&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Stablecoins sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Stablecoins \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow stablecoins research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=crypto-stablecoins&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/crypto",
+        "/crypto/stablecoins",
+        "/?point=crypto-stablecoins",
+        "/crypto/bitcoin",
+        "/crypto/digital-identity",
+        "/crypto/ethereum",
+        "/crypto/onchain-apps",
+        "/crypto/protocols",
+        "/markets",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy",
+      "status": 200,
+      "seconds": 0.414,
+      "h1": 1,
+      "title": [
+        "Energy \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow energy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy",
+        "og:title": "Energy \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow energy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Energy sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Energy \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow energy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/?point=energy",
+        "/energy/battery-storage",
+        "/energy/fusion",
+        "/energy/geothermal",
+        "/energy/grid",
+        "/energy/nuclear",
+        "/energy/power-demand",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/battery-storage",
+      "status": 200,
+      "seconds": 0.292,
+      "h1": 1,
+      "title": [
+        "Battery Storage \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow battery storage research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/battery-storage",
+        "og:title": "Battery Storage \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow battery storage research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/battery-storage",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-battery-storage&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Battery Storage sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Battery Storage \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow battery storage research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-battery-storage&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/battery-storage",
+        "/?point=energy-battery-storage",
+        "/energy/fusion",
+        "/energy/geothermal",
+        "/energy/grid",
+        "/energy/nuclear",
+        "/energy/power-demand",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/fusion",
+      "status": 200,
+      "seconds": 0.333,
+      "h1": 1,
+      "title": [
+        "Fusion \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow fusion research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/fusion",
+        "og:title": "Fusion \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow fusion research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/fusion",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-fusion&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Fusion sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Fusion \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow fusion research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-fusion&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/fusion",
+        "/?point=energy-fusion",
+        "/energy/battery-storage",
+        "/energy/geothermal",
+        "/energy/grid",
+        "/energy/nuclear",
+        "/energy/power-demand",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/geothermal",
+      "status": 200,
+      "seconds": 0.414,
+      "h1": 1,
+      "title": [
+        "Geothermal \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow geothermal research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/geothermal",
+        "og:title": "Geothermal \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow geothermal research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/geothermal",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-geothermal&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Geothermal sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Geothermal \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow geothermal research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-geothermal&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/geothermal",
+        "/?point=energy-geothermal",
+        "/energy/battery-storage",
+        "/energy/fusion",
+        "/energy/grid",
+        "/energy/nuclear",
+        "/energy/power-demand",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/grid",
+      "status": 200,
+      "seconds": 0.362,
+      "h1": 1,
+      "title": [
+        "Grid \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow grid research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/grid",
+        "og:title": "Grid \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow grid research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/grid",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-grid&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Grid sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Grid \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow grid research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-grid&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/grid",
+        "/?point=energy-grid",
+        "/energy/battery-storage",
+        "/energy/fusion",
+        "/energy/geothermal",
+        "/energy/nuclear",
+        "/energy/power-demand",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/nuclear",
+      "status": 200,
+      "seconds": 0.343,
+      "h1": 1,
+      "title": [
+        "Nuclear \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow nuclear research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/nuclear",
+        "og:title": "Nuclear \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow nuclear research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/nuclear",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-nuclear&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Nuclear sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Nuclear \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow nuclear research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-nuclear&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/nuclear",
+        "/?point=energy-nuclear",
+        "/energy/battery-storage",
+        "/energy/fusion",
+        "/energy/geothermal",
+        "/energy/grid",
+        "/energy/power-demand",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/power-demand",
+      "status": 200,
+      "seconds": 0.312,
+      "h1": 1,
+      "title": [
+        "Power Demand \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow power demand research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/power-demand",
+        "og:title": "Power Demand \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow power demand research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/power-demand",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-power-demand&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Power Demand sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Power Demand \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow power demand research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-power-demand&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/power-demand",
+        "/?point=energy-power-demand",
+        "/energy/battery-storage",
+        "/energy/fusion",
+        "/energy/geothermal",
+        "/energy/grid",
+        "/energy/nuclear",
+        "/energy/solar",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/energy/solar",
+      "status": 200,
+      "seconds": 0.337,
+      "h1": 1,
+      "title": [
+        "Solar \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow solar research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/energy/solar",
+        "og:title": "Solar \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow solar research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/energy/solar",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=energy-solar&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Solar sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Solar \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow solar research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=energy-solar&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/energy",
+        "/energy/solar",
+        "/?point=energy-solar",
+        "/energy/battery-storage",
+        "/energy/fusion",
+        "/energy/geothermal",
+        "/energy/grid",
+        "/energy/nuclear",
+        "/energy/power-demand",
+        "/ai",
+        "/science",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware",
+      "status": 200,
+      "seconds": 0.359,
+      "h1": 1,
+      "title": [
+        "Hardware \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow hardware research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware",
+        "og:title": "Hardware \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow hardware research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Hardware sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Hardware \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow hardware research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/?point=hardware",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/chips",
+      "status": 200,
+      "seconds": 0.415,
+      "h1": 1,
+      "title": [
+        "Chips \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow chips research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/chips",
+        "og:title": "Chips \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow chips research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/chips",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-chips&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Chips sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Chips \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow chips research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-chips&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/chips",
+        "/?point=hardware-chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/compute",
+      "status": 200,
+      "seconds": 0.305,
+      "h1": 1,
+      "title": [
+        "Compute \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow compute research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/compute",
+        "og:title": "Compute \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow compute research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/compute",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-compute&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Compute sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Compute \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow compute research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-compute&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/compute",
+        "/?point=hardware-compute",
+        "/hardware/chips",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/devices",
+      "status": 200,
+      "seconds": 0.489,
+      "h1": 1,
+      "title": [
+        "Devices \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow devices research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/devices",
+        "og:title": "Devices \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow devices research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/devices",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-devices&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Devices sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Devices \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow devices research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-devices&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/devices",
+        "/?point=hardware-devices",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/manufacturing",
+      "status": 200,
+      "seconds": 0.423,
+      "h1": 1,
+      "title": [
+        "Manufacturing \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow manufacturing research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/manufacturing",
+        "og:title": "Manufacturing \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow manufacturing research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/manufacturing",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-manufacturing&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Manufacturing sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Manufacturing \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow manufacturing research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-manufacturing&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/manufacturing",
+        "/?point=hardware-manufacturing",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/networks",
+      "status": 200,
+      "seconds": 0.395,
+      "h1": 1,
+      "title": [
+        "Networks \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow networks research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/networks",
+        "og:title": "Networks \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow networks research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/networks",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-networks&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Networks sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Networks \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow networks research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-networks&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/networks",
+        "/?point=hardware-networks",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/semiconductors",
+      "status": 200,
+      "seconds": 0.343,
+      "h1": 1,
+      "title": [
+        "Semiconductors \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow semiconductors research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/semiconductors",
+        "og:title": "Semiconductors \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow semiconductors research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/semiconductors",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-semiconductors&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Semiconductors sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Semiconductors \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow semiconductors research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-semiconductors&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/semiconductors",
+        "/?point=hardware-semiconductors",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/sensors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/sensors",
+      "status": 200,
+      "seconds": 0.476,
+      "h1": 1,
+      "title": [
+        "Sensors \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow sensors research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/sensors",
+        "og:title": "Sensors \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow sensors research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/sensors",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=hardware-sensors&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Sensors sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Sensors \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow sensors research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=hardware-sensors&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/sensors",
+        "/?point=hardware-sensors",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/organic-203f423627e74e4c",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/hardware/organic-203f423627e74e4c",
+      "status": 200,
+      "seconds": 0.279,
+      "h1": 1,
+      "title": [
+        "Meta Glasses \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow meta glasses research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/hardware/organic-203f423627e74e4c",
+        "og:title": "Meta Glasses \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow meta glasses research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/hardware/organic-203f423627e74e4c",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=organic-203f423627e74e4c&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Meta Glasses sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Meta Glasses \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow meta glasses research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=organic-203f423627e74e4c&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/hardware",
+        "/hardware/organic-203f423627e74e4c",
+        "/?point=organic-203f423627e74e4c",
+        "/hardware/chips",
+        "/hardware/compute",
+        "/hardware/devices",
+        "/hardware/manufacturing",
+        "/hardware/networks",
+        "/hardware/semiconductors",
+        "/hardware/sensors",
+        "/ai",
+        "/space",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets",
+      "status": 200,
+      "seconds": 0.364,
+      "h1": 1,
+      "title": [
+        "Markets \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow markets research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets",
+        "og:title": "Markets \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow markets research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Markets sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Markets \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow markets research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/?point=markets",
+        "/markets/commerce",
+        "/markets/economy",
+        "/markets/fintech",
+        "/markets/labor",
+        "/markets/public-markets",
+        "/markets/venture-capital",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets/commerce",
+      "status": 200,
+      "seconds": 0.356,
+      "h1": 1,
+      "title": [
+        "Commerce \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow commerce research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets/commerce",
+        "og:title": "Commerce \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow commerce research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets/commerce",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets-commerce&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Commerce sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Commerce \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow commerce research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets-commerce&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/markets/commerce",
+        "/?point=markets-commerce",
+        "/markets/economy",
+        "/markets/fintech",
+        "/markets/labor",
+        "/markets/public-markets",
+        "/markets/venture-capital",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets/economy",
+      "status": 200,
+      "seconds": 0.381,
+      "h1": 1,
+      "title": [
+        "Economy \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow economy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets/economy",
+        "og:title": "Economy \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow economy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets/economy",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets-economy&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Economy sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Economy \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow economy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets-economy&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/markets/economy",
+        "/?point=markets-economy",
+        "/markets/commerce",
+        "/markets/fintech",
+        "/markets/labor",
+        "/markets/public-markets",
+        "/markets/venture-capital",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets/fintech",
+      "status": 200,
+      "seconds": 0.277,
+      "h1": 1,
+      "title": [
+        "Fintech \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow fintech research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets/fintech",
+        "og:title": "Fintech \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow fintech research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets/fintech",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets-fintech&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Fintech sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Fintech \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow fintech research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets-fintech&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/markets/fintech",
+        "/?point=markets-fintech",
+        "/markets/commerce",
+        "/markets/economy",
+        "/markets/labor",
+        "/markets/public-markets",
+        "/markets/venture-capital",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets/labor",
+      "status": 200,
+      "seconds": 0.357,
+      "h1": 1,
+      "title": [
+        "Labor \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow labor research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets/labor",
+        "og:title": "Labor \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow labor research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets/labor",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets-labor&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Labor sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Labor \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow labor research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets-labor&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/markets/labor",
+        "/?point=markets-labor",
+        "/markets/commerce",
+        "/markets/economy",
+        "/markets/fintech",
+        "/markets/public-markets",
+        "/markets/venture-capital",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets/public-markets",
+      "status": 200,
+      "seconds": 0.27,
+      "h1": 1,
+      "title": [
+        "Public Markets \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow public markets research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets/public-markets",
+        "og:title": "Public Markets \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow public markets research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets/public-markets",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets-public-markets&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Public Markets sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Public Markets \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow public markets research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets-public-markets&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/markets/public-markets",
+        "/?point=markets-public-markets",
+        "/markets/commerce",
+        "/markets/economy",
+        "/markets/fintech",
+        "/markets/labor",
+        "/markets/venture-capital",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/markets/venture-capital",
+      "status": 200,
+      "seconds": 0.359,
+      "h1": 1,
+      "title": [
+        "Venture Capital \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow venture capital research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/markets/venture-capital",
+        "og:title": "Venture Capital \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow venture capital research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/markets/venture-capital",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=markets-venture-capital&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Venture Capital sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Venture Capital \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow venture capital research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=markets-venture-capital&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/markets",
+        "/markets/venture-capital",
+        "/?point=markets-venture-capital",
+        "/markets/commerce",
+        "/markets/economy",
+        "/markets/fintech",
+        "/markets/labor",
+        "/markets/public-markets",
+        "/energy",
+        "/startups",
+        "/crypto",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science",
+      "status": 200,
+      "seconds": 0.682,
+      "h1": 1,
+      "title": [
+        "Science \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow science research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science",
+        "og:title": "Science \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow science research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Science sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Science \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow science research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/?point=science",
+        "/science/biotechnology",
+        "/science/climate-science",
+        "/science/materials",
+        "/science/mathematics",
+        "/science/medicine",
+        "/science/neuroscience",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/biotechnology",
+      "status": 200,
+      "seconds": 0.491,
+      "h1": 1,
+      "title": [
+        "Biotechnology \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow biotechnology research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/biotechnology",
+        "og:title": "Biotechnology \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow biotechnology research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/biotechnology",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-biotechnology&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Biotechnology sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Biotechnology \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow biotechnology research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-biotechnology&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/biotechnology",
+        "/?point=science-biotechnology",
+        "/science/climate-science",
+        "/science/materials",
+        "/science/mathematics",
+        "/science/medicine",
+        "/science/neuroscience",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/climate-science",
+      "status": 200,
+      "seconds": 0.349,
+      "h1": 1,
+      "title": [
+        "Climate Science \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow climate science research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/climate-science",
+        "og:title": "Climate Science \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow climate science research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/climate-science",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-climate-science&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Climate Science sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Climate Science \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow climate science research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-climate-science&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/climate-science",
+        "/?point=science-climate-science",
+        "/science/biotechnology",
+        "/science/materials",
+        "/science/mathematics",
+        "/science/medicine",
+        "/science/neuroscience",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/materials",
+      "status": 200,
+      "seconds": 0.389,
+      "h1": 1,
+      "title": [
+        "Materials \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow materials research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/materials",
+        "og:title": "Materials \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow materials research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/materials",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-materials&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Materials sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Materials \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow materials research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-materials&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/materials",
+        "/?point=science-materials",
+        "/science/biotechnology",
+        "/science/climate-science",
+        "/science/mathematics",
+        "/science/medicine",
+        "/science/neuroscience",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/mathematics",
+      "status": 200,
+      "seconds": 0.286,
+      "h1": 1,
+      "title": [
+        "Mathematics \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow mathematics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/mathematics",
+        "og:title": "Mathematics \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow mathematics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/mathematics",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-mathematics&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Mathematics sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Mathematics \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow mathematics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-mathematics&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/mathematics",
+        "/?point=science-mathematics",
+        "/science/biotechnology",
+        "/science/climate-science",
+        "/science/materials",
+        "/science/medicine",
+        "/science/neuroscience",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/medicine",
+      "status": 200,
+      "seconds": 0.415,
+      "h1": 1,
+      "title": [
+        "Medicine \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow medicine research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/medicine",
+        "og:title": "Medicine \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow medicine research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/medicine",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-medicine&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Medicine sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Medicine \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow medicine research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-medicine&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/medicine",
+        "/?point=science-medicine",
+        "/science/biotechnology",
+        "/science/climate-science",
+        "/science/materials",
+        "/science/mathematics",
+        "/science/neuroscience",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/neuroscience",
+      "status": 200,
+      "seconds": 0.305,
+      "h1": 1,
+      "title": [
+        "Neuroscience \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow neuroscience research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/neuroscience",
+        "og:title": "Neuroscience \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow neuroscience research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/neuroscience",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-neuroscience&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Neuroscience sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Neuroscience \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow neuroscience research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-neuroscience&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/neuroscience",
+        "/?point=science-neuroscience",
+        "/science/biotechnology",
+        "/science/climate-science",
+        "/science/materials",
+        "/science/mathematics",
+        "/science/medicine",
+        "/science/physics",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/science/physics",
+      "status": 200,
+      "seconds": 0.439,
+      "h1": 1,
+      "title": [
+        "Physics \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow physics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/science/physics",
+        "og:title": "Physics \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow physics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/science/physics",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=science-physics&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Physics sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Physics \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow physics research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=science-physics&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/science",
+        "/science/physics",
+        "/?point=science-physics",
+        "/science/biotechnology",
+        "/science/climate-science",
+        "/science/materials",
+        "/science/mathematics",
+        "/science/medicine",
+        "/science/neuroscience",
+        "/ai",
+        "/space",
+        "/energy",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security",
+      "status": 200,
+      "seconds": 0.354,
+      "h1": 1,
+      "title": [
+        "Security \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow security research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security",
+        "og:title": "Security \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow security research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Security sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Security \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow security research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/?point=security",
+        "/security/cryptography",
+        "/security/cybersecurity",
+        "/security/identity",
+        "/security/open-source-security",
+        "/security/privacy",
+        "/security/threat-intelligence",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security/cryptography",
+      "status": 200,
+      "seconds": 0.42,
+      "h1": 1,
+      "title": [
+        "Cryptography \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow cryptography research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security/cryptography",
+        "og:title": "Cryptography \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow cryptography research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security/cryptography",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security-cryptography&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Cryptography sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Cryptography \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow cryptography research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security-cryptography&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/security/cryptography",
+        "/?point=security-cryptography",
+        "/security/cybersecurity",
+        "/security/identity",
+        "/security/open-source-security",
+        "/security/privacy",
+        "/security/threat-intelligence",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security/cybersecurity",
+      "status": 200,
+      "seconds": 0.34,
+      "h1": 1,
+      "title": [
+        "Cybersecurity \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow cybersecurity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security/cybersecurity",
+        "og:title": "Cybersecurity \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow cybersecurity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security/cybersecurity",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security-cybersecurity&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Cybersecurity sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Cybersecurity \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow cybersecurity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security-cybersecurity&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/security/cybersecurity",
+        "/?point=security-cybersecurity",
+        "/security/cryptography",
+        "/security/identity",
+        "/security/open-source-security",
+        "/security/privacy",
+        "/security/threat-intelligence",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security/identity",
+      "status": 200,
+      "seconds": 0.357,
+      "h1": 1,
+      "title": [
+        "Identity \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow identity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security/identity",
+        "og:title": "Identity \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow identity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security/identity",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security-identity&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Identity sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Identity \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow identity research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security-identity&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/security/identity",
+        "/?point=security-identity",
+        "/security/cryptography",
+        "/security/cybersecurity",
+        "/security/open-source-security",
+        "/security/privacy",
+        "/security/threat-intelligence",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security/open-source-security",
+      "status": 200,
+      "seconds": 0.327,
+      "h1": 1,
+      "title": [
+        "Open Source Security \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow open source security research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security/open-source-security",
+        "og:title": "Open Source Security \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow open source security research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security/open-source-security",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security-open-source-security&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Open Source Security sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Open Source Security \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow open source security research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security-open-source-security&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/security/open-source-security",
+        "/?point=security-open-source-security",
+        "/security/cryptography",
+        "/security/cybersecurity",
+        "/security/identity",
+        "/security/privacy",
+        "/security/threat-intelligence",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security/privacy",
+      "status": 200,
+      "seconds": 0.401,
+      "h1": 1,
+      "title": [
+        "Privacy \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow privacy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security/privacy",
+        "og:title": "Privacy \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow privacy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security/privacy",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security-privacy&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Privacy sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Privacy \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow privacy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security-privacy&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/security/privacy",
+        "/?point=security-privacy",
+        "/security/cryptography",
+        "/security/cybersecurity",
+        "/security/identity",
+        "/security/open-source-security",
+        "/security/threat-intelligence",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/security/threat-intelligence",
+      "status": 200,
+      "seconds": 0.393,
+      "h1": 1,
+      "title": [
+        "Threat Intelligence \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow threat intelligence research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/security/threat-intelligence",
+        "og:title": "Threat Intelligence \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow threat intelligence research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/security/threat-intelligence",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=security-threat-intelligence&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Threat Intelligence sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Threat Intelligence \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow threat intelligence research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=security-threat-intelligence&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/security",
+        "/security/threat-intelligence",
+        "/?point=security-threat-intelligence",
+        "/security/cryptography",
+        "/security/cybersecurity",
+        "/security/identity",
+        "/security/open-source-security",
+        "/security/privacy",
+        "/software",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software",
+      "status": 200,
+      "seconds": 0.299,
+      "h1": 1,
+      "title": [
+        "Software \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow software research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software",
+        "og:title": "Software \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow software research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Software sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Software \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow software research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/?point=software",
+        "/software/cloud",
+        "/software/databases",
+        "/software/developer-tools",
+        "/software/open-source",
+        "/software/operating-systems",
+        "/software/programming-languages",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/cloud",
+      "status": 200,
+      "seconds": 0.361,
+      "h1": 1,
+      "title": [
+        "Cloud \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow cloud research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/cloud",
+        "og:title": "Cloud \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow cloud research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/cloud",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-cloud&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Cloud sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Cloud \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow cloud research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-cloud&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/cloud",
+        "/?point=software-cloud",
+        "/software/databases",
+        "/software/developer-tools",
+        "/software/open-source",
+        "/software/operating-systems",
+        "/software/programming-languages",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/databases",
+      "status": 200,
+      "seconds": 0.349,
+      "h1": 1,
+      "title": [
+        "Databases \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow databases research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/databases",
+        "og:title": "Databases \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow databases research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/databases",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-databases&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Databases sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Databases \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow databases research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-databases&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/databases",
+        "/?point=software-databases",
+        "/software/cloud",
+        "/software/developer-tools",
+        "/software/open-source",
+        "/software/operating-systems",
+        "/software/programming-languages",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/developer-tools",
+      "status": 200,
+      "seconds": 0.423,
+      "h1": 1,
+      "title": [
+        "Developer Tools \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow developer tools research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/developer-tools",
+        "og:title": "Developer Tools \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow developer tools research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/developer-tools",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-developer-tools&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Developer Tools sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Developer Tools \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow developer tools research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-developer-tools&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/developer-tools",
+        "/?point=software-developer-tools",
+        "/software/cloud",
+        "/software/databases",
+        "/software/open-source",
+        "/software/operating-systems",
+        "/software/programming-languages",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/open-source",
+      "status": 200,
+      "seconds": 0.349,
+      "h1": 1,
+      "title": [
+        "Open Source \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow open source research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/open-source",
+        "og:title": "Open Source \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow open source research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/open-source",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-open-source&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Open Source sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Open Source \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow open source research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-open-source&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/open-source",
+        "/?point=software-open-source",
+        "/software/cloud",
+        "/software/databases",
+        "/software/developer-tools",
+        "/software/operating-systems",
+        "/software/programming-languages",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/operating-systems",
+      "status": 200,
+      "seconds": 0.334,
+      "h1": 1,
+      "title": [
+        "Operating Systems \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow operating systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/operating-systems",
+        "og:title": "Operating Systems \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow operating systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/operating-systems",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-operating-systems&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Operating Systems sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Operating Systems \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow operating systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-operating-systems&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/operating-systems",
+        "/?point=software-operating-systems",
+        "/software/cloud",
+        "/software/databases",
+        "/software/developer-tools",
+        "/software/open-source",
+        "/software/programming-languages",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/programming-languages",
+      "status": 200,
+      "seconds": 0.346,
+      "h1": 1,
+      "title": [
+        "Programming Languages \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow programming languages research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/programming-languages",
+        "og:title": "Programming Languages \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow programming languages research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/programming-languages",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-programming-languages&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Programming Languages sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Programming Languages \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow programming languages research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-programming-languages&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/programming-languages",
+        "/?point=software-programming-languages",
+        "/software/cloud",
+        "/software/databases",
+        "/software/developer-tools",
+        "/software/open-source",
+        "/software/operating-systems",
+        "/software/web-platforms",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/software/web-platforms",
+      "status": 200,
+      "seconds": 0.449,
+      "h1": 1,
+      "title": [
+        "Web Platforms \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow web platforms research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/software/web-platforms",
+        "og:title": "Web Platforms \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow web platforms research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/software/web-platforms",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=software-web-platforms&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Web Platforms sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Web Platforms \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow web platforms research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=software-web-platforms&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/software",
+        "/software/web-platforms",
+        "/?point=software-web-platforms",
+        "/software/cloud",
+        "/software/databases",
+        "/software/developer-tools",
+        "/software/open-source",
+        "/software/operating-systems",
+        "/software/programming-languages",
+        "/ai",
+        "/security",
+        "/startups",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space",
+      "status": 200,
+      "seconds": 0.431,
+      "h1": 1,
+      "title": [
+        "Space \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow space research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space",
+        "og:title": "Space \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow space research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Space sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Space \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow space research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/?point=space",
+        "/space/astronomy",
+        "/space/earth-observation",
+        "/space/exploration",
+        "/space/launch-systems",
+        "/space/satellites",
+        "/space/spacecraft",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space/astronomy",
+      "status": 200,
+      "seconds": 0.33,
+      "h1": 1,
+      "title": [
+        "Astronomy \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow astronomy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space/astronomy",
+        "og:title": "Astronomy \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow astronomy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space/astronomy",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space-astronomy&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Astronomy sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Astronomy \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow astronomy research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space-astronomy&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/space/astronomy",
+        "/?point=space-astronomy",
+        "/space/earth-observation",
+        "/space/exploration",
+        "/space/launch-systems",
+        "/space/satellites",
+        "/space/spacecraft",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space/earth-observation",
+      "status": 200,
+      "seconds": 0.426,
+      "h1": 1,
+      "title": [
+        "Earth Observation \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow earth observation research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space/earth-observation",
+        "og:title": "Earth Observation \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow earth observation research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space/earth-observation",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space-earth-observation&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Earth Observation sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Earth Observation \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow earth observation research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space-earth-observation&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/space/earth-observation",
+        "/?point=space-earth-observation",
+        "/space/astronomy",
+        "/space/exploration",
+        "/space/launch-systems",
+        "/space/satellites",
+        "/space/spacecraft",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space/exploration",
+      "status": 200,
+      "seconds": 0.475,
+      "h1": 1,
+      "title": [
+        "Exploration \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow exploration research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space/exploration",
+        "og:title": "Exploration \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow exploration research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space/exploration",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space-exploration&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Exploration sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Exploration \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow exploration research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space-exploration&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/space/exploration",
+        "/?point=space-exploration",
+        "/space/astronomy",
+        "/space/earth-observation",
+        "/space/launch-systems",
+        "/space/satellites",
+        "/space/spacecraft",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space/launch-systems",
+      "status": 200,
+      "seconds": 0.39,
+      "h1": 1,
+      "title": [
+        "Launch Systems \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow launch systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space/launch-systems",
+        "og:title": "Launch Systems \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow launch systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space/launch-systems",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space-launch-systems&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Launch Systems sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Launch Systems \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow launch systems research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space-launch-systems&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/space/launch-systems",
+        "/?point=space-launch-systems",
+        "/space/astronomy",
+        "/space/earth-observation",
+        "/space/exploration",
+        "/space/satellites",
+        "/space/spacecraft",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space/satellites",
+      "status": 200,
+      "seconds": 0.391,
+      "h1": 1,
+      "title": [
+        "Satellites \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow satellites research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space/satellites",
+        "og:title": "Satellites \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow satellites research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space/satellites",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space-satellites&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Satellites sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Satellites \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow satellites research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space-satellites&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/space/satellites",
+        "/?point=space-satellites",
+        "/space/astronomy",
+        "/space/earth-observation",
+        "/space/exploration",
+        "/space/launch-systems",
+        "/space/spacecraft",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/space/spacecraft",
+      "status": 200,
+      "seconds": 0.461,
+      "h1": 1,
+      "title": [
+        "Spacecraft \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow spacecraft research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/space/spacecraft",
+        "og:title": "Spacecraft \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow spacecraft research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/space/spacecraft",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=space-spacecraft&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Spacecraft sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Spacecraft \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow spacecraft research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=space-spacecraft&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/space",
+        "/space/spacecraft",
+        "/?point=space-spacecraft",
+        "/space/astronomy",
+        "/space/earth-observation",
+        "/space/exploration",
+        "/space/launch-systems",
+        "/space/satellites",
+        "/science",
+        "/hardware",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups",
+      "status": 200,
+      "seconds": 0.437,
+      "h1": 1,
+      "title": [
+        "Startups \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow startups research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups",
+        "og:title": "Startups \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow startups research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Startups sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Startups \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow startups research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/?point=startups",
+        "/startups/design",
+        "/startups/founders",
+        "/startups/funding",
+        "/startups/growth",
+        "/startups/new-ventures",
+        "/startups/product",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups/design",
+      "status": 200,
+      "seconds": 0.311,
+      "h1": 1,
+      "title": [
+        "Design \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow design research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups/design",
+        "og:title": "Design \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow design research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups/design",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups-design&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Design sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Design \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow design research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups-design&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/startups/design",
+        "/?point=startups-design",
+        "/startups/founders",
+        "/startups/funding",
+        "/startups/growth",
+        "/startups/new-ventures",
+        "/startups/product",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups/founders",
+      "status": 200,
+      "seconds": 0.375,
+      "h1": 1,
+      "title": [
+        "Founders \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow founders research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups/founders",
+        "og:title": "Founders \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow founders research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups/founders",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups-founders&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Founders sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Founders \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow founders research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups-founders&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/startups/founders",
+        "/?point=startups-founders",
+        "/startups/design",
+        "/startups/funding",
+        "/startups/growth",
+        "/startups/new-ventures",
+        "/startups/product",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups/funding",
+      "status": 200,
+      "seconds": 0.285,
+      "h1": 1,
+      "title": [
+        "Funding \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow funding research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups/funding",
+        "og:title": "Funding \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow funding research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups/funding",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups-funding&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Funding sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Funding \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow funding research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups-funding&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/startups/funding",
+        "/?point=startups-funding",
+        "/startups/design",
+        "/startups/founders",
+        "/startups/growth",
+        "/startups/new-ventures",
+        "/startups/product",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": false,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups/growth",
+      "status": 200,
+      "seconds": 0.352,
+      "h1": 1,
+      "title": [
+        "Growth \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow growth research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups/growth",
+        "og:title": "Growth \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow growth research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups/growth",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups-growth&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Growth sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Growth \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow growth research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups-growth&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/startups/growth",
+        "/?point=startups-growth",
+        "/startups/design",
+        "/startups/founders",
+        "/startups/funding",
+        "/startups/new-ventures",
+        "/startups/product",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups/new-ventures",
+      "status": 200,
+      "seconds": 0.37,
+      "h1": 1,
+      "title": [
+        "New Ventures \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow new ventures research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups/new-ventures",
+        "og:title": "New Ventures \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow new ventures research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups/new-ventures",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups-new-ventures&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "New Ventures sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "New Ventures \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow new ventures research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups-new-ventures&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/startups/new-ventures",
+        "/?point=startups-new-ventures",
+        "/startups/design",
+        "/startups/founders",
+        "/startups/funding",
+        "/startups/growth",
+        "/startups/product",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    },
+    {
+      "url": "https://symtri.com/startups/product",
+      "status": 200,
+      "seconds": 0.274,
+      "h1": 1,
+      "title": [
+        "Product \u2014 what tech is paying attention to | SYMTRI"
+      ],
+      "metadata": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Follow product research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "canonical": "https://symtri.com/startups/product",
+        "og:title": "Product \u2014 what tech is paying attention to | SYMTRI",
+        "og:description": "Follow product research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "og:url": "https://symtri.com/startups/product",
+        "og:site_name": "SYMTRI",
+        "og:image": "https://symtri.com/api/og?point=startups-product&v=2",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "Product sources and activity in SYMTRI",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "Product \u2014 what tech is paying attention to | SYMTRI",
+        "twitter:description": "Follow product research, projects, and news in SYMTRI. Explore original sources and connected ideas.",
+        "twitter:image": "https://symtri.com/api/og?point=startups-product&v=2"
+      },
+      "internalLinks": [
+        "/",
+        "/startups",
+        "/startups/product",
+        "/?point=startups-product",
+        "/startups/design",
+        "/startups/founders",
+        "/startups/funding",
+        "/startups/growth",
+        "/startups/new-ventures",
+        "/software",
+        "/markets",
+        "/about",
+        "/signal",
+        "/"
+      ],
+      "emptyEvidence": true,
+      "schemaTypes": [
+        "Dataset",
+        "BreadcrumbList",
+        "WebSite"
+      ],
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://buttondown.com"
+      }
+    }
+  ]
+}

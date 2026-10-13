@@ -1,5 +1,7 @@
 # GTM implementation status
 
+SEO/AEO updates and current measured telemetry are documented in [the October 13 audit](seo/README.md). The newsletter and editorial-report notes below describe an earlier baseline; current implementation details are in [newsletter personalization](newsletter-personalization.md).
+
 Newsletter signup and email delivery remain deferred. Vercel Analytics is the selected provider; the owner will enable it in the dashboard.
 
 | Issue | Release scope | Remaining external step |

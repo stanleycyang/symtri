@@ -1,3 +1,4 @@
+import {parseTopicCursor} from "./topic-cursor";
 import postgres from "postgres";
 import { embeddingInputHash, signalEmbeddingText, topicEmbeddingText, EMBEDDING_DIMENSIONS } from "../ai/embed";
 import { embeddingModelId } from "../ai/embed";
@@ -452,20 +453,7 @@ export async function getConnectionEvents(firstId: string, secondId: string, arc
   }).slice(0, 20);
 }
 
-type TopicPageCursor = { publishedAt: string; id: string; topicId?: string; childId?: string | null; asOf?: string };
 export type TopicPage = { events: SignalEvent[]; nextCursor: string | null };
-
-function parseTopicCursor(value: string | null): TopicPageCursor | null {
-  if (!value) return null;
-  try {
-    if (value.length > 1200) return null;
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as TopicPageCursor;
-    if (typeof parsed.id !== "string" || !parsed.id || parsed.id.length > 300 ||
-      typeof parsed.publishedAt !== "string" || !Number.isFinite(Date.parse(parsed.publishedAt))) return null;
-    if (parsed.asOf !== undefined && (typeof parsed.asOf !== "string" || !Number.isFinite(Date.parse(parsed.asOf)) || Date.parse(parsed.asOf) > Date.now()+60_000)) return null;
-    return parsed;
-  } catch { return null; }
-}
 
 export async function getTopicFeedRevision(catalogRevision: number): Promise<string> {
   const rows = await database()<{ publication: string; sources: string }[]>`
@@ -481,10 +469,10 @@ export async function getTopicPage(topicId: string, childId: string | null, curs
   const size = Math.max(1, Math.min(40, Math.floor(limit)));
   const sql = database();
   const filter = childId ? { topicId, subtopicId: childId } : { topicId };
-  const rows = await sql`
+  const rows = await sql<{id:string;source:string;external_id:string;title:string;url:string;summary:string;published_at:Date;first_seen_at:Date|null;importance:number;topics:SignalEvent["topics"];classification_input:unknown;classifier_version:number}[]>`
     select event.id, event.source, case when ${lightweight} then '' else event.external_id end as external_id,
       event.title, event.url, case when ${lightweight} then '' else event.summary end as summary,
-      event.published_at, event.importance, event.topics,
+      event.published_at, case when ${lightweight} then null else event.first_seen_at end as first_seen_at, event.importance, event.topics,
       case when ${lightweight} and event.classifier_version >= ${CLASSIFIER_VERSION} then null else event.classification_input end as classification_input, event.classifier_version
     from signal_events as event
     where event.topics @> ${sql.json([filter])}::jsonb
@@ -502,6 +490,7 @@ export async function getTopicPage(topicId: string, childId: string | null, curs
     id: row.id, source: row.source, externalId: row.external_id,
     title: row.title, url: row.url, summary: row.summary,
     publishedAt: new Date(row.published_at).toISOString(), importance: row.importance,
+    ...(row.first_seen_at ? {firstSeenAt: row.first_seen_at.toISOString()} : {}),
     topics: currentTopics(row),
   })).filter((event) => event.topics.some((match) => match.topicId === topicId && (!childId || match.subtopicId === childId)));
   const last = pageRows.at(-1);
@@ -1022,4 +1011,20 @@ export async function getArchivedSignal(id:string, readyOnly = false): Promise<S
       and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=event.id)`;
   const row=rows[0];
   return row ? {id:row.id,source:row.source,externalId:row.external_id,title:row.title,url:row.url,summary:row.summary,publishedAt:row.published_at.toISOString(),importance:row.importance,topics:currentTopics(row)} : null;
+}
+
+/** Complete publication-time archive window; the map's 300-detail cap never applies. */
+export async function getWeeklyArchive(start: string, end: string, asOf: string): Promise<SignalEvent[]> {
+  const rows=await database()<{id:string;source:string;external_id:string;title:string;url:string;summary:string;
+    published_at:Date;importance:number;topics:SignalEvent["topics"];classifier_version:number;classification_input:unknown}[]>`
+    select event.id,event.source,event.external_id,event.title,event.url,event.summary,event.published_at,
+      event.importance,event.topics,event.classifier_version,event.classification_input
+    from signal_events event where event.published_at>=${start}::timestamptz and event.published_at<${end}::timestamptz
+      and event.first_seen_at<=${asOf}::timestamptz
+      and exists(select 1 from signal_observations observation join source_catalog source
+        on source.id=observation.source and source.status='active'
+        where observation.signal_id=event.id and observation.first_seen_at<=${asOf}::timestamptz)
+    order by event.published_at desc,event.id`;
+  return rows.map(row=>({id:row.id,source:row.source,externalId:row.external_id,title:row.title,url:row.url,
+    summary:row.summary,publishedAt:row.published_at.toISOString(),importance:row.importance,topics:currentTopics(row)}));
 }

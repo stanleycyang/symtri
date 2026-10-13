@@ -1,0 +1,250 @@
+{
+  "observedAt": "2026-10-13",
+  "scope": "testimonio/symtri",
+  "note": "Existing production before these SEO changes; sparse traffic and mixed devices. Percentiles are provider summaries, not a controlled experiment.",
+  "metrics": {
+    "field-lcp": {
+      "query": {
+        "metric": "vercel.speed_insights.lcp_ms",
+        "aggregation": "p75",
+        "groupBy": [
+          "route"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "route": "/",
+          "vercel_speed_insights_lcp_ms_p75": 1164
+        },
+        {
+          "route": "/about",
+          "vercel_speed_insights_lcp_ms_p75": 388
+        },
+        {
+          "route": "/[region]/[topic]",
+          "vercel_speed_insights_lcp_ms_p75": 816
+        },
+        {
+          "route": "/signal/[week]",
+          "vercel_speed_insights_lcp_ms_p75": 2319
+        }
+      ]
+    },
+    "field-inp": {
+      "query": {
+        "metric": "vercel.speed_insights.inp_ms",
+        "aggregation": "p75",
+        "groupBy": [
+          "route"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "route": "/",
+          "vercel_speed_insights_inp_ms_p75": 120
+        },
+        {
+          "route": "/about",
+          "vercel_speed_insights_inp_ms_p75": 40
+        },
+        {
+          "route": "/signal",
+          "vercel_speed_insights_inp_ms_p75": 48
+        }
+      ]
+    },
+    "field-cls": {
+      "query": {
+        "metric": "vercel.speed_insights.cls",
+        "aggregation": "p75",
+        "groupBy": [
+          "route"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "route": "/",
+          "vercel_speed_insights_cls_p75": 0.05609999969601631
+        },
+        {
+          "route": "/about",
+          "vercel_speed_insights_cls_p75": 0.02290000021457672
+        },
+        {
+          "route": "/signal",
+          "vercel_speed_insights_cls_p75": 0
+        }
+      ]
+    },
+    "field-samples": {
+      "query": {
+        "metric": "vercel.speed_insights.lcp_ms",
+        "aggregation": "count",
+        "groupBy": [
+          "route"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "route": "/",
+          "vercel_speed_insights_lcp_ms_count": 15
+        },
+        {
+          "route": "/about",
+          "vercel_speed_insights_lcp_ms_count": 5
+        },
+        {
+          "route": "/[region]/[topic]",
+          "vercel_speed_insights_lcp_ms_count": 1
+        },
+        {
+          "route": "/signal/[week]",
+          "vercel_speed_insights_lcp_ms_count": 1
+        }
+      ]
+    },
+    "field-devices": {
+      "query": {
+        "metric": "vercel.speed_insights.lcp_ms",
+        "aggregation": "p75",
+        "groupBy": [
+          "deviceType"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "deviceType": "desktop",
+          "vercel_speed_insights_lcp_ms_p75": 916
+        },
+        {
+          "deviceType": "mobile",
+          "vercel_speed_insights_lcp_ms_p75": 2319
+        },
+        {
+          "deviceType": "tablet",
+          "vercel_speed_insights_lcp_ms_p75": 553
+        }
+      ]
+    },
+    "pageviews": {
+      "query": {
+        "metric": "vercel.analytics.page_view.count",
+        "aggregation": "count",
+        "groupBy": [],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        }
+      },
+      "summary": [
+        {
+          "vercel_analytics_page_view_count_count": 21
+        }
+      ]
+    },
+    "referrals": {
+      "query": {
+        "metric": "vercel.analytics.page_view.count",
+        "aggregation": "count",
+        "groupBy": [
+          "referrerHostname"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "referrerHostname": "",
+          "vercel_analytics_page_view_count_count": 22
+        }
+      ]
+    },
+    "events": {
+      "query": {
+        "metric": "vercel.analytics.event.count",
+        "aggregation": "count",
+        "groupBy": [
+          "eventName"
+        ],
+        "filter": "environment:production",
+        "startTime": "2026-10-06T16:00:00.000Z",
+        "endTime": "2026-10-13T20:00:00.000Z",
+        "granularity": {
+          "hours": 4
+        },
+        "orderBy": "count",
+        "orderDirection": "desc"
+      },
+      "summary": [
+        {
+          "eventName": "select_topic",
+          "vercel_analytics_event_count_count": 9
+        },
+        {
+          "eventName": "select_region",
+          "vercel_analytics_event_count_count": 7
+        },
+        {
+          "eventName": "newsletter_signup",
+          "vercel_analytics_event_count_count": 3
+        },
+        {
+          "eventName": "enter_universe",
+          "vercel_analytics_event_count_count": 2
+        },
+        {
+          "eventName": "ask_symtri_open",
+          "vercel_analytics_event_count_count": 1
+        }
+      ]
+    }
+  }
+}

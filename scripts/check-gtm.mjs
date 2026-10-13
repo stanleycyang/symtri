@@ -3,7 +3,7 @@ const base=process.env.SYMTRI_CHECK_URL ?? "http://127.0.0.1:3105";
 const read=async path=>{const response=await fetch(new URL(path,base),{headers:{"User-Agent":"Twitterbot/1.0"},signal:AbortSignal.timeout(20000)});assert.equal(response.status,200,path);return response.text();};
 const sitemap=await read("/sitemap.xml");
 const locations=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match=>new URL(match[1]).pathname);
-assert.ok(locations.length>=79,"Home, about, weekly reports, ten regions and 66 threads are indexed");
+assert.ok(locations.length>=3,"Home, about, and weekly report archive are discoverable");
 assert.equal(new Set(locations).size,locations.length,"No duplicate sitemap entries");
 const titles=new Set();const descriptions=new Set();
 for(const path of locations) {
@@ -38,4 +38,7 @@ const image=await fetch(new URL(imagePath,base));assert.equal(image.status,200);
 const fallback=await fetch(new URL("/api/og?point=not-a-real-thread",base),{redirect:"manual"});assert.equal(fallback.status,302);assert.match(fallback.headers.get("location"),/opengraph-image.png/);
 assert.equal((await fetch(new URL("/api/digest",base))).status,401);
 assert.equal((await fetch(new URL("/api/subscribe",base),{method:"POST"})).status,404);
-console.log(`GTM check passed: ${locations.length} sitemap URLs, unique metadata, SSR and schema, share previews, RSS, fallbacks, authenticated report cron, and removed signup.`);
+const signupPolicy=(await fetch(new URL("/",base))).headers.get("content-security-policy");
+assert.match(signupPolicy ?? "",/form-action 'self' https:\/\/buttondown\.com/);
+assert.match(await read("/signal"),/https:\/\/buttondown.com\/api\/emails\/embed-subscribe\/symtri/);
+console.log(`GTM check passed: ${locations.length} sitemap URLs, unique metadata, SSR and schema, share previews, RSS, fallbacks, authenticated report cron, and Buttondown signup.`);

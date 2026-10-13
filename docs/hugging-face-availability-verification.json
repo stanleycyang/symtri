@@ -1,0 +1,74 @@
+{
+  "observedAt": "2026-10-13T20:18:45.868678+00:00",
+  "deploymentId": "dpl_E7RgJTz1fucX7tTL8reazKzrxcir",
+  "deploymentUrl": "https://symtri-1jgfhwt1d-testimonio.vercel.app",
+  "productionUrl": "https://symtri.com",
+  "readyState": "READY",
+  "runId": "wrun_01M4VEHF57GFBRH9NFFPC1SRDR",
+  "runDeploymentVerified": true,
+  "lastRun": {
+    "startedAt": "2026-10-13T20:16:25.745Z",
+    "completedAt": "2026-10-13T20:17:27.071Z",
+    "status": "partial",
+    "sources": {
+      "cisa": "ok",
+      "nasa": "ok",
+      "arxiv": "ok",
+      "github": "ok",
+      "nasa-jpl": "ok",
+      "openalex": "ok",
+      "europe-pmc": "ok",
+      "hacker-news": "ok",
+      "hugging-face": "partial"
+    },
+    "fetched": 594,
+    "mapped": 300,
+    "added": 47,
+    "embedded": 71,
+    "embeddingStatus": "ok"
+  },
+  "visibleHuggingFaceCards": 52,
+  "newlyVisibleHuggingFaceCards": [
+    {
+      "id": "hugging-face:datasets-1247ea047761f39489c56fbb",
+      "title": "krysyuk/fineweb-2-russian-quality-full \u2014 dataset update",
+      "url": "https://huggingface.co/datasets/krysyuk/fineweb-2-russian-quality-full"
+    },
+    {
+      "id": "hugging-face:datasets-616f779c4b842c631e9de0db",
+      "title": "SilvioS/illegal_dumps_croatia_ortophoto \u2014 dataset update",
+      "url": "https://huggingface.co/datasets/SilvioS/illegal_dumps_croatia_ortophoto"
+    },
+    {
+      "id": "hugging-face:datasets-8fcad23713a58f31369bf31f",
+      "title": "nvidia/PhysicalAI-Robotics-PhysicalAssets-VoMP \u2014 dataset update",
+      "url": "https://huggingface.co/datasets/nvidia/PhysicalAI-Robotics-PhysicalAssets-VoMP"
+    },
+    {
+      "id": "hugging-face:datasets-b1b1adc7608903c232ca04f0",
+      "title": "FluidVerse/2D_SABW_SSOO \u2014 dataset update",
+      "url": "https://huggingface.co/datasets/FluidVerse/2D_SABW_SSOO"
+    },
+    {
+      "id": "hugging-face:models-f2a295e5158226807081f22c",
+      "title": "mist-models/mist-conductivity-27.0M-2mpg8dcd \u2014 model update",
+      "url": "https://huggingface.co/mist-models/mist-conductivity-27.0M-2mpg8dcd"
+    },
+    {
+      "id": "hugging-face:models-738ae2cb194a67e7cb962650",
+      "title": "NbAiLab/nb-asr-qwen06b-bokmal-nynorsk-reranker \u2014 model update",
+      "url": "https://huggingface.co/NbAiLab/nb-asr-qwen06b-bokmal-nynorsk-reranker"
+    }
+  ],
+  "lastIngestedAt": "2026-10-13T20:16:47.965Z",
+  "validation": {
+    "unitTestsPassed": 225,
+    "lint": "passed",
+    "typecheck": "passed",
+    "isolatedPostgres": "passed",
+    "productionBuild": "passed",
+    "gtm": "passed",
+    "productionCheck": "failed: 7 pending embeddings at check time; Hugging Face ingestion and visible evidence independently verified"
+  },
+  "limits": "No original HTTP cause was logged for prior outages; full coverage is not claimed."
+}

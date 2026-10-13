@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {database} from "../lib/data/storage";
+import {database,persistSignals,persistSourceEvidence,getWeeklyArchive} from "../lib/data/storage";
 import {buildWeeklyDigest} from "../lib/data/digest";
-import {saveWeeklyReport,getWeeklyReport,listWeeklyReports,publishWeeklyReport} from "../lib/data/reports";
+import {reviseLegacyWeeklyReport,buildArchivedWeeklyReport,saveWeeklyReport,getWeeklyReport,listWeeklyReports,publishWeeklyReport} from "../lib/data/reports";
+import {ENRICHMENT_VERSION,type ReadingNote} from "../lib/data/enrichment";
+import type {SignalEvent,SignalFeed,SourceEvidence} from "../lib/data/model";
+import {getNodeReportCandidates} from "../lib/data/report-evidence";
 import {GET} from "../app/api/digest/route";
 async function main() {
 const url=process.env.SYMTRI_TEST_DATABASE_URL;
@@ -10,6 +13,8 @@ if(!url || !["localhost","127.0.0.1","[::1]"].includes(new URL(url).hostname))th
 process.env.DATABASE_URL=url;
 const sql=database();
 let migrated=false;
+const priorKey=process.env.AI_GATEWAY_API_KEY;const priorVercel=process.env.VERCEL;
+delete process.env.AI_GATEWAY_API_KEY;delete process.env.VERCEL;
 try {
   await sql.unsafe("DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon; END IF; IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated; END IF; END $$;");
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261012000000_weekly_reports.sql",import.meta.url),"utf8"));
@@ -23,19 +28,56 @@ try {
   assert.equal(table[0].relrowsecurity,true);
   const access=await sql`select has_table_privilege('anon','weekly_reports','SELECT') as readable`;
   assert.equal(access[0].readable,false,"Public clients cannot bypass the server reader");
+  await sql`delete from weekly_reports where week=${digest.week}`;
   process.env.CRON_SECRET="isolated-report-test";
   assert.equal((await GET(new Request("https://symtri.com/api/digest"))).status,401);
   const authorized=await GET(new Request("https://symtri.com/api/digest",{headers:{authorization:"Bearer isolated-report-test"}}));
   assert.equal(authorized.status,200);
   assert.equal((await authorized.json()).status,"insufficient-evidence");
   const none=await publishWeeklyReport(new Date("2040-01-02"));assert.equal(none.status,"insufficient-evidence");
-  const snapshot={observedAt:"2039-12-31T12:00:00Z",events:[{id:"report-test",source:"arxiv",externalId:"report-test",title:"A grounded weekly source",url:"https://arxiv.org/abs/report-test",summary:"Test",publishedAt:"2039-12-31T12:00:00Z",importance:1,topics:[{topicId:"ai",subtopicId:"ai-agents",relevance:1}]}],sources:{arxiv:"ok"},partial:false,scope:"history"};
+  const snapshot:SignalFeed={observedAt:"2039-12-31T12:00:00Z",events:[{id:"report-test",source:"arxiv",externalId:"report-test",title:"A grounded weekly source",url:"https://arxiv.org/abs/report-test",summary:"Test",publishedAt:"2039-12-31T12:00:00Z",importance:1,topics:[{topicId:"ai",subtopicId:"ai-agents",relevance:1}]}],sources:{arxiv:"ok"},partial:false,scope:"history"};
   await sql`insert into signal_snapshots(day,captured_at,feed) values('2039-12-31','2039-12-31T12:00:00Z',${sql.json(snapshot)})`;
+  assert.equal((await publishWeeklyReport(new Date("2040-01-02"))).status,"insufficient-evidence","A title-only snapshot cannot publish an analytical brief");
+  const text="The authors introduce a reproducible evaluation procedure for measuring the accuracy of telescope calibration under changing atmospheric conditions. The evaluation uses archived images rather than live observations.";
+  const events:SignalEvent[]=Array.from({length:305},(_,index)=>({id:`arxiv:report-check-${index}`,source:"arxiv",externalId:`report-check-${index}`,title:`Telescope calibration evaluation ${index}`,url:`https://arxiv.org/abs/report-check-${index}`,summary:`${text} Record ${index}.`,publishedAt:"2039-12-30T12:00:00Z",importance:25,topics:[{topicId:"science",subtopicId:"science-astronomy",relevance:1}]}));
+  await persistSignals({...snapshot,events});
+  const event=events[304];
+  const evidence:SourceEvidence={text,kind:"preprint",url:event.url,attribution:"Study authors",license:null,retrievedAt:"2039-12-31T00:00:00Z"};
+  await persistSourceEvidence([{...event,evidence}]);
+  const note:ReadingNote={explanation:"The authors introduce a telescope calibration evaluation.",claims:[{text:"The authors introduce a reproducible evaluation procedure for telescope calibration.",kind:"fact",evidence:[{sourceId:event.id,quote:"The authors introduce a reproducible evaluation procedure"}]}],questions:["How does this telescope calibration evaluation handle atmospheric changes?"],createdAt:"2039-12-31T00:00:00Z",sourceKind:"preprint",evidenceSource:"arxiv",evidenceUrl:event.url,evidenceAttribution:"Study authors",evidenceLicense:null,context:[],synthesisMethod:"model"};
+  await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},published_revision=revision,published_at='2039-12-31',note=${sql.json(note)} where signal_id=${event.id}`;
+  await sql`update signal_events set first_seen_at='2040-01-03' where id=${events[0].id}`;
+  assert.equal((await getWeeklyArchive("2039-12-26","2040-01-02","2040-01-02")).length,304,"Later discoveries cannot leak into a point-in-time report");
+  const draft=await buildArchivedWeeklyReport(new Date("2040-01-02"),new Date("2040-01-02"));
+  assert.equal(draft.editorial?.archiveCount,304,"Full weekly archive exceeds the map cap");
+  assert.equal(draft.editorial?.briefs[0].id,event.id,"A checked source outside the snapshot is reachable");
+  assert.equal(draft.editorial?.readyCount,1);
+  assert.equal(draft.editorial?.briefs[0].sources[0].url,event.url);
+  await sql`update reading_notes set version=0 where signal_id=${event.id}`;
+  assert.equal((await buildArchivedWeeklyReport(new Date("2040-01-02"),new Date("2040-01-02"))).editorial?.briefs.length,0,"Stale note versions cannot supply a report");
+  await sql`update reading_notes set version=${ENRICHMENT_VERSION} where signal_id=${event.id}`;
+  const scoped=await getNodeReportCandidates(await getWeeklyArchive("2039-12-26","2040-01-02","2040-01-02"),"2040-01-02",{start:"2039-12-26",end:"2040-01-02"});
+  assert.ok(scoped.get("science-astronomy")?.some(candidate=>candidate.event.id===event.id),"Per-node evidence reaches a source outside the map and global sample");
+  assert.equal(scoped.get("ai-agents"),undefined,"A quiet thread does not borrow another region's source");
   const published=await publishWeeklyReport(new Date("2040-01-02"));assert.equal(published.status,"published");
   assert.equal((await publishWeeklyReport(new Date("2040-01-02"))).status,"already-published");
-  assert.equal((await getWeeklyReport(published.week))?.digest.signals.length,1);
-  console.log("Weekly reports: JSONB payload, immutable retries, completed-week publication, empty evidence, private table, and unauthorized cron passed.");
-} finally {if(migrated){await sql`delete from weekly_reports`;await sql`delete from signal_snapshots where day='2039-12-31'`;}await sql.end();}
+  assert.equal((await getWeeklyReport(published.week))?.digest.editorial?.archiveCount,304);
+  const legacy={...draft,editorial:undefined};
+  await sql`update weekly_reports set digest=${sql.json(legacy)} where week=${published.week}`;
+  const originalPublication=(await getWeeklyReport(published.week))!.publishedAt;
+  assert.equal(await reviseLegacyWeeklyReport(draft),true,"A reviewed draft can explicitly upgrade a legacy edition");
+  const revised=await getWeeklyReport(published.week);
+  assert.equal(revised?.publishedAt,originalPublication,"The original publication timestamp survives an upgrade");
+  assert.equal(revised?.digest.previousDigest?.editorial,undefined,"The original legacy digest remains saved");
+  assert.ok(revised?.digest.revisedAt);
+  assert.equal((await listWeeklyReports()).find(report=>report.week===draft.week)?.modifiedAt,revised.digest.revisedAt,"Sitemap report modification time follows the actual revision, not its original publication");
+  assert.equal(await reviseLegacyWeeklyReport(draft),false,"An upgraded briefing cannot be overwritten by another revision attempt");
+  console.log("Weekly reports: JSONB payload, immutable retries, completed-week publication, empty evidence, private table, unauthorized cron, full-archive briefs beyond the map cap, point-in-time bounds, stale note exclusion, and one-time reviewed legacy revision passed.");
+} finally {
+if(priorKey===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorKey;
+if(priorVercel===undefined)delete process.env.VERCEL;else process.env.VERCEL=priorVercel;
+await sql`delete from signal_events where id like 'arxiv:report-check-%'`;
+if(migrated){await sql`delete from weekly_reports`;await sql`delete from signal_snapshots where day='2039-12-31'`;}await sql.end();}
 
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const view=parseShareView(params);
     const week=params.get("week");
     const report=week ? await getWeeklyReport(week) : null;
-    const card=report ? {name:`The week in technology`,label:`Symtri Signal / ${report.week}`,color:"#d5a878",day:report.digest.start.slice(0,10),stat:`${report.digest.coverage.currentDays}/7 SNAPSHOT DAYS · WEEK ${report.week}`,headlines:report.digest.signals.slice(0,3).map(event=>event.title)} : await shareCard(view.point,view.connection,view.signal,view.day);
+    const card=report ? {name:`What deserves your attention`,label:`Symtri Signal / ${report.week}`,color:"#d5a878",day:report.digest.start.slice(0,10),stat:report.digest.editorial ? `${report.digest.editorial.briefs.length} DEVELOPMENTS · WEEK ${report.week}` : `SAVED EDITION · WEEK ${report.week}`,headlines:report.digest.editorial?.briefs.map(brief=>brief.title) ?? report.digest.signals.slice(0,3).map(event=>event.title)} : await shareCard(view.point,view.connection,view.signal,view.day);
     if(!card)return Response.redirect(new URL("/opengraph-image.png",request.url));
     const response=renderCard(card);
     // Materialize inside the try block so rendering failures use the static card.

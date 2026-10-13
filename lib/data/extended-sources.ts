@@ -82,17 +82,26 @@ export async function fetchHuggingFace(load: PublicLoader = fetchPublicText): Pr
   const events: SignalEvent[] = []; let failed = 0;
   for (const kind of ["models", "datasets"] as const) {
     try {
-      const items: unknown = JSON.parse((await load(`https://huggingface.co/api/${kind}?sort=lastModified&direction=-1&limit=30&full=true`)).text);
+      // full=true includes file manifests that can exceed the bounded response
+      // budget. The default listing already contains the selection metadata.
+      const items: unknown = JSON.parse((await load(`https://huggingface.co/api/${kind}?sort=lastModified&direction=-1&limit=30`)).text);
       if (!Array.isArray(items)) throw new Error("Invalid Hub listing");
-      // Four documented cards per kind bounds the total to 18 HTTP requests.
+      // Try at most eight repositories to obtain four usable cards per kind.
+      // Missing READMEs are common; replacements keep the total <=34 requests.
       const candidates = items.map(record).filter((item) => !item.private && !item.gated && /^(?:[\w.-]+\/)?[\w.-]+$/.test(text(item.id))
-        && (Number(item.downloads) >= 20 || Number(item.likes) >= 1)).slice(0, 4);
+        && (Number(item.downloads) >= 20 || Number(item.likes) >= 1)).slice(0, 8);
+      let collected = 0;
       for (const item of candidates) {
+        if (collected >= 4) break;
+        let stage = "metadata";
         try {
           const id = text(item.id);
-          const detail = record(JSON.parse((await load(`https://huggingface.co/api/${kind}/${id}?expand[]=createdAt&expand[]=lastModified&expand[]=cardData&expand[]=downloads&expand[]=tags`, 500_000)).text));
+          const detail = record(JSON.parse((await load(`https://huggingface.co/api/${kind}/${id}?expand[]=createdAt&expand[]=lastModified&expand[]=cardData&expand[]=downloads&expand[]=tags&expand[]=private&expand[]=gated`, 500_000)).text));
+          if (detail.private || detail.gated) continue;
           const root = `https://huggingface.co/${kind === "datasets" ? "datasets/" : ""}${id}`;
-          const cardUrl = `${root}/raw/main/README.md`;
+          // Resolver URLs are the Hub's documented programmatic file endpoint.
+          const cardUrl = `${root}/resolve/main/README.md`;
+          stage = "card";
           const card = (await load(cardUrl, 120_000)).text.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, "").trim();
           const createdAt = date(detail.createdAt ?? item.createdAt);
           const updatedAt = date(detail.lastModified ?? item.lastModified);
@@ -105,9 +114,21 @@ export async function fetchHuggingFace(load: PublicLoader = fetchPublicText): Pr
             { text: cleanSourceText(card).slice(0, 12000), kind: kind === "models" ? "model-card" : "dataset-card", url: cardUrl,
               attribution: id.split("/")[0], license: license || null, retrievedAt: new Date().toISOString(),
               metadata: { repoId: id, createdAt, updatedAt:updatedAt ?? createdAt, changeKind, dateMeaning:changeKind==="update" ? "Repository update, not original release" : "Repository release", downloads: Number(detail.downloads) || 0 } }, ["cs.AI"]));
-        } catch { failed++; }
+          collected++;
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "unknown error";
+          // A missing card is a repository without usable evidence, rather
+          // than a Hub outage. Try the next bounded candidate instead.
+          if (stage === "card" && reason === "Feed returned HTTP 404") continue;
+          failed++;
+          console.warn("SYMTRI Hugging Face request failed", {kind, stage, reason: reason.slice(0, 160)});
+        }
       }
-    } catch { failed++; }
+      if (collected < Math.min(4, candidates.length)) failed++;
+    } catch (error) {
+      failed++;
+      console.warn("SYMTRI Hugging Face listing failed", {kind, reason: error instanceof Error ? error.message.slice(0, 160) : "unknown error"});
+    }
   }
   if (failed && !events.length) throw new Error("Hugging Face cards unavailable");
   return { events, status: failed ? "partial" : "ok" };

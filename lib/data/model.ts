@@ -28,6 +28,7 @@ export type SignalEvent = {
   url: string;
   summary: string;
   publishedAt: string;
+  firstSeenAt?: string;
   importance: number;
   topics: TopicMatch[];
   classificationInput?: { title: string; summary: string; categories: string[] };

@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "audit:deps": "npm audit --audit-level=moderate",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "tsx --test lib/data/*.test.ts lib/ai/*.test.ts",
+    "test": "tsx --test lib/data/*.test.ts lib/ai/*.test.ts lib/email/*.test.ts lib/newsletter/*.test.ts",
     "test:storage": "tsx scripts/check-storage.ts",
     "test:storage:local": "bash scripts/check-storage-local.sh",
     "test:scale:local": "bash scripts/check-growth-scale-local.sh",
@@ -19,7 +19,11 @@
     "enrichment:manage": "tsx scripts/manage-enrichment.ts",
     "digest:build": "tsx --env-file-if-exists=.env.local scripts/build-digest.ts",
     "check:gtm": "node scripts/check-gtm.mjs",
-    "check:topic-performance": "tsx scripts/check-topic-performance.ts"
+    "check:topic-performance": "tsx scripts/check-topic-performance.ts",
+    "digest:publish": "tsx --env-file-if-exists=.env.local scripts/publish-report.ts",
+    "digest:buttondown": "tsx --env-file-if-exists=.env.local scripts/draft-buttondown.ts",
+    "check:seo": "node scripts/check-seo.mjs",
+    "benchmark:record": "node scripts/record-search-observation.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

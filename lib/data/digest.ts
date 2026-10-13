@@ -1,5 +1,8 @@
+import {renderWeeklyBriefing} from "../email/weekly-template";
 import {pointPath} from "../seo/paths";
-import type {SignalFeed} from "./model";
+import type {SignalEvent, SignalFeed} from "./model";
+import {type ReportEditorial} from "./report-editorial";
+import {selectDistinctHeadlines} from "./select";
 import {seedCatalog} from "../universe";
 
 const DAY = 86_400_000;
@@ -10,16 +13,16 @@ export function isoWeek(date: Date): string {
   const week = Math.ceil(((value.getTime() - Date.UTC(year, 0, 1)) / DAY + 1) / 7);
   return `${year}-${String(week).padStart(2,"0")}`;
 }
-export function buildWeeklyDigest(weekEnd: Date, snapshots: SignalFeed[]) {
+export function buildWeeklyDigest(weekEnd: Date, snapshots: SignalFeed[], archive?: {current:SignalEvent[];previous:SignalEvent[]}): WeeklyDigest {
   if (!Number.isFinite(weekEnd.getTime())) throw new Error("Invalid week end");
   const end = weekEnd.getTime(); const start = end - 7 * DAY; const priorStart = start - 7 * DAY;
   const ordered = snapshots.filter(feed => Date.parse(feed.observedAt) < end && Date.parse(feed.observedAt) >= priorStart).sort((a,b) => Date.parse(a.observedAt) - Date.parse(b.observedAt));
   const current = ordered.filter(feed => Date.parse(feed.observedAt) >= start);
   const previous = ordered.filter(feed => Date.parse(feed.observedAt) < start);
   const unique = (feeds: SignalFeed[], from: number, to: number) => [...new Map(feeds.flatMap(feed => feed.events).filter(event => Date.parse(event.publishedAt) >= from && Date.parse(event.publishedAt) < to).map(event => [event.id,event])).values()];
-  const events = unique(current, start, end); const priorEvents = unique(previous, priorStart, start);
+  const events = archive?.current ?? unique(current, start, end); const priorEvents = archive?.previous ?? unique(previous, priorStart, start);
   const catalog = current.at(-1)?.catalog ?? seedCatalog;
-  // Snapshot details are capped; count only this saved sample rather than claiming full weekly coverage.
+  // Legacy editions describe snapshot samples; new editions count the full archive window.
   const counts = (items: typeof events) => { const result: Record<string,number> = {}; for (const event of items) for (const id of new Set(event.topics.flatMap(match => [match.topicId, ...(match.subtopicId ? [match.subtopicId] : [])]))) result[id] = (result[id] ?? 0) + 1; return result; };
   const nowCounts = counts(events); const beforeCounts = counts(priorEvents);
   const topics = catalog.topics.flatMap(region => [{id:region.id,name:region.name,path:`/${region.id}`}, ...region.children.map(child => ({id:child.id,name:child.name,path:pointPath(child.id,catalog)!}))]);
@@ -27,14 +30,37 @@ export function buildWeeklyDigest(weekEnd: Date, snapshots: SignalFeed[]) {
   // Relationships are full-window snapshot aggregates, never reconstructed from capped details.
   const latest = current.at(-1); const baseline = previous.at(-1);
   const connections = Object.entries(latest?.relationships ?? {}).map(([key,count]) => ({key,count,delta:count-(baseline?.relationships?.[key] ?? 0),previous:baseline?.relationships?.[key] ?? 0})).filter(link => baseline && link.previous === 0 && link.count > 0).sort((a,b) => b.count-a.count || a.key.localeCompare(b.key)).slice(0,3);
-  return {week:isoWeek(weekEnd), start:new Date(start).toISOString(), end:weekEnd.toISOString(), catalog, snapshotDay: latest?.observedAt.slice(0,10) ?? null, rising: growth.slice(0,5), quiet: growth.filter(topic => topic.count <= 3).at(-1) ?? null, connections, signals:events.sort((a,b) => b.importance-a.importance || b.publishedAt.localeCompare(a.publishedAt) || a.id.localeCompare(b.id)).slice(0,5), coverage:{currentDays: new Set(current.map(feed => feed.observedAt.slice(0,10))).size, previousDays:new Set(previous.map(feed => feed.observedAt.slice(0,10))).size}};
+  const ranked = [...events].sort((a,b) => Math.min(30,b.importance)-Math.min(30,a.importance) || b.publishedAt.localeCompare(a.publishedAt) || a.id.localeCompare(b.id));
+  const selected: SignalEvent[] = [];
+  for (const source of new Set(ranked.map(event=>event.source))) {
+    const event=ranked.find(item=>item.source===source && selectDistinctHeadlines([item],1,selected.map(item=>item.title)).length);
+    if(event) selected.push(event);
+  }
+  const highlights=selectDistinctHeadlines([...new Map([...selected,...ranked].map(event=>[event.id,event])).values()],5);
+  const emerging = growth.filter(topic=>catalog.topics.some(region=>region.children.some(child=>child.id===topic.id)) && topic.count>=3)
+    .map(topic=>({...topic,evidence:events.filter(event=>event.topics.some(match=>match.subtopicId===topic.id))}))
+    .find(topic=>new Set(topic.evidence.map(event=>{try{return new URL(event.url).hostname;}catch{return event.source;}})).size>=2);
+  return {week:isoWeek(new Date(end-1)), start:new Date(start).toISOString(), end:weekEnd.toISOString(), catalog, snapshotDay: latest?.observedAt.slice(0,10) ?? null, rising: growth.slice(0,5), quiet: growth.filter(topic => topic.count <= 3).at(-1) ?? null, connections, signals:highlights, evidenceScope:archive ? "archive" : "sample", emerging:emerging ? {...emerging,evidence:selectDistinctHeadlines(emerging.evidence,3)} : null, coverage:{currentDays: new Set(current.map(feed => feed.observedAt.slice(0,10))).size, previousDays:new Set(previous.map(feed => feed.observedAt.slice(0,10))).size}};
 }
-export type WeeklyDigest = ReturnType<typeof buildWeeklyDigest>;
+type DigestTopic = {id:string;name:string;path:string;count:number;previous:number;delta:number};
+export type WeeklyDigest = {
+ personalization?: import("../email/personalization").Personalization;
+  week:string;start:string;end:string;catalog:typeof seedCatalog;snapshotDay:string|null;
+  rising:DigestTopic[];quiet:DigestTopic|null;
+  connections:{key:string;count:number;delta:number;previous:number}[];
+  signals:SignalEvent[];coverage:{currentDays:number;previousDays:number};
+  evidenceScope?:"archive"|"sample";
+  emerging?: (DigestTopic & {evidence:SignalEvent[]}) | null;
+  editorial?:ReportEditorial;
+  revisedAt?:string;
+  previousDigest?:WeeklyDigest;
+};
 function escapeHtml(value: string): string { return value.replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]!)); }
 export function digestLink(path: string, week: string): string {
  const url = new URL(path,"https://symtri.com"); url.searchParams.set("utm_source","newsletter"); url.searchParams.set("utm_medium","email"); url.searchParams.set("utm_campaign",`signal-${week}`); return url.toString();
 }
 export function renderWeeklyDigest(digest: WeeklyDigest, intro?: string) {
+ if(digest.editorial?.briefs.length)return renderWeeklyBriefing(digest,intro);
  const paragraphs = [intro || "A weekly look at the sources and connections observed by SYMTRI.", `Coverage: ${digest.coverage.currentDays}/7 snapshot days this week; ${digest.coverage.previousDays}/7 in the comparison week. Topic growth and top signals describe saved samples. Connections compare full fourteen-day windows.`];
  const sections = [
   {title:"Rising in the saved sample", rows:digest.rising.map(topic => ({text:`${topic.name}: ${topic.count} signals (${topic.previous} in the prior week’s sample)`,url:digestLink(topic.path,digest.week)}))},

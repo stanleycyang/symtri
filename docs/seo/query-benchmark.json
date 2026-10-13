@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "createdAt": "2026-10-13",
+  "audience": "Developers, technical researchers, and product teams evaluating emerging AI and software developments.",
+  "focus": "AI agents, coding agents, and their developer-tool connections; broader subjects remain available for exploration.",
+  "measurementNote": "Priority is editorial, not measured search volume. These are fixed benchmark prompts, not promises that the current archive answers every prompt.",
+  "queries": [
+    {
+      "id": "q01",
+      "priority": "p1",
+      "query": "Where can I follow AI agent research with original sources?",
+      "targetPath": "/ai/agents",
+      "intent": "discovery"
+    },
+    {
+      "id": "q02",
+      "priority": "p1",
+      "query": "What is new in AI agents this week?",
+      "targetPath": "/ai/agents",
+      "intent": "fresh evidence"
+    },
+    {
+      "id": "q03",
+      "priority": "p1",
+      "query": "Which AI agent evaluations were published recently?",
+      "targetPath": "/ai/agents",
+      "intent": "research"
+    },
+    {
+      "id": "q04",
+      "priority": "p1",
+      "query": "What new open source AI agent tools are worth investigating?",
+      "targetPath": "/ai/agents",
+      "intent": "projects"
+    },
+    {
+      "id": "q05",
+      "priority": "p1",
+      "query": "What are the limitations of recent AI agent research?",
+      "targetPath": "/ai/agents",
+      "intent": "evidence quality"
+    },
+    {
+      "id": "q06",
+      "priority": "p1",
+      "query": "What is new in AI coding agents?",
+      "targetPath": "/ai/coding-agents",
+      "intent": "fresh evidence"
+    },
+    {
+      "id": "q07",
+      "priority": "p1",
+      "query": "Where can I find original research on coding agent reliability?",
+      "targetPath": "/ai/coding-agents",
+      "intent": "research"
+    },
+    {
+      "id": "q08",
+      "priority": "p1",
+      "query": "Which coding agent projects have released new tooling?",
+      "targetPath": "/ai/coding-agents",
+      "intent": "projects"
+    },
+    {
+      "id": "q09",
+      "priority": "p1",
+      "query": "How are AI agents connected to developer tools?",
+      "targetPath": "/software/developer-tools",
+      "intent": "connections"
+    },
+    {
+      "id": "q10",
+      "priority": "p1",
+      "query": "Where can I read a source linked weekly technology briefing?",
+      "targetPath": "/signal",
+      "intent": "discovery"
+    },
+    {
+      "id": "q11",
+      "priority": "p1",
+      "query": "What changed in AI and software research this week?",
+      "targetPath": "/signal",
+      "intent": "weekly synthesis"
+    },
+    {
+      "id": "q12",
+      "priority": "p1",
+      "query": "What is SYMTRI and how does its knowledge map work?",
+      "targetPath": "/about",
+      "intent": "brand"
+    },
+    {
+      "id": "q13",
+      "priority": "p1",
+      "query": "How does SYMTRI classify sources and measure connections?",
+      "targetPath": "/about#methodology",
+      "intent": "methodology"
+    },
+    {
+      "id": "q14",
+      "priority": "p2",
+      "query": "Where can I track language model research and releases?",
+      "targetPath": "/ai/language-models",
+      "intent": "discovery"
+    },
+    {
+      "id": "q15",
+      "priority": "p2",
+      "query": "What recent language model evaluations have original papers?",
+      "targetPath": "/ai/language-models",
+      "intent": "research"
+    },
+    {
+      "id": "q16",
+      "priority": "p2",
+      "query": "What is new in AI inference infrastructure?",
+      "targetPath": "/ai/ai-infrastructure",
+      "intent": "fresh evidence"
+    },
+    {
+      "id": "q17",
+      "priority": "p2",
+      "query": "How do AI research developments connect to computing hardware?",
+      "targetPath": "/ai",
+      "intent": "connections"
+    },
+    {
+      "id": "q18",
+      "priority": "p2",
+      "query": "What recent multimodal AI research is available?",
+      "targetPath": "/ai/multimodal-systems",
+      "intent": "research"
+    },
+    {
+      "id": "q19",
+      "priority": "p2",
+      "query": "What is new in developer tools and open source software?",
+      "targetPath": "/software",
+      "intent": "fresh evidence"
+    },
+    {
+      "id": "q20",
+      "priority": "p2",
+      "query": "Where can I discover recent open source projects with source links?",
+      "targetPath": "/software/open-source",
+      "intent": "projects"
+    },
+    {
+      "id": "q21",
+      "priority": "p2",
+      "query": "What recent database research and projects should developers investigate?",
+      "targetPath": "/software/databases",
+      "intent": "research"
+    },
+    {
+      "id": "q22",
+      "priority": "p2",
+      "query": "What is new in web platform engineering?",
+      "targetPath": "/software/web-platforms",
+      "intent": "fresh evidence"
+    },
+    {
+      "id": "q23",
+      "priority": "p2",
+      "query": "How do software developments connect to cybersecurity?",
+      "targetPath": "/security",
+      "intent": "connections"
+    },
+    {
+      "id": "q24",
+      "priority": "p2",
+      "query": "How can I check the sources behind an AI generated technology answer?",
+      "targetPath": "/about",
+      "intent": "trust"
+    },
+    {
+      "id": "q25",
+      "priority": "p2",
+      "query": "Where can I explore technology research without a 3D browser?",
+      "targetPath": "/",
+      "intent": "accessibility"
+    }
+  ]
+}

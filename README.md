@@ -91,7 +91,7 @@ OpenAlex adds one deterministic sample of at most 50 recent, open-access English
 
 The database is the growing record. Each ingest refreshes an all-time region connection graph from stored co-classified signals and calculates 14-day region activity from the full recent archive. The map still receives at most 300 signal details so the scene stays responsive; that cap no longer determines momentum or region counts. The same full-window activity is saved with each daily snapshot for historical comparison. The [status endpoint](app/api/status/route.ts) reports the latest run, source coverage, newly added signals, and current-model vector coverage. Hacker News retries a bounded number of failed item requests and reports partial coverage if any remain unavailable. arXiv uses eight spaced query groups and retries a failed group once after six seconds, so an all-group outage makes at most 16 requests; its paper budget stays at 195 per run. Successful groups still enter the archive when another group remains unavailable, and the run reports partial coverage. GitHub waits for an API rate-limit reset and retries once within a bounded window; it retains popular repositories and reports partial coverage when its recent-update query fails. A database lease prevents overlapping runs; failed embeddings remain queued for later runs. Embedding text excludes volatile Hacker News score and comment counts, and unchanged vectors are reused. Model IDs are configurable through AI Gateway; compare current model prices and retrieval quality before changing them because a model switch re-embeds the archive.
 
-The hourly archive also polls curated NASA news and NASA's JPL-center feed, CISA's Known Exploited Vulnerabilities catalog, Europe PMC research abstracts, and public Hugging Face model/dataset cards. These run only in ingestion, not per visitor. Per run: each NASA feed contributes at most 20 items; CISA reads one bounded catalog and processes at most 50 new or changed entries, comparing per-CVE hashes across the entire catalog so older revisions remain reachable; Europe PMC makes one 25-record subject query over 14 days; Hugging Face makes two 30-record listings and at most four metadata/card pairs per kind (18 requests total). Missing cards or one failed Hub group mark that source partial while keeping successful cards. CISA dates mean catalog addition, not first disclosure. Hub repository creation dates stay separate from update dates. Apply `20260928000000_source_evidence.sql` before deploying these adapters.
+The hourly archive also polls curated NASA news and NASA's JPL-center feed, CISA's Known Exploited Vulnerabilities catalog, Europe PMC research abstracts, and public Hugging Face model/dataset cards. These run only in ingestion, not per visitor. Per run: each NASA feed contributes at most 20 items; CISA reads one bounded catalog and processes at most 50 new or changed entries, comparing per-CVE hashes across the entire catalog so older revisions remain reachable; Europe PMC makes one 25-record subject query over 14 days; Hugging Face makes two compact 30-record listings and tries up to eight metadata/card pairs per kind to obtain four usable cards (34 requests maximum). README downloads use the Hub resolver endpoint. Missing cards are replaced by the next bounded candidate; exhausted samples or real request failures mark the source partial while keeping successful cards. Listings omit full file manifests to keep response sizes bounded. CISA dates mean catalog addition, not first disclosure. Hub repository creation dates stay separate from update dates. Apply `20260928000000_source_evidence.sql` before deploying these adapters.
 
 Structured paper abstracts, syndication text, advisories, and cards are retained separately in `signal_evidence`, with source attribution, retrieval time, content hash, source type, declared license when available, and source-specific metadata. Unknown licenses remain unknown. Evidence links to canonical signals through source observations, preserving independent source evidence even when two connectors find the same page. Map payloads retain only short excerpts. Source evidence is available only while its source is active; the new table has RLS and no client read policies.
 
@@ -266,3 +266,70 @@ cards, dataset cards, and advisories. OpenAlex, Europe PMC, and CISA supply date
 without a time of day, so their source labels show dates rather than precise
 elapsed hours. Limitation audits check the requested task as well as factual
 support; a positive finding mislabeled as a limitation is not a valid answer.
+
+### Weekly briefings
+
+`/signal` displays the latest edition directly. New Monday editions select from
+all active-source archive records published in the completed UTC week, bounded
+by their discovery time at publication. Counts cover the full archive, while
+reading candidates are bounded to 16 published notes per evidence feed and 160
+in total. Candidates are sampled across UTC days, using engagement only within
+each feed, so Sunday updates cannot displace the entire earlier week.
+
+An editorial model ranks the checked findings for usefulness to people building
+and evaluating technology. Three distinct developments lead the report; a fourth
+source is reserved for further investigation. Briefs explain the contribution,
+its supported practical consequence, a concrete editorial next step, and source
+limitations. Exact supporting passages are resolved from retained text by ID,
+then factual support and recommendations receive a separate model audit.
+Source-type caveats remain separate from limitations reported by authors.
+Model or audit failure reuses a checked reading note without inventing a missing
+implication. No model calls or source fetches run on report page views.
+
+Publication makes at most one ranking request and four draft/audit pairs, with a
+25-second deadline per ranking or pair and no provider retries. `/api/digest`
+allows 180 seconds; an edition without usable checked briefs remains unpublished.
+The optional emerging-thread section needs three readable sources from at least
+two publishers. Co-classification is an invitation to investigate, not a trend
+or causal claim. HTML/text newsletter exports and RSS use the same saved briefs.
+
+To review a draft, run `npm run digest:build -- 2026-10-12` (the exclusive UTC week
+end), with server credentials configured locally. It writes HTML, text, and JSON
+to ignored `artifacts/digests/`. `npm run digest:publish --
+artifacts/digests/signal-2026-41.json` publishes that reviewed JSON without
+regenerating it. It can explicitly upgrade a legacy count/headline edition once,
+preserving the prior digest and original publication time. Routine cron retries
+and already-upgraded editions remain immutable. Deploy the page changes before
+publishing an upgraded edition so the current layout and metadata read it.
+
+The homepage invitation and report signup post directly to the verified Buttondown
+`symtri` list. The CSP permits form submissions to `https://buttondown.com`;
+Buttondown handles confirmation, spam protection and unsubscribe. Signup events
+record only the placement and provider, never the email address.
+
+Readers can confirm up to five map interests and select a lead node. Meaningful
+exploration stays in local storage and supplies suggestions only. The form sends
+confirmed IDs through Buttondown metadata; submitting the same email updates
+those choices. The weekly job saves bounded editions from the full archive,
+prioritizing analytical reading notes and rejecting obvious editorial mismatches.
+Buttondown renders two lead-node picks and an optional connection to another
+confirmed interest. Quiet interests receive an honest update; empty preferences
+receive the broader edition. See [the plan and verification](docs/newsletter-personalization.md).
+
+With server-only `BUTTONDOWN_API_KEY` configured, the Monday 14:00 UTC publication
+job creates one Buttondown draft per edition. The key should have email read/write
+permission with sending disabled. Provider failures are retried by rerunning the
+job against the immutable saved edition; a stable idempotency key and unique slug
+prevent duplicate emails. Existing drafts and sent editions are preserved.
+`npm run digest:buttondown -- artifacts/digests/signal-YYYY-WW.json` creates a draft
+from a reviewed export. Review and send newsletters in Buttondown; report
+publication does not automatically send to the list.
+Use Buttondown's subscriber preview to review an individual edition: the editor
+contains all conditional branches. Subjects and bodies support those conditions;
+the inbox description must remain plain text because Buttondown delivers it verbatim.
+
+## Search discovery and answer-engine visibility
+
+Public subject pages expose source-backed HTML independently of WebGL. `npm run check:seo` crawls the production build (default `http://127.0.0.1:3107`); set `SYMTRI_CHECK_URL` for a deployed site and pass `-- --report /tmp/seo.json` to save evidence. The check validates canonical URLs, sitemap/indexing consistency, structured data, internal links, source pagination, crawler responses, and invalid-route status codes. It inspects one older source page per subject rather than crawling the entire archive.
+
+See [the SEO/AEO audit and release evidence](docs/seo/README.md), [the fixed 25-query benchmark](docs/seo/query-benchmark.json), and [the measurement procedure](docs/seo/measurement.md). Sparse subject pages remain browsable but need at least three readable archive sources before appearing in the sitemap. That is an editorial quality floor, not a search-engine ranking rule.

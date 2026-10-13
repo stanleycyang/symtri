@@ -90,6 +90,8 @@ test("Hugging Face bounds card requests, keeps both source types and separates u
   };
   const result = await fetchHuggingFace(loader);
   assert.equal(calls.length, 18);
+  assert.ok(calls.filter(url => url.includes("?sort=")).every(url => !url.includes("full=true")));
+  assert.ok(calls.filter(url => !url.includes("/api/")).every(url => url.includes("/resolve/main/README.md")));
   assert.equal(result.events.length, 8);
   assert.equal(result.status, "ok");
   assert.equal(result.events[0].publishedAt, "2026-09-27T00:00:00.000Z");
@@ -105,4 +107,52 @@ test("Hugging Face bounds card requests, keeps both source types and separates u
   });
   assert.equal(partial.status, "partial");
   assert.equal(partial.events.length, 4);
+});
+
+test("Hugging Face replaces missing cards without losing healthy source coverage", async () => {
+  let calls = 0;
+  const result = await fetchHuggingFace(async url => {
+    calls++;
+    if (url.includes("?sort=")) return {text: JSON.stringify(Array.from({length:30}, (_, i) => ({id:`example/repo-${i}`, downloads:100})))};
+    if (url.includes("/api/")) return {text: JSON.stringify({createdAt:"2026-09-25", lastModified:"2026-09-27"})};
+    if (/repo-[0-3]\//.test(url)) throw new Error("Feed returned HTTP 404");
+    return {text:abstract};
+  });
+  assert.equal(calls, 34);
+  assert.equal(result.status, "ok");
+  assert.equal(result.events.length, 8);
+});
+
+test("Hugging Face bounds empty and short-card samples and reports real failures", async () => {
+  let calls = 0;
+  const empty = async (url:string) => {
+    calls++;
+    if (url.includes("?sort=")) return {text: JSON.stringify(Array.from({length:30}, (_, i) => ({id:`example/repo-${i}`, downloads:100})))};
+    if (url.includes("/api/")) return {text: JSON.stringify({createdAt:"2026-09-25", lastModified:"2026-09-27"})};
+    return {text:"No documented evidence"};
+  };
+  await assert.rejects(fetchHuggingFace(empty), /cards unavailable/);
+  assert.equal(calls, 34);
+  const partial = await fetchHuggingFace(async url => {
+    if (url.includes("?sort=")) return {text:JSON.stringify([{id:"example/first",downloads:100},{id:"example/second",downloads:100}])};
+    if (url.includes("/api/")) return {text:JSON.stringify({createdAt:"2026-09-25",lastModified:"2026-09-27"})};
+    if(url.includes("/first/")) throw new Error("Feed returned HTTP 429");
+    return {text:abstract};
+  });
+  assert.equal(partial.status,"partial");
+  assert.equal(partial.events.length,2);
+});
+
+test("Hugging Face checks access restrictions absent from compact listings before downloading cards", async () => {
+  let cards = 0;
+  const result = await fetchHuggingFace(async url => {
+    if (url.includes("?sort=")) return {text:JSON.stringify([{id:"example/gated",downloads:100},{id:"example/public",downloads:100}])};
+    if (url.includes("/api/")) return {text:JSON.stringify({createdAt:"2026-09-25",lastModified:"2026-09-27",gated:url.includes("/gated?")})};
+    cards++;
+    assert.ok(!url.includes("/gated/"));
+    return {text:abstract};
+  });
+  assert.equal(cards,2);
+  assert.equal(result.events.length,2);
+  assert.equal(result.status,"partial");
 });

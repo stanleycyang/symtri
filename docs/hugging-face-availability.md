@@ -1,0 +1,15 @@
+# Hugging Face ingestion availability — 2026-10-13
+
+Production reported `unavailable` at 19:01 UTC, then recovered to `partial` on the next hourly run at 20:01 UTC. Logs retained only “Hugging Face cards unavailable”, so the exact failed HTTP request in the earlier run cannot be reconstructed. There is no observed 401 or 429 evidence establishing that a token is required.
+
+Direct probes reproduced missing README 404s, short cards and a card exceeding the 120 KB response cap. The prior adapter selected only four repositories per type and never replaced them. Full model listings also include large file manifests: an observed full listing was ~562 KB, whereas a compact listing was ~11 KB at another moment. Those samples change over time and are not a controlled comparison; full manifests are unnecessary for candidate selection and can exceed the 2 MB listing cap.
+
+The adapter now uses compact 30-record listings, tries up to eight repositories per type to obtain four usable cards, and uses `/resolve/main/README.md` for programmatic downloads. The normal path remains 18 requests; worst case is 34. Private/gated checks remain enforced using both listing and detail data. Missing card replacements do not independently degrade coverage when a complete sample succeeds; incomplete samples and real request failures remain partial. Successful cards are preserved. Failure diagnostics identify kind, stage and bounded error reason without response bodies or credentials.
+
+The source remains anonymous. Hugging Face recommends resolver URLs for programmatic downloads because their limits are higher. If future production diagnostics establish 429s, scoped authentication and bounded reset-aware retries can be considered; no paid service or new account is required by the observed failures.
+
+Validation: 225 unit tests, lint, typecheck and isolated PostgreSQL storage/report checks passed. Regression cases cover missing-card replacement, maximum request count, empty/short cards, real rate-limit failures with successful sibling cards, and access restrictions absent from compact listings. Live probes retrieved model and dataset evidence while retaining truthful partial coverage.
+
+Official guidance: https://huggingface.co/docs/hub/rate-limits and https://huggingface.co/docs/hub/en/api.
+
+Production verification: Ready deployment `dpl_E7RgJTz1fucX7tTL8reazKzrxcir`; workflow `wrun_01M4VEHF57GFBRH9NFFPC1SRDR` was explicitly started against that deployment and completed at 20:17:27 UTC. Hugging Face coverage was partial; six newly visible cards and 52 total visible Hugging Face cards were observed after this run. GTM passed. The all-source health check failed because seven embeddings were pending at check time; this is separate from successful Hub retrieval and persistence. No claim of complete system health or complete Hub coverage is made. See `hugging-face-availability-verification.json`.
