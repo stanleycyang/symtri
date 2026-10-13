@@ -87,12 +87,12 @@ export async function fetchHuggingFace(load: PublicLoader = loadHuggingFace): Pr
     try {
       // full=true includes file manifests that can exceed the bounded response
       // budget. The default listing already contains the selection metadata.
-      const items: unknown = JSON.parse((await load(`https://huggingface.co/api/${kind}?sort=lastModified&direction=-1&limit=30`)).text);
+      const items: unknown = JSON.parse((await load(`https://huggingface.co/api/${kind}?sort=lastModified&direction=-1&limit=100`)).text);
       if (!Array.isArray(items)) throw new Error("Invalid Hub listing");
-      // Try at most eight repositories to obtain four usable cards per kind.
-      // Missing READMEs are common; replacements keep the total <=34 requests.
+      // Try at most 24 repositories to obtain four usable cards per kind.
+      // Missing/short READMEs are common; total requests remain <=98.
       const candidates = items.map(record).filter((item) => !item.private && !item.gated && /^(?:[\w.-]+\/)?[\w.-]+$/.test(text(item.id))
-        && (Number(item.downloads) >= 20 || Number(item.likes) >= 1)).slice(0, 8);
+        && (Number(item.downloads) >= 20 || Number(item.likes) >= 1)).slice(0, 24);
       let collected = 0;
       for (const item of candidates) {
         if (collected >= 4) break;
@@ -105,7 +105,7 @@ export async function fetchHuggingFace(load: PublicLoader = loadHuggingFace): Pr
           // Resolver URLs are the Hub's documented programmatic file endpoint.
           const cardUrl = `${root}/resolve/main/README.md`;
           stage = "card";
-          const card = (await load(cardUrl, 120_000)).text.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, "").trim();
+          const card = cleanSourceText((await load(cardUrl, 500_000)).text.replace(/^---\s*\n[\s\S]*?\n---\s*\n/, "").trim());
           const createdAt = date(detail.createdAt ?? item.createdAt);
           const updatedAt = date(detail.lastModified ?? item.lastModified);
           const publishedAt=updatedAt ?? createdAt;
@@ -122,12 +122,15 @@ export async function fetchHuggingFace(load: PublicLoader = loadHuggingFace): Pr
           const reason = error instanceof Error ? error.message : "unknown error";
           // A missing card is a repository without usable evidence, rather
           // than a Hub outage. Try the next bounded candidate instead.
-          if (stage === "card" && reason === "Feed returned HTTP 404") continue;
+          if (stage === "card" && ["Feed returned HTTP 404", "Feed response too large"].includes(reason)) continue;
           failed++;
           console.warn("SYMTRI Hugging Face request failed", {kind, stage, reason: reason.slice(0, 160)});
         }
       }
-      if (collected < Math.min(4, candidates.length)) failed++;
+      if (collected < 4) {
+        failed++;
+        console.warn("SYMTRI Hugging Face sample incomplete", { kind, collected, target: 4, candidates: candidates.length });
+      }
     } catch (error) {
       failed++;
       console.warn("SYMTRI Hugging Face listing failed", {kind, reason: error instanceof Error ? error.message.slice(0, 160) : "unknown error"});

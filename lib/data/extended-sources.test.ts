@@ -132,7 +132,7 @@ test("Hugging Face bounds empty and short-card samples and reports real failures
     return {text:"No documented evidence"};
   };
   await assert.rejects(fetchHuggingFace(empty), /cards unavailable/);
-  assert.equal(calls, 34);
+  assert.equal(calls, 98);
   const partial = await fetchHuggingFace(async url => {
     if (url.includes("?sort=")) return {text:JSON.stringify([{id:"example/first",downloads:100},{id:"example/second",downloads:100}])};
     if (url.includes("/api/")) return {text:JSON.stringify({createdAt:"2026-09-25",lastModified:"2026-09-27"})};
@@ -155,4 +155,35 @@ test("Hugging Face checks access restrictions absent from compact listings befor
   assert.equal(cards,2);
   assert.equal(result.events.length,2);
   assert.equal(result.status,"partial");
+});
+
+test("Hugging Face fills samples beyond eight candidates and replaces oversized or markup-only cards", async () => {
+  let calls = 0;
+  const result = await fetchHuggingFace(async (url, bytes) => {
+    calls++;
+    if (url.includes("?sort=")) {
+      assert.equal(new URL(url).searchParams.get("limit"), "100");
+      return {text: JSON.stringify(Array.from({length:100}, (_, i) => ({id:`example/repo-${i}`, downloads:100})))};
+    }
+    if (url.includes("/api/")) return {text:JSON.stringify({createdAt:"2026-09-25",lastModified:"2026-09-27"})};
+    assert.equal(bytes,500_000);
+    const index = Number(/repo-(\d+)/.exec(url)![1]);
+    if (index < 8) throw new Error("Feed returned HTTP 404");
+    if (index === 8) throw new Error("Feed response too large");
+    if (index === 9) return {text:"<div>".repeat(100)};
+    return {text:abstract};
+  });
+  assert.equal(result.status,"ok");
+  assert.equal(result.events.length,8);
+  assert.equal(calls,58);
+});
+
+test("Hugging Face never reports full coverage for an undersized or empty eligible pool", async () => {
+  const result = await fetchHuggingFace(async url => {
+    if (url.includes("?sort=")) return {text:JSON.stringify(url.includes("/datasets") ? [] : [{id:"example/public",downloads:100}])};
+    if (url.includes("/api/")) return {text:JSON.stringify({createdAt:"2026-09-25",lastModified:"2026-09-27"})};
+    return {text:abstract};
+  });
+  assert.equal(result.status,"partial");
+  assert.equal(result.events.length,1);
 });
