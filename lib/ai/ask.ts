@@ -53,6 +53,8 @@ const subtopicAliases: Record<string, string[]> = {
   "energy-fusion": ["fusion", "tokamak", "tokamaks", "stellarator", "stellarators"],
   "hardware-semiconductors": ["semiconductor", "semiconductors"],
   "hardware-networks": ["network hardware", "network devices", "hardware networks"],
+  "software-databases": ["database", "databases", "database engine", "database engines", "postgres", "postgresql", "duckdb", "sqlite"],
+  "software-programming-languages": ["programming language", "programming languages"],
   "startups-product": ["startup product", "product launch"],
   "startups-growth": ["startup growth", "company growth"],
   "startups-design": ["startup design", "design for startups"],

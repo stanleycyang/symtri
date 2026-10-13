@@ -11,6 +11,7 @@ import { unavailableSources, type RelatedSignal, type SignalEvent, type SignalFe
 import { evidenceFingerprint } from "./enrichment-policy";
 import { readySignal } from "./publication";
 import { ENRICHMENT_VERSION } from "./reading-note-version";
+import { isCalendarDay } from "./dates";
 
 let connection: ReturnType<typeof postgres> | undefined;
 let lastDatabaseUse = 0;
@@ -301,23 +302,40 @@ export async function hasCurrentSignalEmbeddings(events: SignalEvent[], retained
 export async function getStoredFeed(readyOnly = false): Promise<SignalFeed | null> {
   const sql = database();
   const rows = await sql`
-    with ranked as (
-      select event.id, event.source, event.external_id, event.title, event.url, event.summary,
-        event.published_at, event.importance, event.topics, event.classification_input, event.classifier_version,
-        row_number() over (partition by event.source order by event.published_at desc, event.first_seen_at desc) as source_rank
+    with reserved as materialized (
+      select preview.* from source_catalog source cross join lateral (
+        select event.id,event.published_at,event.first_seen_at
+        from signal_events event
+        where event.source=source.id
+          and event.published_at >= now() - interval '14 days' and jsonb_array_length(event.topics)>0
+          and (${!readyOnly} or ${readySignal(sql, "event.id")})
+          and exists(select 1 from signal_observations observation
+            join source_catalog active_source on active_source.id=observation.source and active_source.status='active'
+            where observation.signal_id=event.id)
+        order by event.published_at desc,event.first_seen_at desc,event.id desc
+        limit case when source.id like 'feed-%' then 6 else 12 end
+      ) preview
+    ), latest as materialized (
+      select event.id,event.published_at,event.first_seen_at
       from signal_events as event
       where event.published_at >= now() - interval '14 days' and jsonb_array_length(event.topics) > 0
         and (${!readyOnly} or ${readySignal(sql, "event.id")})
         and exists (select 1 from signal_observations as observation
           join source_catalog as active_source on active_source.id = observation.source and active_source.status = 'active'
           where observation.signal_id = event.id)
+      order by event.published_at desc,event.first_seen_at desc,event.id desc limit 300
+    ), candidates as (
+      select id,published_at,first_seen_at,0 as priority from reserved
+      union all select id,published_at,first_seen_at,1 from latest
     ), chosen as (
-      select * from ranked
-      order by case when source_rank <= case when source like 'feed-%' then 6 else 12 end then 0 else 1 end,
-        published_at desc limit 300
+      select id,max(published_at) as published_at,max(first_seen_at) as first_seen_at,min(priority) as priority
+      from candidates group by id
+      order by min(priority),max(published_at) desc,max(first_seen_at) desc,id desc limit 300
     )
-    select id, source, external_id, title, url, summary, published_at, importance, topics, classification_input, classifier_version
-    from chosen order by published_at desc
+    select event.id,event.source,event.external_id,event.title,event.url,event.summary,event.published_at,
+      event.importance,event.topics,event.classification_input,event.classifier_version
+    from chosen join signal_events event on event.id=chosen.id
+    order by event.published_at desc,event.first_seen_at desc,event.id desc
   `;
   if (!rows.length) return null;
   const events: SignalEvent[] = rows.map((row) => ({
@@ -577,12 +595,22 @@ export async function getArchiveRelationships(at = new Date(), catalog: Universe
 export async function getPublishedEvidenceCounts(): Promise<NonNullable<SignalFeed["publishedEvidence"]>> {
   const sql = database();
   const rows = await sql<{kind:string;key:string;count:number}[]>`
-    with published as (
-      select event.id,event.topics,event.published_at from signal_events event
-      where ${readySignal(sql, "event.id")}
-        and (event.classifier_version >= ${CLASSIFIER_VERSION} or event.classification_input is null)
-        and exists(select 1 from signal_observations observation join source_catalog source
-          on source.id=observation.source and source.status='active' where observation.signal_id=event.id)
+    with eligible_events as materialized (
+      select id,topics,published_at from signal_events
+      where jsonb_array_length(topics)>0
+        and (classifier_version >= ${CLASSIFIER_VERSION} or classification_input is null)
+    ), published_notes as materialized (
+      select signal_id from reading_notes
+      where status='ready' and version=${ENRICHMENT_VERSION}
+        and published_revision=revision and note is not null
+        and note->>'evidenceSource'=any(array(select id from source_catalog where status='active'))
+    ), active_observations as materialized (
+      select distinct signal_id from signal_observations
+      where source=any(array(select id from source_catalog where status='active'))
+    ), published as (
+      select event.* from eligible_events event
+      join published_notes note on note.signal_id=event.id
+      join active_observations observation on observation.signal_id=event.id
     ), matches as (
       select distinct id,published_at,topic->>'topicId' as region,topic->>'subtopicId' as child
       from published cross join lateral jsonb_array_elements(topics) topic
@@ -977,7 +1005,7 @@ export async function getSnapshotDays(): Promise<SnapshotDay[]> {
 }
 
 export async function getSnapshotFeed(day: string): Promise<SignalFeed | null> {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  if (!isCalendarDay(day)) return null;
   const rows = await database()`select captured_at, feed from signal_snapshots where day = ${day}::date limit 1`;
   if (!rows.length) return null;
   const feed = rows[0].feed as SignalFeed;

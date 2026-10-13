@@ -3,6 +3,7 @@
 import {sourceHasDayPrecision} from "@/lib/data/source-presentation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import {isCalendarDay} from "@/lib/data/dates";
 import {trackEvent} from "@/lib/analytics";
 import {viewPath, referralUrl} from "@/lib/seo/share";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -215,12 +216,13 @@ export default function Experience() {
   useEffect(() => {
     if (!signalId || selectedDay || connectedSignal?.id === signalId) return;
     const controller = new AbortController();
-    fetch(`/api/signal?id=${encodeURIComponent(signalId)}`, {cache:"no-store", signal:controller.signal})
+    fetch(`/api/signal?id=${encodeURIComponent(signalId)}`, {cache:"no-store", signal:AbortSignal.any([controller.signal,AbortSignal.timeout(12_000)])})
       .then(response => response.ok ? response.json() : null).then(result => {
         if (result?.event && !controller.signal.aborted) setConnectedSignal(showLive(result.event, new Date().toISOString(), sourceLabels));
+        else if (result?.event === null && !controller.signal.aborted) hideUnavailableStory(signalId);
       }).catch(() => {});
     return () => controller.abort();
-  }, [signalId, selectedDay, connectedSignal?.id, sourceLabels]);
+  }, [signalId, selectedDay, connectedSignal?.id, sourceLabels, hideUnavailableStory]);
   useEffect(() => {if(focusedId)trackEvent("select_region",{id:focusedId});},[focusedId]);
   useEffect(() => {if(childId)trackEvent("select_topic",{id:childId});},[childId]);
   useEffect(() => {if(askOpen)trackEvent("ask_symtri_open");},[askOpen]);
@@ -260,13 +262,13 @@ export default function Experience() {
   }, [entered, focusedId, childId, signalId, connectionId, askOpen, topicKey, selectedDay]);
 
   useEffect(() => {
-    if (!entered || !deepLinkApplied.current) return;
+    if (!entered || !deepLinkApplied.current || pendingDay) return;
     const url = new URL(window.location.href);
     if (sharePointId) url.searchParams.set("point", sharePointId);
     else url.searchParams.delete("point");
     for (const [key, value] of [["connection", connectionId], ["signal", signalId], ["day", selectedDay]]) { if (value) url.searchParams.set(key!, value); else url.searchParams.delete(key!); }
     if (url.href !== window.location.href) window.history.pushState(null, "", url);
-  }, [entered, sharePointId, selectedDay, signalId, connectionId]);
+  }, [entered, sharePointId, selectedDay, signalId, connectionId, pendingDay]);
 
   useEffect(() => {
     const restoreLocation = () => {
@@ -280,9 +282,10 @@ export default function Experience() {
       const signal = params.get("signal"); const connection = params.get("connection"); const day = params.get("day");
       setSignalId(signal && /^[\w:.-]{1,200}$/.test(signal) ? signal : null);
       setConnectionId(connection && catalog.topics.some(item => item.id === connection) && connection !== topic?.id ? connection : null);
-      const validDay = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+      const validDay = isCalendarDay(day) ? day : null;
       historicalLink.current = validDay ? {day:validDay,signal,connection} : null;
-      setPendingDay(validDay); setSelectedDay(validDay);
+      setPendingDay(validDay);
+      if (!validDay) setSelectedDay(null);
       setHoveredId(null);
       setAskSteps([]);
       setMobileGuideOpen(false);
@@ -343,7 +346,7 @@ export default function Experience() {
                 const signal = params.get("signal"); const connection = params.get("connection"); const day = params.get("day");
                 if (signal && /^[\w:.-]{1,200}$/.test(signal)) setSignalId(signal);
                 if (connection && linkedCatalog.topics.some(item => item.id === connection) && connection !== matched.id) setConnectionId(connection);
-                if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {historicalLink.current={day,signal,connection};setPendingDay(day);setSelectedDay(day);}
+                if (isCalendarDay(day)) {historicalLink.current={day,signal,connection};setPendingDay(day);}
               }
             }
           }

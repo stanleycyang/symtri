@@ -158,6 +158,19 @@ test("a specific region question excludes nearby stories about only the broad su
   assert.match(empty.summary, /No observed signal matches battery recycling/);
 });
 
+test("singular database questions stay in their thread and exclude unrelated Software evidence",()=>{
+  for(const question of ["What is new in database research?","What is new in databases?","How is Postgres evolving?"]) {
+    assert.deepEqual(questionTopics(question),[{id:"software",childId:"software-databases"}]);
+  }
+  const database=event("duckdb","A real DuckDB database in S3","software","software-databases");
+  const coding=event("coding","Full sandbox snapshots help coding agents","software","software-developer-tools");
+  const result=answerQuestion("What is new in database research?",{...feed,events:[coding,database]},[{id:coding.id,similarity:1}]);
+  assert.equal(result.subtopicId,"software-databases");
+  assert.deepEqual(result.events.map(item=>item.id),[database.id]);
+  assert.deepEqual(answerQuestion("What is new in database research?",{...feed,events:[coding]}).events,[]);
+  assert.deepEqual(questionTopics("Which programming language should I study?"),[{id:"software",childId:"software-programming-languages"}]);
+});
+
 test("semantic similarity reorders sources only within the identified region", () => {
   const first = event("first", "Repository notes", "ai", "ai-agents");
   const second = event("second", "Tooling notes", "ai", "ai-agents");

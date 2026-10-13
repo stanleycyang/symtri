@@ -11,6 +11,7 @@ import { findSemanticSignals, getArchivedSignal, getConnectionEvents, withStored
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { getUniverseCatalog } from "@/lib/data/catalog";
 import { checkAskRateLimit } from "@/lib/data/ask-limit";
+import { isCalendarDay } from "@/lib/data/dates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -64,7 +65,7 @@ async function handleAsk(request: Request, deadline:AbortSignal, publish?:(answe
   const body = parsed.value;
   if (!body || typeof body !== "object") return new Response("Invalid request", { status: 400 });
   const { question, day, context } = body as Record<string, unknown>;
-  if (typeof question !== "string" || question.trim().length < 3 || question.length > 240 || (day !== undefined && typeof day !== "string")) {
+  if (typeof question !== "string" || question.trim().length < 3 || question.length > 240 || (day !== undefined && !isCalendarDay(day))) {
     return new Response("Invalid question", { status: 400 });
   }
   if (context !== undefined && (!context || typeof context !== "object" || Array.isArray(context)

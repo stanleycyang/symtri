@@ -342,10 +342,14 @@ export async function enrichBatch(limit=5, synthesize:typeof summarizeReadingNot
 }
 
 export async function readingNoteCounts(): Promise<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number;eligible:number;waiting:number}> {
-  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number;eligible:number;waiting:number}[]>`with queue as (
-      select reading_notes.*,exists(select 1 from signal_observations observation join source_catalog source
-        on source.id=observation.source and source.status='active' where observation.signal_id=reading_notes.signal_id) as active
-      from reading_notes
+  const rows=await database()<{ready:number;pending:number;failed:number;working:number;blocked:number;oldestPendingAt:Date|null;averagePublicationSeconds:number|null;generationCount:number;reuseCount:number;publicationVersion:string|null;completedLastHour:number;activeWorkers:number;lastWorkerAt:Date|null;retryable:number;exhausted:number;inactive:number;eligible:number;waiting:number}[]>`with active_observations as materialized (
+      select distinct signal_id from signal_observations
+      where source=any(array(select id from source_catalog where status='active'))
+    ), queue as materialized (
+      select note.status,note.version,note.blocked,note.attempts,note.lease_until,note.queued_at,
+        note.generation_count,note.reuse_count,note.publication_version,note.published_at,note.updated_at,note.retry_at,
+        observation.signal_id is not null as active
+      from reading_notes note left join active_observations observation on observation.signal_id=note.signal_id
     ) select
     count(*) filter(where status='ready' and version=${ENRICHMENT_VERSION})::int as ready,
     count(*) filter(where active and ((status='working' and lease_until>now()) or (not blocked and attempts<3 and status in ('pending','failed'))))::int as pending,

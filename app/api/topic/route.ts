@@ -12,13 +12,14 @@ export async function GET(request: Request) {
   const browse = params.get("browse") === "1";
   const cursor = params.get("cursor");
   const lightweight = params.get("view") === "list";
-  const catalog = await getUniverseCatalog();
-  const region = catalog.topics.find((item) => item.id === regionId);
-  if (!region || (childId && !region.children.some((item) => item.id === childId))) {
-    return Response.json({ error: "Unknown topic" }, { status: 400 });
-  }
-  if (!process.env.DATABASE_URL) return Response.json({ events: [], nextCursor: null, ...(lightweight ? { revision: "preview" } : {}) }, { headers: { "Cache-Control": "no-store" } });
+  const headers = { "Cache-Control": "no-store" };
   try {
+    const catalog = await getUniverseCatalog();
+    const region = catalog.topics.find((item) => item.id === regionId);
+    if (!region || (childId && !region.children.some((item) => item.id === childId))) {
+      return Response.json({ error: "Unknown topic" }, { status: 400, headers });
+    }
+    if (!process.env.DATABASE_URL) return Response.json({ events: [], nextCursor: null, ...(lightweight ? { revision: "preview" } : {}) }, { headers });
     if (browse) {
       const page = await getTopicPage(region.id, childId, cursor,
         lightweight && !cursor ? INITIAL_TOPIC_PAGE_SIZE : NEXT_TOPIC_PAGE_SIZE, true, lightweight);
@@ -30,8 +31,8 @@ export async function GET(request: Request) {
     const events = await getRecentTopicEvents([{ id: region.id, childId }], false, true);
     return Response.json({ events }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof Error && error.message === "Invalid topic cursor") return Response.json({ error: error.message }, { status: 400 });
+    if (error instanceof Error && error.message === "Invalid topic cursor") return Response.json({ error: error.message }, { status: 400, headers });
     console.warn("SYMTRI topic archive unavailable", error instanceof Error ? error.message : "unknown error");
-    return Response.json({ error: "Topic archive unavailable" }, { status: 503 });
+    return Response.json({ error: "Topic archive unavailable" }, { status: 503, headers });
   }
 }

@@ -10,5 +10,9 @@ export function readySignal(sql: ReturnType<typeof postgres>, id: "event.id" | "
       and published_note.status = 'ready' and published_note.version = ${ENRICHMENT_VERSION}
       and published_note.published_revision = published_note.revision
       and published_note.note is not null
-      and (${publishedBefore}::timestamptz is null or published_note.published_at <= ${publishedBefore}::timestamptz))`;
+      and (${publishedBefore}::timestamptz is null or published_note.published_at <= ${publishedBefore}::timestamptz)
+      -- Keep this an indexed lookup for the candidate event. Flattening the
+      -- EXISTS misestimates revision equality and scans every published note
+      -- before a bounded, date-ordered source query can apply its LIMIT.
+      offset 0)`;
 }

@@ -9,6 +9,7 @@ import type { SignalEvent, SignalFeed } from "../lib/data/model";
 import { rollingFeed } from "../lib/data/rolling";
 import { regionActivity } from "../lib/data/activity";
 import { CLASSIFIER_VERSION } from "../lib/data/classify";
+import { readySignal as publicationPredicate } from "../lib/data/publication";
 import { GET as getPublicSignals } from "../app/api/signals/route";
 import { GET as getHistory } from "../app/api/history/route";
 import { availableReadingNoteLanes, claimableReadingNoteCount, claimReadingNoteWorker, readingNoteCounts, reserveReadingNoteWorker, enrichBatch, enqueueMissingNotes, releaseReadingNoteWorker, renewReadingNoteWorker, retrieveStoryEvidence, ENRICHMENT_VERSION, type ReadingNote } from "../lib/data/enrichment";
@@ -139,6 +140,19 @@ async function main() {
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261001000000_reading_note_workers.sql", import.meta.url), "utf8"));
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261004000000_reading_note_failure_code.sql", import.meta.url), "utf8"));
   await sql.unsafe(await readFile(new URL("../supabase/migrations/20261011045159_enrichment_pipeline.sql", import.meta.url), "utf8"));
+  // Model Supabase's legacy client grants, including privileges RLS cannot deny.
+  await sql.unsafe("create role anon nologin; create role authenticated nologin;");
+  await sql.unsafe("grant usage on schema public to anon,authenticated; grant all privileges on all tables in schema public to anon,authenticated; grant all privileges on all sequences in schema public to anon,authenticated; alter default privileges in schema public grant all on tables to anon,authenticated;");
+  await sql.unsafe(await readFile(new URL("../supabase/migrations/20261013042527_revoke_legacy_client_grants.sql", import.meta.url), "utf8"));
+  for (const role of ["anon","authenticated"]) {
+    const privileges=await sql<{can_truncate:boolean;can_select:boolean}[]>`select has_table_privilege(${role},'public.signal_events','TRUNCATE') as can_truncate,has_table_privilege(${role},'public.signal_events','SELECT') as can_select`;
+    assert.equal(privileges[0].can_truncate,false,"RLS does not deny TRUNCATE; client grants must be revoked");
+    assert.equal(privileges[0].can_select,false,"Public routes, not the Data API, own archive access");
+  }
+  await assert.rejects(sql.begin(async tx=>{await tx`set local role anon`;await tx`truncate public.source_catalog`;}),/permission denied/);
+  await sql`create table public.client_grant_check(id integer)`;
+  assert.equal((await sql`select has_table_privilege('anon','public.client_grant_check','TRUNCATE') as allowed`)[0].allowed,false,"Future app tables do not inherit client grants");
+  await sql`drop table public.client_grant_check`;
   const protectedTables = await sql<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
     where relname in ('signal_events', 'signal_snapshots', 'topic_embeddings', 'ingestion_lease', 'ingestion_runs', 'knowledge_graph', 'signal_observations',
@@ -1097,6 +1111,18 @@ async function main() {
       await persistSignals({...feed,events:pendingBurst});
       assert.ok(!(await getStoredFeed())?.events.some(item=>item.id===id),"The raw overview cap is crowded by pending fixtures");
       assert.ok((await getStoredFeed(true))?.events.some(item=>item.id===id),"Pending stories cannot crowd a ready story out of the published overview");
+      const expectedOverview=await sql<{id:string}[]>`with ranked as (
+        select event.id,event.source,event.published_at,event.first_seen_at,
+          row_number() over(partition by event.source order by event.published_at desc,event.first_seen_at desc,event.id desc) as source_rank
+        from signal_events event where event.published_at>=now()-interval '14 days' and jsonb_array_length(event.topics)>0
+          and ${publicationPredicate(sql,"event.id")}
+          and exists(select 1 from signal_observations observation join source_catalog source on source.id=observation.source and source.status='active' where observation.signal_id=event.id)
+      ) select id from ranked order by case when source_rank<=case when source like 'feed-%' then 6 else 12 end then 0 else 1 end,
+        published_at desc,first_seen_at desc,id desc limit 300`;
+      assert.deepEqual((await getStoredFeed(true))!.events.map(item=>item.id).sort(),expectedOverview.map(item=>item.id).sort(),"Bounded overview selection preserves the full-window source reservations and cap");
+      assert.equal(await getSnapshotFeed("2026-02-30"),null,"An impossible calendar date cannot reach a Postgres date cast");
+      assert.equal((await getHistory(new Request("https://symtri.test/api/history?day=2026-02-30"))).status,400);
+      assert.equal((await askSymtri(new Request("https://symtri.test/api/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:"What is new in databases?",day:"2026-02-30"})}))).status,400);
       const readable=await getPublishedEvidenceCounts();
       const readyTopics=readySignal.topics;
       for(const match of readyTopics) if(match.subtopicId) assert.ok((readable.childCounts[match.subtopicId]??0)>=1,"Full-window readable counts retain a story beyond the overview cap");
