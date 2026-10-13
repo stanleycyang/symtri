@@ -23,5 +23,6 @@ export function extractivePassage(text: string): string | null {
 }
 
 export function excerptDisplay(text:string):string {
-  return /[.!?…][”"’\')\]]?$/.test(text.trim()) ? text : `${text}…`;
+  const display=text.trim().replace(/\s+([.!?…。！？][”"’')\]]?)$/, "$1");
+  return /[.!?…。！？][”"’')\]]?$/.test(display) ? display : `${display}…`;
 }
