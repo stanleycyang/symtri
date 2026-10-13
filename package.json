@@ -41,7 +41,7 @@
     "react-dom": "^19.2.3",
     "react-markdown": "10.1.0",
     "remark-gfm": "4.0.1",
-    "three": "^0.182.0",
+    "three": "^0.186.1",
     "undici": "8.11.2",
     "workflow": "^4.8.9",
     "zod": "^4.6.5"
