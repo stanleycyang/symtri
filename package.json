@@ -28,13 +28,13 @@
   "dependencies": {
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
-    "@tanstack/react-virtual": "3.14.15",
+    "@tanstack/react-virtual": "3.14.19",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "ai": "^7.0.137",
+    "ai": "^7.0.139",
     "fast-xml-parser": "^5.11.2",
     "ipaddr.js": "2.5.0",
-    "next": "16.3.8",
+    "next": "16.4.0",
     "parse5": "^8.0.1",
     "postgres": "^3.4.9",
     "react": "^19.2.3",
@@ -43,18 +43,18 @@
     "remark-gfm": "4.0.1",
     "three": "^0.186.1",
     "undici": "8.11.2",
-    "workflow": "^4.8.9",
-    "zod": "^4.6.5"
+    "workflow": "^4.8.13",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "@types/three": "^0.182.0",
+    "@types/three": "^0.186.0",
     "eslint": "^9.39.2",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.0",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   },
   "overrides": {
     "@workflow/core": {
