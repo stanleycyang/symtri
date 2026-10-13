@@ -1,5 +1,5 @@
 import {usefulNodeCandidate} from "./selection";
-export const PERSONALIZATION_VERSION=2;
+export const PERSONALIZATION_VERSION=3;
 import type {WeeklyDigest} from "../data/digest";
 import {briefFromReadingNote,selectReportCandidates,type ReportBrief,type ReportCandidate} from "../data/report-editorial";
 import {renderWeeklyBriefing,styleEmailHtml,emailDateRange} from "./weekly-template";

@@ -52,3 +52,22 @@ existing confirmed owner subscription. Browsing alone never updates them.
 Buttondown does not evaluate conditions in its description field. Keep that
 preheader plain text; subject/body personalization is verified. Editing subscriber
 metadata in its dashboard requires both **Done** and the subscriber's **Save**.
+
+## Selection repair — version 3
+
+Personalized candidate ranking uses the current classifications from the full
+weekly archive, rather than stale stored topic assignments. Each node retains
+at most six valid candidates. Missing evidence, unsupported passages, and
+editorial rejections trigger sequential six-row refill batches, scanning at
+most 48 candidates per node across eight reads. Nodes stop scanning when their
+pool is full or their ranked evidence is exhausted. The bounded sample does
+not establish that the complete archive has no relevant evidence.
+
+The personalization version is bumped to 3 so the next report retry rebuilds
+older supplements while preserving the published public briefing and its
+publication time. Existing Buttondown drafts remain unchanged and require
+manual review; this fix never sends email.
+
+Isolated PostgreSQL regression checks cover refill after six rejected rows,
+new and removed current-classifier matches, and rebuilding a saved older
+supplement without rewriting the public edition.

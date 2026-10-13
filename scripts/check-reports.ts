@@ -6,6 +6,7 @@ import {reviseLegacyWeeklyReport,buildArchivedWeeklyReport,saveWeeklyReport,getW
 import {ENRICHMENT_VERSION,type ReadingNote} from "../lib/data/enrichment";
 import type {SignalEvent,SignalFeed,SourceEvidence} from "../lib/data/model";
 import {getNodeReportCandidates} from "../lib/data/report-evidence";
+import {PERSONALIZATION_VERSION} from "../lib/email/personalization";
 import {GET} from "../app/api/digest/route";
 async function main() {
 const url=process.env.SYMTRI_TEST_DATABASE_URL;
@@ -59,9 +60,52 @@ try {
   const scoped=await getNodeReportCandidates(await getWeeklyArchive("2039-12-26","2040-01-02","2040-01-02"),"2040-01-02",{start:"2039-12-26",end:"2040-01-02"});
   assert.ok(scoped.get("science-astronomy")?.some(candidate=>candidate.event.id===event.id),"Per-node evidence reaches a source outside the map and global sample");
   assert.equal(scoped.get("ai-agents"),undefined,"A quiet thread does not borrow another region's source");
+  const crowdedRows=events.slice(1,7);
+  const crowdedIds=new Set(crowdedRows.map(item=>item.id));
+  for (const item of crowdedRows) {
+    const candidateNote={...note,evidenceUrl:item.url,claims:note.claims.map(claim=>({...claim,evidence:claim.evidence.map(passage=>({...passage,sourceId:item.id}))}))};
+    await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},published_revision=revision,published_at='2039-12-31',note=${sql.json(candidateNote)} where signal_id=${item.id}`;
+    await sql`update signal_events set importance=30 where id=${item.id}`;
+  }
+  const fullArchive=await getWeeklyArchive("2039-12-26","2040-01-02","2040-01-02");
+  const nodeWindow={start:"2039-12-26",end:"2040-01-02"};
+  const refill=await getNodeReportCandidates(fullArchive,"2040-01-02",nodeWindow);
+  assert.ok(refill.get("science-astronomy")?.some(candidate=>candidate.event.id===event.id),"Six missing evidence records cannot crowd out the next valid source");
+  for (const item of crowdedRows) await persistSourceEvidence([{...item,evidence:{...evidence,url:item.url,text:"Retained text that does not contain the reading note's cited passage."}}]);
+  for (const item of crowdedRows) {
+    const candidateNote={...note,evidenceUrl:item.url,claims:note.claims.map(claim=>({...claim,evidence:claim.evidence.map(passage=>({...passage,sourceId:item.id}))}))};
+    await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},published_revision=revision,published_at='2039-12-31',note=${sql.json(candidateNote)} where signal_id=${item.id}`;
+  }
+  const unsupported=await getNodeReportCandidates(fullArchive,"2040-01-02",nodeWindow);
+  assert.ok(unsupported.get("science-astronomy")?.some(candidate=>candidate.event.id===event.id),"Six unsupported notes must refill from later valid evidence");
+  for (const item of crowdedRows) await persistSourceEvidence([{...item,evidence:{...evidence,url:item.url,retrievedAt:"2040-01-01T00:00:00Z"}}]);
+  for (const item of crowdedRows) {
+    const candidateNote={...note,evidenceUrl:item.url,claims:note.claims.map(claim=>({...claim,evidence:claim.evidence.map(passage=>({...passage,sourceId:item.id}))}))};
+    await sql`update reading_notes set status='ready',version=${ENRICHMENT_VERSION},published_revision=revision,published_at='2039-12-31',note=${sql.json(candidateNote)} where signal_id=${item.id}`;
+  }
+  const corrected=fullArchive.map(item=>crowdedIds.has(item.id) ? {...item,topics:[{topicId:"ai",subtopicId:"ai-agents",relevance:1}]} : item);
+  const currentMatches=await getNodeReportCandidates(corrected,"2040-01-02",nodeWindow);
+  assert.ok(currentMatches.get("science-astronomy")?.some(candidate=>candidate.event.id===event.id),"Stale stored matches cannot displace a valid current match");
+  assert.ok(currentMatches.get("ai-agents")?.some(candidate=>crowdedIds.has(candidate.event.id)),"New current matches are reachable before stored topics are reclassified");
+  assert.equal(currentMatches.get("ai-agents")?.length,6,"Valid candidate pools retain the six-source bound");
+  for (const item of crowdedRows) {
+    const rejectedNote={...note,evidenceUrl:item.url,claims:[{...note.claims[0],text:"kind:fact evidence:[broken serialized finding]",evidence:[{sourceId:item.id,quote:"The authors introduce a reproducible evaluation procedure"}]}]};
+    await sql`update reading_notes set note=${sql.json(rejectedNote)} where signal_id=${item.id}`;
+  }
+  const editorialRefill=await getNodeReportCandidates(fullArchive,"2040-01-02",nodeWindow);
+  assert.ok(editorialRefill.get("science-astronomy")?.some(candidate=>candidate.event.id===event.id),"Editorial rejections must refill before applying the valid-candidate cap");
+  for(const item of crowdedRows)await sql`update reading_notes set status='pending' where signal_id=${item.id}`;
   const published=await publishWeeklyReport(new Date("2040-01-02"));assert.equal(published.status,"published");
   assert.equal((await publishWeeklyReport(new Date("2040-01-02"))).status,"already-published");
   assert.equal((await getWeeklyReport(published.week))?.digest.editorial?.archiveCount,304);
+  const beforeRebuild=(await getWeeklyReport(published.week))!;
+  await sql`update weekly_reports set digest=jsonb_set(digest,'{personalization}',${sql.json({version:PERSONALIZATION_VERSION-1,editions:[]})}) where week=${published.week}`;
+  await publishWeeklyReport(new Date("2040-01-02"));
+  const rebuilt=(await getWeeklyReport(published.week))!;
+  assert.equal(rebuilt.digest.personalization?.version,PERSONALIZATION_VERSION,"A stale selection version is rebuilt on retry");
+  assert.ok(rebuilt.digest.personalization?.editions.some(edition=>edition.id==="science"));
+  assert.deepEqual(rebuilt.digest.editorial,beforeRebuild.digest.editorial,"Personalization rebuild preserves the published briefing");
+  assert.equal(rebuilt.publishedAt,beforeRebuild.publishedAt);
   const legacy={...draft,editorial:undefined};
   await sql`update weekly_reports set digest=${sql.json(legacy)} where week=${published.week}`;
   const originalPublication=(await getWeeklyReport(published.week))!.publishedAt;
