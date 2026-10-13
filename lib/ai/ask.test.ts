@@ -300,3 +300,11 @@ test("Ask source lists retain the evidence type separately from generated prose"
   assert.equal(answerQuestion("What's happening with AI agents?",{...feed,events:[paper]}).events[0].sourceKind,"preprint");
   assert.equal(answerKnowledgeQuestion("What is new in exoplanet research?",[{event:paper,similarity:null}]).events[0].sourceKind,"preprint");
 });
+
+ test("research collection questions search the archive without software routing", () => {
+  for (const question of ["What is HelexKids lexical database?", "Explain a normative database of words"]) {
+    assert.deepEqual(questionTopics(question), []);
+    assert.equal(shouldSearchKnowledge(question), true);
+  }
+  assert.deepEqual(questionTopics("How does a lexical database engine work?"), [{id:"software",childId:"software-databases"}]);
+});

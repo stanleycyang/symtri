@@ -1,3 +1,4 @@
+import { databaseSense } from "../data/classify";
 import { regionActivity } from "../data/activity";
 import type { SignalEvent, SignalFeed } from "../data/model";
 import { planQuestion, type AskIntent } from "./intent";
@@ -96,7 +97,8 @@ function words(input: string): string[] {
 }
 
 export function questionTopics(question: string, catalog: UniverseCatalog = seedCatalog): { id: string; childId: string | null }[] {
-  const routingQuestion = question.replace(/\bsecurity[ -]council\b/gi, "");
+  const databaseImplementation = /\b(?:sql|postgres(?:ql)?|mysql|sqlite|duckdb|database[ -](?:engines?|systems?|index(?:ing)?|transactions?)|query[ -](?:planners?|planning|optimizers?|optimization)|mvcc)\b/i.test(question);
+  const routingQuestion = (databaseImplementation ? question : databaseSense(question)).replace(/\bsecurity[ -]council\b/gi, "");
   return catalog.topics.map((topic) => {
     const regionPosition = firstMatch(routingQuestion, regionAliases[topic.id] ?? [topic.name.toLowerCase()]);
     const children = topic.children.map((child) => ({ id: child.id, position: firstMatch(routingQuestion, subtopicAliases[child.id] ?? [child.name.toLowerCase()]) }));

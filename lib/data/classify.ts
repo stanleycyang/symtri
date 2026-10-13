@@ -92,7 +92,7 @@ function securitySense(text: string): string {
   return text.replace(/\bsecurity[ -]council\b/gi, "");
 }
 
-function databaseSense(text: string): string {
+export function databaseSense(text: string): string {
   // A research collection of word/clinical ratings is not a database engine.
   return text
     .replace(/\b(?:normative|lexical|genomic|clinical|linguistic)[ -]databases?\b/gi, "")
