@@ -31,6 +31,14 @@ test("classification prefers a specific thread and leaves unrelated stories unma
   assert.equal(classifySignal("AI agents operating as foreign agents", "Hacker News discussion")[0]?.subtopicId, "ai-agents");
 });
 
+test("research rating collections are not software database engines",()=>{
+  for(const title of ["A multidimensional normative database of experiential ratings for German nouns","HelexKids 2.0: A linguistically annotated lexical database building on HelexKids"]) {
+    assert.ok(!classifySignal(title,"Experiential ratings support language and neuroscience research.").some(match=>match.topicId==="software"));
+  }
+  assert.equal(classifySignal("Postgres improves indexing for a lexical database","SQL query planning and database transactions")[0].subtopicId,"software-databases");
+  assert.equal(classifySignal("A lexical database engine for string retrieval","Database systems implement transactions")[0].subtopicId,"software-databases");
+});
+
 test("solar wind research does not create a false energy connection", () => {
   const wind = classifySignal("Solar wind speed forecasting with AI", "Forecasts from solar images", ["cs.AI"]);
   assert.ok(wind.some((match) => match.topicId === "ai"));

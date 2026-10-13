@@ -2,7 +2,7 @@ import { topics } from "../universe";
 import type { TopicMatch } from "./model";
 
 // Bump this when the rules below change so stored signals are reclassified.
-export const CLASSIFIER_VERSION = 13;
+export const CLASSIFIER_VERSION = 14;
 
 const topicTerms: Record<string, string[]> = {
   ai: ["ai", "artificial intelligence", "machine learning", "neural network", "llm", "gpt", "language model", "language models", "ai agent", "agentic", "transformer", "generative ai", "openai", "anthropic", "claude", "gemini 3", "qwen", "vlm"],
@@ -92,6 +92,13 @@ function securitySense(text: string): string {
   return text.replace(/\bsecurity[ -]council\b/gi, "");
 }
 
+function databaseSense(text: string): string {
+  // A research collection of word/clinical ratings is not a database engine.
+  return text
+    .replace(/\b(?:normative|lexical|genomic|clinical|linguistic)[ -]databases?\b/gi, "")
+    .replace(/\bdatabases?[ -]of[ -](?:experiential|lexical|linguistic|normative|words?|nouns?)\b/gi, "");
+}
+
 function energySense(text: string): string {
   // Nuclear military and geological stories are not evidence of civil power.
   if (/\b(?:weapons?|warheads?|arms|military|earthquake|detonation|bombs?)\b/i.test(text)
@@ -102,11 +109,14 @@ function energySense(text: string): string {
 }
 
 export function classifySignal(title: string, summary: string, categories: string[] = []): TopicMatch[] {
+  const databaseImplementation=/\b(?:sql|postgres(?:ql)?|mysql|sqlite|duckdb|database[ -](?:engines?|systems?|index(?:ing)?|transactions?)|query[ -](?:planners?|planning|optimizers?|optimization)|mvcc)\b/i.test(`${title} ${summary}`);
+  const softwareTitle=databaseImplementation ? title : databaseSense(title);
+  const softwareSummary=databaseImplementation ? summary : databaseSense(summary);
   const scored = topics.map((topic) => {
     const terms = topicTerms[topic.id] ?? [];
     const energyText = energySense(`${title} ${summary}`);
-    const regionTitle = topic.id === "energy" ? energyText === `${title} ${summary}` ? title : title.replace(/\bnuclear\b/gi, "") : title;
-    const regionSummary = topic.id === "energy" && energyText !== `${title} ${summary}` ? summary.replace(/\bnuclear\b/gi, "") : summary;
+    const regionTitle = topic.id === "software" ? softwareTitle : topic.id === "energy" ? energyText === `${title} ${summary}` ? title : title.replace(/\bnuclear\b/gi, "") : title;
+    const regionSummary = topic.id === "software" ? softwareSummary : topic.id === "energy" && energyText !== `${title} ${summary}` ? summary.replace(/\bnuclear\b/gi, "") : summary;
     const physicalEnergy = topic.id === "energy" && (
       /\b(?:dark|vacuum|holographic) energy\b/i.test(`${title} ${summary}`)
       || categories.some((category) => category.startsWith("astro-ph") || category === "gr-qc" || category === "hep-th")
@@ -123,7 +133,7 @@ export function classifySignal(title: string, summary: string, categories: strin
       ? { id: "space-astronomy", score: 4 } : null;
     for (const child of topic.children) {
       const childAliases = childTerms[child.id] ?? [child.name.toLowerCase()];
-      const childTitle = child.id === "ai-agents" ? title.replace(/\bforeign agents?\b/gi, "") : topic.id === "energy" ? regionTitle : title;
+      const childTitle = child.id === "ai-agents" ? title.replace(/\bforeign agents?\b/gi, "") : topic.id === "energy" || topic.id === "software" ? regionTitle : title;
       const titleMatch = strongestTerm(childTitle, childAliases);
       const childScore = titleMatch ? 5 + Math.min(3, titleMatch / 5) : 0;
       if (childScore > (bestChild?.score ?? 0)) bestChild = { id: child.id, score: childScore };
