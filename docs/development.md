@@ -1,0 +1,337 @@
+# SYMTRI development guide
+
+[← Back to the project](../README.md)
+
+**The Internet Is Thinking.** [SYMTRI](https://symtri.com) is an open-source, source-linked map of technology research, projects, and discussion. Its hourly workflow adds distinct observations, builds connections between topics, and keeps the archive searchable as the source network grows.
+
+The map reflects the connected sources, not everything published on the internet. Every source card links to its origin; classification and AI summaries are aids to exploration, not independent verification of a claim.
+
+[View the application flow](../docs/symtri-flow.svg) or edit its [Mermaid source](../docs/symtri-flow.mmd). Regenerate the SVG with `mmdc -i docs/symtri-flow.mmd -o docs/symtri-flow.svg`.
+
+Contributions are welcome. See [CONTRIBUTING.md](../CONTRIBUTING.md), report vulnerabilities through [SECURITY.md](../SECURITY.md), and review the [MIT license](../LICENSE).
+
+## Explore the universe
+
+The universe starts with seeded regions and threads, then promotes new points from repeated source evidence. Its 3D view uses signal particles, curved relationships, distance-based detail reveal, persistent orbit and zoom, hover highlighting, and a region → thread → source exploration path. The scene is atmospheric while the live feed loads, then uses observed counts from Hacker News, GitHub, arXiv, and OpenAlex. If a device cannot create a WebGL context, a lightweight region view still lets visitors explore topics, real sources, and Ask. Region panels expose recent signals that do not fit a named subtopic; topic panels show matching real signals with source links. Quiet threads show their observed count before selection and explain whether they are a starting thread or grew from earlier evidence. Loading and failed topic requests have separate recovery states. Mobile navigation offers visible region shortcuts and readable thread counts with larger touch targets. No example stories or fabricated counts appear.
+
+Curved region connections combine starting routes with evidence from sources matched to both regions. Moving particles represent recent shared sources; brightness also considers activity, cumulative evidence, and subject similarity. Select a curve or a region panel's connection row to inspect shared sources and open their original links. Recent connection counts cover the full 14-day archive, while cumulative counts are labeled separately. The connection endpoint queries both region IDs together, outside the overview's detail cap; earlier sources are available on request. Historical views use only their saved source sample and never fetch current evidence. A shared classification describes a common subject, not a causal relationship.
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open <http://127.0.0.1:3000>. Drag to orbit, scroll to zoom, click a region to focus, and select a subtopic to reveal signal markers. Escape or the back button returns outward.
+
+The social preview source is [design/social-card.svg](../design/social-card.svg). After editing it, regenerate the served Open Graph PNG with `node -e 'const sharp=require("sharp");sharp("design/social-card.svg").png().toFile("app/opengraph-image.png")'` and check the 1200 × 630 image before deployment.
+
+Each live region and thread has a SHARE control that copies a stable `?point=<id>` link. Merged point IDs redirect to their current point when the link opens.
+
+## Checks
+
+```bash
+npm run typecheck
+npm run lint
+npm run audit:deps
+npm test
+npm run build
+```
+
+After the hourly cron, run `npm run check:production` for a read-only check of the latest completed run, source coverage, vector backlog, full-window relationship counts, and available snapshot dates. Set `SYMTRI_REQUIRED_SOURCE=openalex SYMTRI_MIN_SIGNALS=1151` to require a newly added source to report healthy, appear in the overview, and grow the unique archive beyond a known baseline. It checks the newest two snapshots for historical samples, full-window activity, and relationship counts so the first real date comparison is covered automatically. It reports a pending classification refresh after a classifier deployment; public reads use the current rules while the next cron updates stored rows. The check makes no Gateway model calls. Set `SYMTRI_SITE_URL` to check another deployment.
+
+The independent `/api/verify` cron runs at minute 12 of each UTC hour, persists a health result, and checks the latest ingest, prepared feed, vector and catalog backlog, graph refresh, and daily snapshots. `/api/status` reports the latest monitor result. Once the minute-12 check has run, use `SYMTRI_REQUIRE_MONITOR=1 npm run check:production` to require a healthy result for the latest ingestion. Vercel runs unit tests, lint, and the production build before each deployment. The local Postgres storage check remains a separate release gate.
+
+For a synthetic growth check, run `npm run test:scale:local` (20,000 signals) or `SYMTRI_SCALE_ROWS=50000 npm run test:scale:local`. It creates and removes an isolated loopback Postgres database, applies all migrations, and times the bounded feed, activity, child counts, topic page, and daily graph rollup paths. These local timings are a regression baseline, not a production latency guarantee.
+
+Ask permits 60 requests per visitor IP per UTC hour and 3,000 requests across the site per UTC day, returning 429 with `Retry-After` after a limit. Request bodies are capped at 4 KiB before parsing; previous question, answer, selected subject, and story identity are bounded separately. Only HMAC hashes of IP addresses are stored; the hourly workflow removes expired quota rows. Active RSS sources are capped at 60 and sampled in six-hour turns. A source paused after three failed polls is retried after 24 hours when capacity exists; manually paused or capacity-replaced sources stay paused. Use `npm run growth:manage -- --help` for operator actions. See [production operations](../docs/production-operations.md) for release, recovery, and backup checks.
+
+To prove a particular hourly run has finished, set `SYMTRI_MIN_COMPLETED_AT` to that hour's UTC timestamp, for example `SYMTRI_MIN_COMPLETED_AT=2026-09-24T16:00:00Z npm run check:production`. An older healthy run cannot satisfy this check.
+For the first live time-travel comparison, run `SYMTRI_MIN_SNAPSHOT_DAYS=2 npm run check:production` after the next UTC day's ingestion. The check then requires two saved daily snapshots and validates both samples, relationships, activity, and cumulative archive counts.
+
+To verify the Postgres path with PostgreSQL and pgvector installed locally, run `npm run test:storage:local`. It starts a temporary loopback database, applies all migrations, checks API table protection, signal upserts, embedding cache and retrieval, relationships, and snapshots, then removes the database. For an existing isolated local database, set `SYMTRI_TEST_DATABASE_URL` to its loopback connection string and run `npm run test:storage`; that command rejects non-local hosts.
+
+## Interaction QA
+
+After a production build, check that the entrance button is visible and usable in a short desktop window (756 × 469 px) and a short phone viewport (390 × 480 px). The entrance should show the map's motion without region labels crossing the headline; entering should reveal those labels. Then focus AI, select Agents, open a signal, and use Escape to return outward. Drag and scroll after the entrance animation finishes; the camera must keep the visitor's chosen view. While focused, drag from empty space and from a node; neither drag should navigate away. A deliberate empty click or tap should return to the overview. Check that subtopics appear as the camera approaches a region, and that the mobile region selector and detail sheet remain usable at 390 px width. Open Ask Symtri, try both example questions, confirm the camera follows the answer, and verify linked sources, their ages, and the mobile panel. On mobile, the focused region and any selected route stop should remain visible below the Ask panel; closing it should restore the normal topic view. When two database snapshots exist, switch dates in the timeline, inspect a historical signal, return to NOW, and check timeline placement beside a focused region on mobile. Historical Ask sources should show their UTC publication dates. At 756 × 469 px, the timeline should stay clear of the Markets label in the overview and the topic panel when focused. On a slow connection, confirm the loading label appears while the header and map stay on the current date; they should switch together when the snapshot arrives. Returning to NOW before it arrives must keep the live map visible even if the old request finishes later.
+
+With a live feed, focus a region containing signals without a named thread. Open one from RECENT SIGNALS, check its source link, and return to the region. On mobile, verify the thread list remains reachable by scrolling the panel.
+
+For a repeatable frame pacing check, use a hardware-backed browser on the target device. After entering and letting camera motion settle, run this in DevTools in both the overview and a focused region. Repeat while orbiting and zooming. Headless Chrome results are useful smoke checks but do not establish real-device performance.
+
+```js
+const frameTimes = [];
+await new Promise((done) => {
+  const start = performance.now();
+  let previous = start;
+  function sample(now) {
+    frameTimes.push(now - previous);
+    previous = now;
+    if (now - start < 4000) requestAnimationFrame(sample);
+    else done();
+  }
+  requestAnimationFrame(sample);
+});
+console.log({ fps: frameTimes.length / (frameTimes.reduce((sum, ms) => sum + ms, 0) / 1000), slowFrames: frameTimes.filter((ms) => ms > 33).length });
+```
+
+## Development roadmap
+
+1. **Universe and polish:** Keep the entrance and map visually coherent, tune camera paths and labels, check desktop and touch navigation, and measure frame rate on target hardware.
+2. **Real signals:** The four source adapters, normalization, classification, canonical URL deduplication, database, and hourly ingestion workflow are implemented. Continue broadening source coverage and checking classification quality.
+3. **Semantic layer:** Ingestion can embed new or changed signals and stable topic descriptions through Vercel AI Gateway. Topic similarity adjusts the brightness of established map links, and Ask can use matching stored event vectors to rank sources within a detected region. Calibrate with real production embeddings while keeping region positions stable.
+4. **Time and intelligence:** Daily sampled snapshots and timeline navigation are implemented. Ask Symtri routes a question through the current or historical sample, highlights a map path, and shows source-backed signals. Production Gateway synthesis has been verified with cited sources; evaluate answer quality and compare history after multiple scheduled ingestions.
+
+## Data and deployment
+
+The embedding step drains up to three durable batches of 200 signals per hourly run. If more remain, the run reports a partial embedding backlog and the next hour continues it; source records and the daily snapshot are already stored. This bounds each run's Gateway work while letting a larger backfill catch up over multiple hours.
+
+The four connectors normalize source IDs, URLs, timestamps, titles, and summaries before storage. Hourly ingestion samples Hacker News top and new stories, GitHub repositories ranked by stars and recent updates, and up to 195 recent arXiv papers across AI, software, security, biology, climate science, space, exoplanet research, physics, fusion energy, and quantitative finance categories. The climate query samples Atmospheric and Oceanic Physics; titles that clearly concern climate, weather, or related atmospheric research enter the Climate Science thread. A focused Earth and Planetary Astrophysics query keeps recent exoplanet papers from being crowded out by cosmology in the blended astronomy sample. The fusion query keeps papers with fusion, tokamak, or stellarator in the title; arXiv search can return broader abstract matches. The public feed keeps its shorter sample so map loads stay responsive. Ingestion keeps every normalized, deduplicated item, including ones outside the ten current map regions. Its daily snapshot holds up to 300 mapped signals, matching the NOW view's limit. The map shows classified observations; Ask searches the full archive for questions outside its preset regions. Search combines indexed text matching with 256-dimensional vector similarity and returns source links. A new connector should produce the same `SignalEvent` shape, keep a stable source ID, and avoid discarding items solely because today's region classifier does not recognize them.
+
+OpenAlex adds one deterministic sample of at most 50 recent, open-access English journal articles per hourly slot. It samples across computer science, engineering, physics, molecular biology, and energy, stores DOI links and abstract excerpts, rejects retracted or thin records, and keeps articles outside the map in the searchable archive. Sampling the same slot yields the same IDs; canonical DOI and content checks prevent repeats from inflating the universe. The public database-free preview requests at most 12. Its optional API key is not needed for the current bounded request rate. [OpenAlex API documentation](https://help.openalex.org/api/) describes its query limits and daily allowance.
+
+The database is the growing record. Each ingest refreshes an all-time region connection graph from stored co-classified signals and calculates 14-day region activity from the full recent archive. The map still receives at most 300 signal details so the scene stays responsive; that cap no longer determines momentum or region counts. The same full-window activity is saved with each daily snapshot for historical comparison. The [status endpoint](../app/api/status/route.ts) reports the latest run, source coverage, newly added signals, and current-model vector coverage. Hacker News retries a bounded number of failed item requests and reports partial coverage if any remain unavailable. arXiv uses eight spaced query groups and retries a failed group once after six seconds, so an all-group outage makes at most 16 requests; its paper budget stays at 195 per run. Successful groups still enter the archive when another group remains unavailable, and the run reports partial coverage. GitHub waits for an API rate-limit reset and retries once within a bounded window; it retains popular repositories and reports partial coverage when its recent-update query fails. A database lease prevents overlapping runs; failed embeddings remain queued for later runs. Embedding text excludes volatile Hacker News score and comment counts, and unchanged vectors are reused. Model IDs are configurable through AI Gateway; compare current model prices and retrieval quality before changing them because a model switch re-embeds the archive.
+
+The hourly archive also polls curated NASA news and NASA's JPL-center feed, CISA's Known Exploited Vulnerabilities catalog, Europe PMC research abstracts, and public Hugging Face model/dataset cards. These run only in ingestion, not per visitor. Per run: each NASA feed contributes at most 20 items; CISA reads one bounded catalog and processes at most 50 new or changed entries, comparing per-CVE hashes across the entire catalog so older revisions remain reachable; Europe PMC makes one 25-record subject query over 14 days; Hugging Face makes two compact 100-record listings and tries up to 24 metadata/card pairs per kind to obtain four usable cards (98 requests maximum; stops as soon as the sample is complete). README downloads use the Hub resolver endpoint with a 500 KB download cap and retain up to 12,000 characters of cleaned evidence. Missing cards are replaced by the next bounded candidate; exhausted samples or real request failures mark the source partial while keeping successful cards. Listings omit full file manifests to keep response sizes bounded. CISA dates mean catalog addition, not first disclosure. Hub repository creation dates stay separate from update dates. Apply `20260928000000_source_evidence.sql` before deploying these adapters.
+
+Structured paper abstracts, syndication text, advisories, and cards are retained separately in `signal_evidence`, with source attribution, retrieval time, content hash, source type, declared license when available, and source-specific metadata. Unknown licenses remain unknown. Evidence links to canonical signals through source observations, preserving independent source evidence even when two connectors find the same page. Map payloads retain only short excerpts. Source evidence is available only while its source is active; the new table has RLS and no client read policies.
+
+The database retains every distinct ingested signal and daily snapshot; the 14-day NOW window limits only what is loaded into the interactive map. The overview and daily snapshots reserve up to 12 details per source inside their 300-event cap, so date-only journal papers can appear alongside newer timestamped posts; the remaining slots go to the newest records. A Vercel cron runs on the hour on the Testimonio Vercel Pro team. It claims a unique UTC hour in Postgres and queues a durable Vercel Workflow. The workflow fetches sources, stores canonical pages, refreshes outdated classifications, rebuilds the graph and daily snapshot, and embeds pending records in retryable steps. Database uniqueness on normalized URLs and exact normalized content prevents a duplicate page from growing the archive twice, even if another connector discovers it under a different source ID. Canonical URLs retain content-identifying query parameters such as Hacker News item IDs while dropping known tracking parameters. Ingestion retains distinct source IDs through storage, including when two connectors find the same page in one run; `signal_observations` links each to the one canonical record. The workflow's lease prevents overlapping runs, and the embedding hash avoids paying for unchanged text. New Vercel environment variables become active in functions after the next production deployment.
+
+`/api/signals` serves the hourly archive once it contains signals. It selects classified events from the past 14 days and caps the map detail payload at 300, while the all-time unique count continues growing beyond that visible window. Its region activity covers all classified archive signals in that 14-day period. The feed reports the latest completed ingest separately from its current request time; the overview shows when that ingest finished. Mapped Ask questions use the same archive-backed feed and can fetch matching topic records beyond the map cap. If a question names a more specific subject than its mapped region or thread, Ask requires that subject in each cited source and searches the full archive when the recent topic window has no match. Questions outside the preset regions also search the full archive. Exact text matches rank ahead of vector-only neighbors, and weak semantic matches are excluded so unsupported subjects can return an honest empty answer. The four source APIs are called for an empty archive or a local database-free preview, not for each visitor. Public responses are uncached; the open map refreshes every 15 minutes and when a hidden tab becomes visible. If ingestion falls behind, the map labels older observations as archived; a failed archive request shows a retry state. Historical signal details remain point-in-time samples, while their region activity covers the archived 14-day window. Region counts are sampled source observations, not a complete count of internet activity.
+
+Once a persisted feed loads, region counts cover classified archive events from the past 14 days; local database-free previews use only their fetched sample. Region brightness, cloud density, and incoming particles follow a score that weights topic relevance, source importance, and a 24-hour exponential decay. “Rising” compares weighted events from the latest 24 hours with the preceding 24 hours across that full archive window; it does not claim a platform-wide growth rate. Region positions stay fixed so the map remains learnable. Before the feed loads, the atmospheric map remains visible without invented signal counts.
+
+Connections between regions brighten when the same recent archive signals match both. The live web counts co-classified signals across the full 14-day archive even though the scene loads only 300 signal details. A new connection appears after two shared signals; those links outside the established routes use a restrained warm tone. The region panel links to related regions with the all-time observed count. Daily snapshots retain their own 14-day connection counts so historical webs do not borrow today's links. Those counts are co-classification evidence. When current topic embeddings exist, cosine similarity adds a restrained brightness adjustment to the established links only; it does not move regions or create new links. Historical snapshots use their recorded co-classification without today's semantic adjustment.
+
+### Organic growth
+
+Apply `supabase/migrations/20260924016000_organic_graph.sql` and `supabase/migrations/20260924017000_seed_catalog.sql` before deploying the catalog-backed app. The second migration copies the initial regions and threads into Postgres and records the first catalog revision; hourly ingestion maintains later revisions for historical views. The current classifier remains a high-precision seed; the workflow also matches promoted points to archive signals in bounded batches of 1,000. Public point IDs and positions stay stable. Points with no observed evidence for 90 days leave the current map but remain in revision history. The overview shows at most 12 active regions, while the point search reaches the full public catalog.
+
+Each hourly run collects evidence for recurring two-word concepts from the last 30 days of active sources. A new child requires at least five distinct signals, two sources, two publication days, current-model embeddings, and coherent vectors. A major region requires 12 signals, three sources, four days, and research evidence from arXiv or OpenAlex. Initial promotion is limited to two children per day and one major region per week. Candidate evidence is stored separately so an unsupported phrase does not appear on the map. If Gateway embeddings are unavailable, signal ingestion continues and promotion waits for a later run. Use `npm run growth:manage -- point-inactive <id>`, `point-public <id>`, or `point-merge <id> <target-id>` to correct a point; old IDs retain redirects.
+
+Source discovery probes up to five public HTTPS domains per day when at least three distinct recent Hacker News links point to that domain. It accepts a site's advertised RSS/Atom feed, limits response size, redirects, and request time, and keeps new items in a separate trial table. A feed can enter the public archive after three successful days, five distinct relevant items, and no more than 40% canonical overlap with the archive. At most two feeds promote per week; up to 60 RSS feeds can be active, with ten due feeds polled each hour and each feed eligible no more than once every six hours. Once slots are full, a qualified trial replaces a feed that has produced no new observations for 30 days; healthy feeds keep their slots. Three consecutive failures pause a feed. Trial items are removed after promotion and stale trial evidence after 90 days. `npm run growth:manage -- feed-pause <id>`, `feed-trial <id>`, or `feed-active <id>` provides an operator override. `/api/status` includes point and source growth counts plus catalog and graph backlogs. Run `npm run test:storage:local`, `npm test`, `npm run typecheck`, and `npm run build` before deploying ingestion changes.
+
+For the scaling work, see [the growth execution plan](../docs/growth-scaling-plan.md). The hourly workflow stores a prepared public feed and exact 14-day child counts. The map still displays at most 300 signal details; each current region or thread can browse its full archive through cursor pages. A focused 3D region reveals its 24 most active children on desktop or 12 on mobile, plus any selected or Ask path point, while the panel pages through every child. The knowledge graph now refreshes changed UTC day buckets, preserving existing graph totals while a dirty-day backlog drains. Source visibility follows any active observation of a canonical signal. Apply `20260924018000_growth_scaling.sql` before deploying the code, then verify `/api/status` backlogs and the first completed hourly run.
+
+Each successful ingestion stores a snapshot of that day's sampled feed and the all-time unique signal count at capture. A same-day retry replaces a snapshot only when no source drops from ok to partial or unavailable, no partial source becomes unavailable, and the mapped event count does not fall. The workflow fills missing activity, relationships, and cumulative counts on older snapshots from signals first seen by their capture time, allowing a short allowance for records stored immediately after fetching; it does not replace their saved event sample. Partial and archived samples are labeled in the map, including on mobile. After two dates exist, a timeline lets visitors compare region energy, relationships, cumulative archive growth, and event details across those dates or return to NOW. Live signal ages use the visitor's current time and refresh each minute; historical ages stay relative to the snapshot's capture time. A topic with no historical match shows an empty state. The first real comparison requires snapshots on two UTC dates; a local database can be seeded to exercise the interface during development.
+
+Ask Symtri recognizes updates, explanations, comparisons, connections, and bounded follow-up context. Comparisons retrieve each subject independently, including full-archive lexical search; missing evidence on either side remains explicit. Connection answers require sources matching both requested regions and named threads, rather than substituting separate stories from each region. Nuclear-energy connections require civil power context. Conceptual map routes remain labeled separately from source evidence. The panel passes the previous subjects and selected story/thread/region for follow-ups; ambiguous pronouns without context request clarification.
+
+With AI Gateway authentication, Ask ranks current evidence with embeddings and can generate up to three claims (two for a comparison). Every claim must reference an exact passage from selected source text and pass a separate model support audit. A rejected claim, invalid passage, incomplete comparison, or model failure falls back to the retrieval note. The first two claims are visible with inline source links; an expandable section shows supporting passages and further detail. These checks reduce unsupported synthesis but are not a guarantee of factual correctness. Historical Ask stays within the saved snapshot.
+
+For persistence, create a Supabase Postgres project, run [db/001_signals.sql](../db/001_signals.sql), [db/002_embeddings.sql](../db/002_embeddings.sql), and [db/003_lock_down_api.sql](../db/003_lock_down_api.sql) in order, then apply the versioned migrations in [supabase/migrations](../supabase/migrations) with `supabase db push --linked --dry-run` followed by `supabase db push --linked --yes`. Set `DATABASE_URL` to the shared session pooler connection string (port 5432). For existing shared transaction pooler URLs, the app switches port 6543 to the same host's session port because Postgres.js pipelining can hang in transaction mode. The production database has 60 maximum connections and a 24-connection Supavisor pool, sized for four concurrent enrichment lanes plus ingestion and public reads; keep pool capacity and database headroom in sync if either workload or compute size changes. The migrations enable row level security with no API policies; the app reads and writes through its server-side Postgres connection. Set a random `CRON_SECRET` of at least 16 characters in Vercel. The [Vercel cron schedule](../vercel.json) calls `/api/ingest` hourly; the route requires `Authorization: Bearer <CRON_SECRET>`, claims that UTC hour, and starts [the ingestion workflow](../workflows/ingest-universe.ts). Gateway batches new or changed text into 256-dimensional vectors in pgvector. The default embedding model is `openai/text-embedding-3-small`; the default summary model is `anthropic/claude-haiku-4.5`. Set `SYMTRI_EMBEDDING_MODEL` or `SYMTRI_SUMMARY_MODEL` to choose another Gateway model. The embedding model must support 256-dimensional output; Google and OpenAI dimension controls are configured. Changing the embedding model queues old vectors for refresh. An embedding failure does not discard stored signals or the snapshot. Vercel passes OIDC authentication to functions through the request context; local runs can use `AI_GATEWAY_API_KEY`. `GITHUB_TOKEN` is optional; a dedicated read-only token can avoid GitHub's unauthenticated IP limits on shared serverless egress. `OPENALEX_API_KEY` is optional; a free key provides a dedicated daily API allowance if shared keyless egress becomes unreliable. See [.env.example](../.env.example) for variable names; never commit real values.
+
+For Gateway spending controls, check the active team's budgets with a current Vercel CLI: `npx vercel@latest ai-gateway budgets list --scope <team-id>`. A deployment using `AI_GATEWAY_API_KEY` is charged against that key's budget and the team budget; a project budget applies to deployment OIDC calls instead. The public Ask route limits question length, caps claim-generation output at 1,200 tokens and support-audit output at 200 tokens with a shared 15-second model deadline, and falls back to a source sample when Gateway is unavailable. Set a budget on the production key if it needs a cap separate from the team's other projects; review its observed usage before choosing the amount. [Vercel's budget documentation](https://vercel.com/docs/ai-gateway/observability-and-spend/budgets) describes the scope rules and the soft-cap behavior.
+
+When setting `CRON_SECRET` through the Vercel CLI, remove the final newline from piped input; Vercel rejects whitespace in the cron authorization header. For a new secret: `openssl rand -hex 32 | tr -d '\n' | vercel env add CRON_SECRET production --sensitive --scope testimonio`. Use `--force` only when replacing an existing value.
+
+Ask reserves up to eight retained-evidence records per source within each requested 14-day topic window so recent upload bursts do not hide papers. Chronological archive browsing keeps its existing order. Research claims in Ask updates carry explicit author attribution; comparison claims are scoped to the cited study before the support audit.
+
+Ask selects distinct headlines from its ranked evidence so alternate reports of one incident do not crowd out other updates. The archive still retains each unique article and its source attribution.
+
+The live sample and grounded Ask navigation work without Gateway access. The production database is the Supabase `testimonio/symtri` project in `us-east-1`, with the versioned migrations applied. Production snapshot history needs observations on multiple UTC dates before it can be compared across dates. Production Gateway calls have populated vectors and returned cited field notes; tune semantic edge weights and summary quality as more observations accumulate. The Vercel project is `testimonio/symtri`, connected to `stanleycyang/symtri` for deployments from Git pushes. Both `symtri.com` and `www.symtri.com` are assigned to it.
+
+Before production ingestion, confirm access to the intended Supabase project and confirm `DATABASE_URL` and `CRON_SECRET` are set in the Vercel project. If either is missing, finish database setup first; repeating ingestion commands will not resolve missing credentials. Never print secret values during these checks.
+
+Claim audits receive the quoted passages and source identity rather than the full
+source body, so unquoted findings cannot silently support a claim. Individually
+rejected claims are removed; comparisons still require supported citations for
+both subjects. Title-only Hacker News placeholders remain discovery links.
+Generation uses Haiku by default; the independent support audit uses Sonnet via
+`SYMTRI_SUPPORT_MODEL`. Claims with numbers absent from their quoted passages
+are rejected before model verification. Both calls share the model deadline.
+
+Reading notes use migrations `20260928001000_reading_notes.sql`,
+`20261001000000_reading_note_workers.sql`, and the `enrichment_pipeline` migration.
+Apply the pipeline migration before deploying these functions. It adds worker
+reservations, cached successful notes, failure admission, and publication revisions.
+After persisting source observations, ingestion immediately dispatches available
+reading-note workers. `/api/enrich` remains a five-minute recovery sweep for missed
+dispatches and due retries. Four lanes each process up to ten notes: two durable
+steps of up to five notes, with a two-minute budget per step. Each note is claimed
+just before processing, and each claim rechecks and renews worker ownership.
+Lane zero reserves its first five notes for due retries; lane three prioritizes
+older work. Source and thread balancing apply within the queue. Reservations
+precede workflow dispatch; a failed dispatch releases its reservation, and a lost
+dispatch expires after five minutes. A completed slot cannot run twice.
+A full enrichment lane now uses four durable steps (claim, two processing steps,
+release), compared with twelve previously, excluding embedding work. Completed
+notes commit individually and are skipped when a processing step replays.
+Each note uses retained source text, exact supporting passages, and a separate
+model support check. Insufficient or restricted evidence is rejected before model
+generation. Meaningful source changes requeue notes and invalidate in-flight
+results. Fingerprints retain text, title, summary, publication date and its meaning, source ownership, provenance,
+license, and note version; they ignore collection timestamps, tracking parameters,
+whitespace, and transport metadata. An unchanged effective fingerprint reuses its
+last verified note without another draft, audit, or background lookup.
+Temporary failures retry after 15 minutes, then one hour, with a three-attempt
+ceiling. Support rejection waits six hours. Permanent evidence and configuration
+failures remain blocked until evidence, note version, or operator state changes.
+After resolving a source/provider problem, `npm run enrichment:manage -- retry
+<signal-id>` resets one failed note. It never resets a ready or working note.
+`/api/status` reports ready, pending, failed, blocked, oldest pending time,
+publication latency, generation count, reuse count, and publication version.
+Counters introduced by this migration begin at zero; historical model spend
+cannot be reconstructed from them. Compare billing with publication throughput
+and queue age before asserting cost savings. `/api/story?id=...` serves cached
+notes without generating them during a visit. Ask questions about “this source”
+use the selected story identity rather than a broad topic search.
+Ingestion and enrichment have independent leases and can overlap. Live stories
+are published only after a reading note is ready for the current enrichment
+version and its supporting source is active. The map, topic browsing,
+connections, nearby stories, and live Ask enforce this before result limits.
+Public feed reads pick up newly completed notes between hourly ingestions;
+the archive retains pending observations and full-window activity for workers
+and historical analysis. Saved historical views retain their original excerpts.
+Ready notes lead the source detail; the original excerpt is expandable below the
+supported explanation. World Bank context labels each geography separately.
+Background reading notes use hosted `alibaba/qwen3.7-flash` with reasoning disabled
+to draft, then open-weight `mistral/mistral-nemo` on DeepInfra to audit claims.
+A rejected or failed first pass retries Qwen with `mistral/mistral-small` auditing
+before the database marks it failed. Set `SYMTRI_READING_NOTE_MODEL`,
+`SYMTRI_READING_NOTE_SUPPORT_MODEL`, `SYMTRI_READING_NOTE_FALLBACK_MODEL`, or
+`SYMTRI_READING_NOTE_FALLBACK_SUPPORT_MODEL` to override these choices. Interactive Ask
+keeps its separate summary and support model settings.
+The `enrichReadingNotes` Workflow runs independently of the hourly ingestion
+lease, so source fetching can proceed while notes are generated. It does not poll
+news sources. `/api/embed` checks for changed evidence every fifteen minutes and
+starts a bounded embedding workflow only when work exists. It shares a separate
+embedding lease with the hourly embedding pass, preventing duplicate model work.
+`/api/maintenance` runs every six hours, moving feed discovery, trial promotion,
+concept discovery/retirement, rate-limit cleanup, and historical metadata repair
+out of the hourly persistence step. Discovery, trial polling, and catalog repair
+have separate bounded steps with renewed ownership. Current archive membership,
+full-window activity, relationships, and snapshots still update hourly.
+Check `/api/status` after deployment and confirm publication throughput, queue age,
+embedding backlog, source coverage, and the first completed maintenance run.
+
+Background context uses one Wikipedia intro/revision request per selected subject
+and one World Bank indicator request for energy or markets. Results are cached for
+seven days, failures for six hours. Background and quantitative context are shown
+separately from story claims, with attribution, retrieval date, revision or reported
+period, and reuse metadata. World Development Indicators use
+[CC BY 4.0](https://datacatalog.worldbank.org/search/dataset/0037712/world-development-indicators).
+Older arXiv records await retained abstracts from the paced source ingestion;
+reading-note workers do not start a second arXiv request stream.
+
+When checking reading-note UI, verify the unavailable and ready states separately.
+Use an explicitly labeled fixture for the ready layout if Gateway is unavailable;
+that validates presentation only. Check 390px mobile, 756×469 short desktop, and
+1440px desktop, expand supporting passages and background, open a follow-up, and
+close Ask with Escape. Focus must return to the follow-up button that opened it.
+
+Retained evidence has its own indexed lexical search and contributes up to 3,000
+characters to signal embeddings. Current map vectors use the same retained-input
+hash; historical Ask requests do not hydrate current source text into snapshots.
+Vector writes check the source revision so changed inputs cannot receive stale
+embeddings. Connection questions search full-archive evidence with both requested
+regions and named threads before synthesis.
+
+Ask has a 38-second server budget, shared with paid model calls, in addition to
+the 40-second client budget. The bounded previous answer is context, not evidence.
+Two source-specific exploration questions retain story identity; questions from
+historical answers resolve inside that saved snapshot. Hugging Face updates use
+the repository update time for activity and are labeled as updates; original
+creation time is retained separately, and repeated observations keep one signal.
+
+Run `npm run evaluate:ask` for the bounded eight-question production sample, or
+set `SYMTRI_URL` to a local build. The command spends Ask/Gateway requests, prints
+latency and mechanical citation/scope checks, and saves the full responses to a
+local `/tmp` report. Review source relevance, claim support, useful information,
+and empty-answer correctness manually; valid citation IDs alone do not prove
+answer quality. Keep the scored sample separate from unit and database checks.
+
+Score each manual evaluation dimension from 0 to 2: 0 means incorrect or absent,
+1 means relevant but limited, and 2 means direct and useful. Check every displayed
+claim against its quoted passage, including quantities, attribution, and study
+scope. Score empty-answer correctness only for an empty or clarification response;
+leave that dimension null for substantive answers. A source-link fallback can be
+honest while still scoring low on usefulness. Do not use mechanical checks or
+valid IDs as a substitute for these ratings. Comparison checks must prove that
+each subject has a source actually visible in the answer.
+
+The production sample uses the public Ask quota. On HTTP 429 it records the
+status and Retry-After value and stops, preserving the partial report. Resume
+after the advertised reset; repeated model or prompt iterations belong in local
+fixtures rather than repeated production samples.
+
+Reading-note selection first balances source slots, then subject coverage and
+recently served source counts. Within a source and subject, retained text takes
+priority over a higher-scored discovery link. An outdated cached note reports
+pending; a cached note from an inactive evidence owner is requeued when another
+active observation still supports the canonical story.
+
+Ask source links label their retained evidence type, including preprints, model
+cards, dataset cards, and advisories. OpenAlex, Europe PMC, and CISA supply dates
+without a time of day, so their source labels show dates rather than precise
+elapsed hours. Limitation audits check the requested task as well as factual
+support; a positive finding mislabeled as a limitation is not a valid answer.
+
+### Weekly briefings
+
+`/signal` displays the latest edition directly. New Monday editions select from
+all active-source archive records published in the completed UTC week, bounded
+by their discovery time at publication. Counts cover the full archive, while
+reading candidates are bounded to 16 published notes per evidence feed and 160
+in total. Candidates are sampled across UTC days, using engagement only within
+each feed, so Sunday updates cannot displace the entire earlier week.
+
+An editorial model ranks the checked findings for usefulness to people building
+and evaluating technology. Three distinct developments lead the report; a fourth
+source is reserved for further investigation. Briefs explain the contribution,
+its supported practical consequence, a concrete editorial next step, and source
+limitations. Exact supporting passages are resolved from retained text by ID,
+then factual support and recommendations receive a separate model audit.
+Source-type caveats remain separate from limitations reported by authors.
+Model or audit failure reuses a checked reading note without inventing a missing
+implication. No model calls or source fetches run on report page views.
+
+Publication makes at most one ranking request and four draft/audit pairs, with a
+25-second deadline per ranking or pair and no provider retries. `/api/digest`
+allows 180 seconds; an edition without usable checked briefs remains unpublished.
+The optional emerging-thread section needs three readable sources from at least
+two publishers. Co-classification is an invitation to investigate, not a trend
+or causal claim. HTML/text newsletter exports and RSS use the same saved briefs.
+
+To review a draft, run `npm run digest:build -- 2026-10-12` (the exclusive UTC week
+end), with server credentials configured locally. It writes HTML, text, and JSON
+to ignored `artifacts/digests/`. `npm run digest:publish --
+artifacts/digests/signal-2026-41.json` publishes that reviewed JSON without
+regenerating it. It can explicitly upgrade a legacy count/headline edition once,
+preserving the prior digest and original publication time. Routine cron retries
+and already-upgraded editions remain immutable. Deploy the page changes before
+publishing an upgraded edition so the current layout and metadata read it.
+
+The homepage invitation and report signup post directly to the verified Buttondown
+`symtri` list. The CSP permits form submissions to `https://buttondown.com`;
+Buttondown handles confirmation, spam protection and unsubscribe. Signup events
+record only the placement and provider, never the email address.
+
+Readers can confirm up to five map interests and select a lead node. Meaningful
+exploration stays in local storage and supplies suggestions only. The form sends
+confirmed IDs through Buttondown metadata; submitting the same email updates
+those choices. The weekly job saves bounded editions from the full archive,
+prioritizing analytical reading notes and rejecting obvious editorial mismatches.
+Buttondown renders two lead-node picks and an optional connection to another
+confirmed interest. Quiet interests receive an honest update; empty preferences
+receive the broader edition. See [the plan and verification](../docs/newsletter-personalization.md).
+
+With server-only `BUTTONDOWN_API_KEY` configured, the Monday 14:00 UTC publication
+job creates one Buttondown draft per edition. The key should have email read/write
+permission with sending disabled. Provider failures are retried by rerunning the
+job against the immutable saved edition; a stable idempotency key and unique slug
+prevent duplicate emails. Existing drafts and sent editions are preserved.
+`npm run digest:buttondown -- artifacts/digests/signal-YYYY-WW.json` creates a draft
+from a reviewed export. Review and send newsletters in Buttondown; report
+publication does not automatically send to the list.
+Use Buttondown's subscriber preview to review an individual edition: the editor
+contains all conditional branches. Subjects and bodies support those conditions;
+the inbox description must remain plain text because Buttondown delivers it verbatim.
+
+## Search discovery and answer-engine visibility
+
+Public subject pages expose source-backed HTML independently of WebGL. `npm run check:seo` crawls the production build (default `http://127.0.0.1:3107`); set `SYMTRI_CHECK_URL` for a deployed site and pass `-- --report /tmp/seo.json` to save evidence. The check validates canonical URLs, sitemap/indexing consistency, structured data, internal links, source pagination, crawler responses, and invalid-route status codes. It inspects one older source page per subject rather than crawling the entire archive.
+
+See [the SEO/AEO audit and release evidence](../docs/seo/README.md), [the fixed 25-query benchmark](../docs/seo/query-benchmark.json), and [the measurement procedure](../docs/seo/measurement.md). Sparse subject pages remain browsable but need at least three readable archive sources before appearing in the sitemap. That is an editorial quality floor, not a search-engine ranking rule.

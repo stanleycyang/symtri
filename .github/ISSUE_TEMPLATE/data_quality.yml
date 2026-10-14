@@ -1,0 +1,41 @@
+name: Source or evidence quality
+description: Report a misclassification, missing source, irrelevant citation, or evidence gap.
+title: "[Evidence]: "
+labels: [data-quality]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Area
+      options:
+        - Classification
+        - Source coverage or ingestion
+        - Ask retrieval or citations
+        - Source provenance or dates
+        - New source proposal
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Real source or question
+      description: Include an original source URL and relevant map location. For Ask, include the exact question and answer excerpt. Do not paste private or copyrighted full text.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected evidence or classification
+      description: Explain the mismatch and the source passage or metadata that supports the correction.
+    validations:
+      required: true
+  - type: textarea
+    id: counterexample
+    attributes:
+      label: Similar example that should not match
+      description: Negative examples help keep broader classification and retrieval changes precise.
+  - type: textarea
+    id: provider
+    attributes:
+      label: Provider details for a new source
+      description: If applicable, include public API/feed documentation, licensing, rate limits, and the subject coverage it adds.

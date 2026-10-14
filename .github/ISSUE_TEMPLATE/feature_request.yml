@@ -1,0 +1,29 @@
+name: Feature proposal
+description: Propose a focused improvement and explain who it helps.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the person, use case, and obstacle in the current experience.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: Describe the smallest useful change and how someone would use it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Current workarounds or other approaches worth considering.
+  - type: textarea
+    id: success
+    attributes:
+      label: How would we know it works?
+      description: A concrete example, acceptance criteria, or measurement.
