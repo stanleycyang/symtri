@@ -27,7 +27,8 @@
     "demo:record": "npm --prefix demo run record",
     "demo:render": "npm --prefix demo run render",
     "demo:check": "npm --prefix demo run check",
-    "demo:launch": "npm --prefix demo run launch"
+    "demo:launch": "npm --prefix demo run launch",
+    "demo:capture:launch": "npm --prefix demo run capture:launch"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

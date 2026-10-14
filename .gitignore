@@ -13,3 +13,6 @@ supabase/.temp/
 /demo/node_modules/
 /demo/out/
 /demo/public/
+
+# Interrupted launch capture publication
+/docs/.launch-assets-*

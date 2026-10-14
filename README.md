@@ -27,6 +27,8 @@ Explore a living knowledge map, ask questions with cited evidence, and follow id
   <img src="docs/demo.gif" alt="SYMTRI — demo: enter the universe, explore AI and Agents, and ask about connections" width="720">
 </p>
 
+[**Watch the 75-second launch film →**](docs/launch.mp4) · [Square](docs/launch-square.mp4) · [Portrait](docs/launch-vertical.mp4) · [Music credit](demo/CREDITS.md)
+
 ## Why SYMTRI?
 
 A paper, a repository, and a discussion can be parts of the same story. SYMTRI brings those observations into one explorable map, preserving the sources that let you judge the story yourself.
