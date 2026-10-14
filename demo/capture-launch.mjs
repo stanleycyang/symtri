@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { publishCaptures } from "./capture-store.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const destination = path.resolve(directory, "../docs/launch-assets");
@@ -25,6 +26,9 @@ try {
   await page.locator("#map-point-search").fill("Artificial Intelligence");
   await page.locator("#map-point-search").press("Enter");
   await page.locator(".topic-list").getByRole("button", { name: /^Agents\b/ }).waitFor();
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
   await page.screenshot({ path: path.join(output, "threads.png") });
   await page.locator(".ask-trigger").click();
   await page.locator("#symtri-question").fill("How is AI connected to energy?");
@@ -67,8 +71,7 @@ try {
   await page.locator(".report-summary").screenshot({ path: path.join(output, "signal.png") });
   if (errors.length) throw new Error(`Browser errors: ${errors.join("; ")}`);
   await fs.writeFile(path.join(output, "provenance.json"), JSON.stringify({ capturedAt: new Date().toISOString(), origin: target.origin, question: answer.question, source: { id: source.id, title: source.title, url: source.url }, summaryKind: answer.summaryKind, note: "Unmodified public product screenshots; reduced motion used for stable captures. One real Ask request, no intercepted or fabricated API responses." }, null, 2) + "\n");
-  await fs.mkdir(destination, { recursive: true });
-  await fs.cp(output, destination, { recursive: true });
+  await publishCaptures(output, destination);
   console.log("Captured the current weekly Signal and saved provenance.");
 } finally {
   await browser.close();
