@@ -1,0 +1,12 @@
+{
+  "capturedAt": "2026-10-14T05:27:20.488Z",
+  "origin": "https://symtri.com",
+  "question": "How is AI connected to energy?",
+  "source": {
+    "id": "openalex:W7221512267",
+    "title": "Energy Consumer Model Estimation Using Machine Learning",
+    "url": "https://doi.org/10.3390/electricity7040117"
+  },
+  "summaryKind": "model",
+  "note": "Unmodified public product screenshots; reduced motion used for stable captures. One real Ask request, no intercepted or fabricated API responses."
+}

@@ -40,6 +40,10 @@ Tool references: [Playwright video lifecycle](https://playwright.dev/docs/videos
 
 ## Launch film
 
-`npm run demo:launch` exports the 75-second launch film in wide, square, and vertical formats plus `docs/launch-poster.png`. It uses the reviewed final walkthroughs already in `docs/`, so raw browser recordings are not required. All copied inputs stay in ignored `demo/public/`. The film uses timed, non-overlapping captions and preserves the full scene in portrait framing.
+`npm run demo:launch` exports the 75-second launch film in wide, square, and vertical formats plus `docs/launch-poster.png`. It uses the reviewed production captures in `docs/launch-assets/`, so no live API calls or raw browser recordings are required to render. All copied inputs stay in ignored `demo/public/`. Wide layouts place the story beside the product; square and portrait layouts stack the copy above the product without cropping the source or Ask screens.
+
+To refresh the product captures explicitly, run `npm run demo:capture:launch` (optionally set `DEMO_URL`). This opens an isolated Playwright browser, captures the map and AI threads, submits one real Ask question, follows its cited source, and captures the weekly Signal. It requires a running app with populated archive data. The script rejects unfinished or uncited answers and browser errors. `provenance.json` records the actual source, question, origin, and capture time; screenshots retain the product's live content and counts. Review refreshed captures before committing them.
+
+The 75-second edit runs: introduction (0–12s), overview and threads (12–27s), source detail (27–41s), cited Ask answer (41–56s), weekly Signal (56–65s), contributor invitation (65–69s), and closing card (69–75s). Native SVG constellation graphics are decorative, separate from actual product screens. The silent narrative is readable without audio; music fades in and out. The poster is taken from the map chapter.
 
 The bundled music has its own attribution license. See [CREDITS.md](CREDITS.md); the rendered end card also retains the credit and notes the audio changes. Keep that attribution when sharing the exported film.
