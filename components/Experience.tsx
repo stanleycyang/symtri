@@ -329,6 +329,8 @@ export default function Experience() {
   useEffect(() => {
     if (!entered && !new URLSearchParams(window.location.search).has("point")) return;
     const controller = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
     const load = () => {
       if (document.visibilityState === "hidden") return;
       fetch("/api/signals", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) }).then(async (response) => {
@@ -365,12 +367,21 @@ export default function Experience() {
           }
           setLiveFeed(feed); setFeedError(false);
         }
-      }).catch(() => { if (!controller.signal.aborted) setFeedError(true); });
+      }).catch(() => {
+        if (controller.signal.aborted) return;
+        // Friendly automatic retry with exponential backoff and jitter.
+        attempts += 1;
+        setFeedError(true);
+        const backoff = Math.min(20_000, (1_000 * 2 ** Math.min(4, attempts - 1))) + Math.floor(Math.random() * 400);
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(load, backoff);
+      });
     };
     load();
-    const timer = window.setInterval(load, 15 * 60 * 1000);
-    document.addEventListener("visibilitychange", load);
-    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", load); };
+    const interval = window.setInterval(load, 15 * 60 * 1000);
+    const onVisibility = () => load();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { controller.abort(); if (retryTimer) clearTimeout(retryTimer); window.clearInterval(interval); document.removeEventListener("visibilitychange", onVisibility); };
   }, [entered, feedRetry]);
   useEffect(() => {
     if (!entered) return;
@@ -478,13 +489,20 @@ export default function Experience() {
           </button>
           <button className="mobile-guide-ask" type="button" onClick={() => { setMobileGuideOpen(false); askOpener.current=askTrigger.current;setAskInitial("");setAskOpen(true); }}>ASK<br />SYMTRI <span>↗</span></button>
         </div>
-          <div className="mobile-guide-shortcuts" aria-label="Explore leading regions">{rankedRegions.slice(0, 3).map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.short}</strong><small>{measuredActivity?.[topic.id]?.count ?? 0} seen</small></button>)}</div>
+          <div className="mobile-guide-shortcuts" aria-label="Explore leading regions">{rankedRegions.slice(0, 3).map((topic) => {
+            const count = measuredActivity?.[topic.id]?.count;
+            return <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.short}</strong><small>{count === undefined ? "CONNECTING" : count === 0 ? "QUIET" : `${count} seen`}</small></button>;
+          })}</div>
         {mobileGuideOpen && <div className="mobile-guide-content" id="mobile-guide-content">
           <div className="mobile-guide-search"><label htmlFor="mobile-map-search">Find a subject or region</label><input id="mobile-map-search" type="search" value={mapSearch} onKeyDown={searchKeys} onChange={(event) => setMapSearch(event.target.value)} placeholder="Try fusion, robotics, security…" autoComplete="off" />{mapSearch.trim().length >= 2 && !searchMatches.length && <p className="map-search-empty" role="status">No map point found. Try another subject or Ask Symtri.</p>}{searchMatches.length > 0 && <div className="mobile-guide-search-results">{searchMatches.map((item) => <button key={item.childId ?? item.id} type="button" onClick={() => { chooseTopic(item.id); setChildId(item.childId); setMapSearch(""); }}>{item.name}<small>{item.region}</small></button>)}</div>}</div>
           {historyDays.length > 1 && <div className="mobile-guide-time"><h3>Through time</h3><div>{[...historyDays].reverse().map((item) => <button key={item.day} type="button" aria-pressed={selectedDay === item.day} onClick={() => { setPendingDay(item.day); setMobileGuideOpen(false); }}>{shortDay(item.day)}</button>)}<button type="button" aria-pressed={!selectedDay} onClick={returnToNow}>NOW</button></div></div>}
 
           <div className="mobile-guide-stories"><h3>From the sources</h3>{mobileLatest.length ? mobileLatest.map((event) => <button key={event.id} type="button" onClick={() => followNearby(event)}><span>{(sourceLabels[event.source] ?? event.source).toUpperCase()} · {sourceHasDayPrecision(event.source) ? shortDay(event.publishedAt.slice(0, 10)) : ageOf(event.publishedAt, ageReference).toUpperCase()}</span><strong>{event.title}</strong><b aria-hidden="true">↗</b></button>) : <p>Fresh signals will appear here as the sources connect.</p>}</div>
-          <div className="mobile-guide-regions"><h3>More regions</h3><div>{rankedRegions.slice(3 + shownMobileRegionPage * 12, 3 + (shownMobileRegionPage + 1) * 12).map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.name}</strong><small>{measuredActivity?.[topic.id]?.count ?? 0} {displayFeed?.activity ? "signals" : "observed"}</small></button>)}</div>{rankedRegions.length > 15 && <div className="thread-pages"><button type="button" disabled={shownMobileRegionPage === 0} onClick={() => setMobileRegionPage(shownMobileRegionPage - 1)}>PREVIOUS</button><span>{shownMobileRegionPage + 1} / {Math.ceil((rankedRegions.length - 3) / 12)}</span><button type="button" disabled={3 + (shownMobileRegionPage + 1) * 12 >= rankedRegions.length} onClick={() => setMobileRegionPage(shownMobileRegionPage + 1)}>NEXT</button></div>}</div>
+          <div className="mobile-guide-regions"><h3>More regions</h3><div>{rankedRegions.slice(3 + shownMobileRegionPage * 12, 3 + (shownMobileRegionPage + 1) * 12).map((topic) => {
+            const count = measuredActivity?.[topic.id]?.count;
+            const label = count === undefined ? "CONNECTING" : count === 0 ? "QUIET" : `${count} ${displayFeed?.activity ? "signals" : "observed"}`;
+            return <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.name}</strong><small>{label}</small></button>;
+          })}</div>{rankedRegions.length > 15 && <div className="thread-pages"><button type="button" disabled={shownMobileRegionPage === 0} onClick={() => setMobileRegionPage(shownMobileRegionPage - 1)}>PREVIOUS</button><span>{shownMobileRegionPage + 1} / {Math.ceil((rankedRegions.length - 3) / 12)}</span><button type="button" disabled={3 + (shownMobileRegionPage + 1) * 12 >= rankedRegions.length} onClick={() => setMobileRegionPage(shownMobileRegionPage + 1)}>NEXT</button></div>}</div>
         </div>}
       </section>}
       <div className="controls-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM <span>·</span> CLICK TO EXPLORE</div>
