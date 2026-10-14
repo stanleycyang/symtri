@@ -16,7 +16,18 @@ Explore a living knowledge map, ask questions with cited evidence, and follow id
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-101318?style=flat-square&logo=nextdotjs)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript&logoColor=white)](package.json)
 [![GitHub stars](https://img.shields.io/github/stars/stanleycyang/symtri?style=flat-square&color=d7ad7b)](https://github.com/stanleycyang/symtri/stargazers)
+[![Live sources](https://img.shields.io/badge/sources-HN%20·%20GitHub%20·%20arXiv%20·%20NASA%20·%20more-101318?style=flat-square)](#why-symtri)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-d7ad7b?style=flat-square)](CONTRIBUTING.md)
 
+</div>
+
+⭐ If you like where this is going, star the repo — it's the easiest way to help others find it.
+
+<p align="center">
+  <img src="docs/demo.gif" alt="SYMTRI — demo: enter the universe → orbit → pick a region → open a source → Ask with citations" width="720">
+</p>
+
+<div align="center">
 </div>
 
 ## Why SYMTRI?
