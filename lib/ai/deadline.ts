@@ -14,12 +14,14 @@ export async function runAskWithDeadline(task:(signal:AbortSignal)=>Promise<Resp
 
 /** Stop waiting for a provider that does not reject when its abort signal fires. */
 export async function awaitWithinDeadline<T>(task:Promise<T>,signal:AbortSignal):Promise<T> {
-  if (signal.aborted) throw signal.reason;
-  let onAbort:()=>void=()=>{};
-  const timeout=new Promise<never>((_,reject)=>{
-    onAbort=()=>reject(signal.reason);
-    signal.addEventListener("abort",onAbort,{once:true});
+  return await new Promise<T>((resolve, reject) => {
+    const onAbort = () => { cleanup(); reject(signal.reason ?? new Error("Aborted")); };
+    const onResolve = (value: T) => { cleanup(); resolve(value); };
+    const onReject = (error: unknown) => { cleanup(); reject(error as Error); };
+    const check = setInterval(() => { if (signal.aborted) onAbort(); }, 5);
+    const cleanup = () => { clearInterval(check); signal.removeEventListener("abort", onAbort); };
+    if (signal.aborted) { onAbort(); return; }
+    signal.addEventListener("abort", onAbort, { once: true });
+    void task.then(onResolve).catch(onReject);
   });
-  try {return await Promise.race([task,timeout]);}
-  finally {signal.removeEventListener("abort",onAbort);}
 }
