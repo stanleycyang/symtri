@@ -1,4 +1,5 @@
 import { Composition, OffthreadVideo, Sequence, interpolate, spring, registerRoot, staticFile } from "remotion";
+import { Launch } from "./launch";
 import React from "react";
 
 const TitleCard: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => {
@@ -70,6 +71,30 @@ export function RemotionRoot() {
         fps={30}
         width={1080}
         height={1080}
+      />
+      <Composition
+        id="Launch16x9"
+        component={() => <Launch variant="16x9" />}
+        durationInFrames={75 * 30}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="LaunchSquare"
+        component={() => <Launch variant="square" />}
+        durationInFrames={75 * 30}
+        fps={30}
+        width={1080}
+        height={1080}
+      />
+      <Composition
+        id="LaunchVertical"
+        component={() => <Launch variant="vertical" />}
+        durationInFrames={75 * 30}
+        fps={30}
+        width={1080}
+        height={1920}
       />
     </>
   );

@@ -23,7 +23,10 @@
     "digest:publish": "tsx --env-file-if-exists=.env.local scripts/publish-report.ts",
     "digest:buttondown": "tsx --env-file-if-exists=.env.local scripts/draft-buttondown.ts",
     "check:seo": "node scripts/check-seo.mjs",
-    "benchmark:record": "node scripts/record-search-observation.mjs"
+    "benchmark:record": "node scripts/record-search-observation.mjs",
+    "demo:record": "node demo/record.mjs",
+    "demo:render": "node demo/prepare.mjs && remotion render demo/remotion/index.tsx Demo16x9 docs/demo.mp4 --log=error && remotion render demo/remotion/index.tsx DemoSquare docs/demo-square.mp4 --log=error && node demo/gif.mjs",
+    "demo:launch": "node demo/prepare.mjs && remotion render demo/remotion/index.tsx Launch16x9 docs/launch.mp4 --log=error && remotion render demo/remotion/index.tsx LaunchSquare docs/launch-square.mp4 --log=error && remotion render demo/remotion/index.tsx LaunchVertical docs/launch-vertical.mp4 --log=error && remotion still demo/remotion/index.tsx Launch16x9 900 docs/launch-poster.png --log=error"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -54,7 +57,10 @@
     "eslint": "^9.39.2",
     "eslint-config-next": "16.4.0",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "playwright": "^1.47.2",
+    "remotion": "^4.0.81",
+    "@remotion/cli": "^4.0.81"
   },
   "overrides": {
     "@workflow/core": {
