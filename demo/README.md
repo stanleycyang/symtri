@@ -37,3 +37,9 @@ Only publish reviewed final exports:
 Raw recordings, the palette, and render inputs are ignored. App CI checks the optional package independently with its own lockfile; rendering and live recording remain explicit local commands.
 
 Tool references: [Playwright video lifecycle](https://playwright.dev/docs/videos), [Remotion frame timing](https://www.remotion.dev/docs/use-current-frame), and [Remotion CLI rendering](https://www.remotion.dev/docs/cli/render). Tool dependencies retain their own licenses.
+
+## Launch film
+
+`npm run demo:launch` exports the 75-second launch film in wide, square, and vertical formats plus `docs/launch-poster.png`. It uses the reviewed final walkthroughs already in `docs/`, so raw browser recordings are not required. All copied inputs stay in ignored `demo/public/`. The film uses timed, non-overlapping captions and preserves the full scene in portrait framing.
+
+The bundled music has its own attribution license. See [CREDITS.md](CREDITS.md); the rendered end card also retains the credit and notes the audio changes. Keep that attribution when sharing the exported film.

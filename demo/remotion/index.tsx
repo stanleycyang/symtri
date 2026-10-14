@@ -2,6 +2,7 @@ import {
   AbsoluteFill, Composition, OffthreadVideo, Sequence, interpolate,
   registerRoot, spring, staticFile, useCurrentFrame, useVideoConfig, getInputProps,
 } from "remotion";
+import { Launch } from "./launch";
 type Clip = { id: string; file: string; duration: number; width: number; height: number; captions: { seconds: number; text: string }[] };
 const { clips = [] } = getInputProps<{ clips?: Clip[] }>();
 
@@ -48,7 +49,11 @@ export function RemotionRoot() {
     defaultProps={{ src: clip.file, captions: clip.captions }}
     durationInFrames={Math.ceil(clip.duration * 30) + 120} fps={30}
     width={clip.width} height={clip.height}
-  />)}</>;
+  />)}
+    <Composition id="Launch16x9" component={Launch} defaultProps={{ variant: "16x9" as const }} durationInFrames={2250} fps={30} width={1920} height={1080} />
+    <Composition id="LaunchSquare" component={Launch} defaultProps={{ variant: "square" as const }} durationInFrames={2250} fps={30} width={1080} height={1080} />
+    <Composition id="LaunchVertical" component={Launch} defaultProps={{ variant: "vertical" as const }} durationInFrames={2250} fps={30} width={1080} height={1920} />
+  </>;
 }
 
 registerRoot(RemotionRoot);

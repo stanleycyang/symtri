@@ -101,4 +101,4 @@ To regenerate the walkthrough, follow the optional [demo production guide](demo/
 
 ## License
 
-SYMTRI code is released under the [MIT license](LICENSE). Retrieved articles, abstracts, advisories, and other source material retain their original ownership and applicable terms.
+SYMTRI code is released under the [MIT license](LICENSE). Retrieved articles, abstracts, advisories, and other source material retain their original ownership and applicable terms. Demo music has separate attribution terms in [demo/CREDITS.md](demo/CREDITS.md).

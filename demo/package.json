@@ -6,7 +6,8 @@
   "scripts": {
     "record": "node record.mjs",
     "render": "node prepare.mjs && remotion render remotion/index.tsx DemoWide ../docs/demo.mp4 --public-dir=public --props=public/manifest.json --concurrency=2 && remotion render remotion/index.tsx DemoSquare ../docs/demo-square.mp4 --public-dir=public --props=public/manifest.json --concurrency=2 && node gif.mjs",
-    "check": "tsc --noEmit && node --check record.mjs && node --check prepare.mjs && node --check gif.mjs"
+    "check": "tsc --noEmit && node --check record.mjs && node --check prepare.mjs && node --check gif.mjs && node --check prepare-launch.mjs",
+    "launch": "node prepare-launch.mjs && remotion render remotion/index.tsx Launch16x9 ../docs/launch.mp4 --public-dir=public --concurrency=2 && remotion render remotion/index.tsx LaunchSquare ../docs/launch-square.mp4 --public-dir=public --concurrency=2 && remotion render remotion/index.tsx LaunchVertical ../docs/launch-vertical.mp4 --public-dir=public --concurrency=2 && remotion still remotion/index.tsx Launch16x9 ../docs/launch-poster.png --frame=900 --public-dir=public"
   },
   "dependencies": {
     "@remotion/cli": "4.0.535",
