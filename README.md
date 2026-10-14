@@ -24,11 +24,8 @@ Explore a living knowledge map, ask questions with cited evidence, and follow id
 ⭐ If you like where this is going, star the repo — it's the easiest way to help others find it.
 
 <p align="center">
-  <img src="docs/demo.gif" alt="SYMTRI — demo: enter the universe → orbit → pick a region → open a source → Ask with citations" width="720">
+  <img src="docs/demo.gif" alt="SYMTRI — demo: enter the universe, explore AI and Agents, and ask about connections" width="720">
 </p>
-
-<div align="center">
-</div>
 
 ## Why SYMTRI?
 
@@ -94,6 +91,8 @@ Read the [contribution guide](CONTRIBUTING.md), [community standards](CODE_OF_CO
 If SYMTRI helps you discover something worth following, **star the repo** to help other builders find it. Share a source-linked map location with someone who works on that subject.
 
 ## Documentation
+
+To regenerate the walkthrough, follow the optional [demo production guide](demo/README.md).
 
 - [Development guide](docs/development.md) — configuration, checks, interaction QA, ingestion, and retrieval.
 - [Architecture](docs/architecture.md) — code map and data flow.

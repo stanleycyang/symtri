@@ -32,7 +32,9 @@ export function planQuestion(input: string, context: AskContext = {}): QuestionP
   const comparison = question.match(/^(?:compare\s+|.*?difference(?:s)?\s+between\s+)(.+?)\s+(?:and|with|to)\s+(.+?)\s*[?.!]*$/i)
     ?? question.match(/^(.+?)\s+(?:vs\.?|versus)\s+(.+?)\s*[?.!]*$/i);
   const intent: AskIntent = comparison || previousSubjects ? "comparison"
-    : /\b(?:connects?|connected|connections?|relationship|relates?|related|link(?:s|ed)?)\b/i.test(question) ? "connection"
+    : (/\b(?:connects?|connections?|relationship|relates?|link(?:s|ed)?)\b/i.test(question)
+      || /\b(?:connected|related)\s+(?:to|with)\b/i.test(question)
+      || /^how\b.*\band\b.*\b(?:connected|related)\b/i.test(question)) ? "connection"
     : /\b(?:explain|why|how|limitations?|risks?|tradeoffs?|what is|what are)\b/i.test(question)
       && !/\b(?:new|latest|happening|updates?|recent)\b/i.test(question) ? "explanation" : "update";
   const subjects = comparison

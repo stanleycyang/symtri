@@ -1,17 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-await fs.mkdir("public", { recursive: true });
-const copies = [
-  ["demo/out/raw-1600x1000.mp4", "public/demo-raw-1600x1000.mp4"],
-  ["demo/out/raw-1080x1080.mp4", "public/demo-raw-1080x1080.mp4"],
-];
-for (const [from, to] of copies) {
-  try {
-    await fs.copyFile(path.resolve(from), path.resolve(to));
-  } catch (error) {
-    console.error("Missing input for render:", from);
-    process.exitCode = 1;
-  }
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const output = path.join(directory, "out");
+const publicDirectory = path.join(directory, "public");
+await fs.mkdir(publicDirectory, { recursive: true });
+const { clips } = JSON.parse(await fs.readFile(path.join(output, "manifest.json"), "utf8"));
+for (const clip of clips) {
+  await fs.copyFile(path.join(output, clip.file), path.join(publicDirectory, clip.file));
 }
-
+await fs.copyFile(path.join(output, "manifest.json"), path.join(publicDirectory, "manifest.json"));

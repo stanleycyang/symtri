@@ -33,3 +33,9 @@ test("connection intent recognizes 'connected' and 'related' phrasing", () => {
   const related = planQuestion("How is AI related to energy?");
   assert.equal(related.intent, "connection");
 });
+
+test("connection adjectives do not hijack single-subject explanations or updates", () => {
+  assert.equal(planQuestion("Explain connected devices").intent, "explanation");
+  assert.equal(planQuestion("What is the latest related work on AI agents?").intent, "update");
+  assert.equal(planQuestion("How are AI and energy connected?").intent, "connection");
+});

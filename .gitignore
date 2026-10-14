@@ -9,3 +9,7 @@ supabase/.temp/
 /.swc
 
 /artifacts/digests/
+
+/demo/node_modules/
+/demo/out/
+/demo/public/
