@@ -16,9 +16,9 @@ Harassment, discrimination, threats, sexualized attention, personal attacks, dox
 
 ## Reporting concerns
 
-For a non-sensitive moderation concern, contact the maintainer [@stanleycyang](https://github.com/stanleycyang) in the relevant project conversation. Do not publish private information or sensitive details in an issue.
+Report community concerns privately to **[info@symtri.com](mailto:info@symtri.com)**. Include links to the relevant conversation, a description of what happened, and any immediate concerns. Do not publish private information or sensitive details in an issue.
 
-For abuse requiring a private platform report, use GitHub's **Report abuse** control on the relevant user or content. These reports go to GitHub, rather than to the project maintainer. Security vulnerabilities have a separate [private reporting route](SECURITY.md).
+The maintainer will review reports and treat identifying details as confidential to the extent possible, sharing them only when needed to investigate or respond. If the concern involves the maintainer or requires platform intervention, you can also use GitHub's **Report abuse** control; those reports go to GitHub. Security vulnerabilities have a separate [private reporting route](SECURITY.md).
 
 ## Enforcement
 
