@@ -308,3 +308,22 @@ test("Ask source lists retain the evidence type separately from generated prose"
   }
   assert.deepEqual(questionTopics("How does a lexical database engine work?"), [{id:"software",childId:"software-databases"}]);
 });
+
+test("connected and related phrasing cite only sources shared by both requested subjects", () => {
+  for (const question of ["How is AI connected to energy?", "How is AI related to energy?"]) {
+    const sample: SignalFeed = { ...feed, events: [
+      ...feed.events,
+      { ...feed.events[0], id: "shared", title: "AI data centers demand electricity", topics: [{ topicId: "ai", subtopicId: null, relevance: 1 }, { topicId: "energy", subtopicId: null, relevance: 1 }] },
+      { ...feed.events[0], id: "ai-only", title: "AI coding tools", topics: [{ topicId: "ai", subtopicId: null, relevance: 1 }] },
+      { ...feed.events[0], id: "energy-only", title: "Electricity grid research", topics: [{ topicId: "energy", subtopicId: null, relevance: 1 }] },
+    ] };
+    const answer = answerQuestion(question, sample);
+    assert.equal(answer.intent, "connection");
+    assert.deepEqual(answer.events.map(event => event.id), ["shared"]);
+    assert.deepEqual(new Set(answer.regionIds), new Set(["ai", "energy"]));
+    assert.equal(answer.events.some(event => event.id === "ai-only" || event.id === "energy-only"), false);
+    const empty = answerQuestion(question, { ...sample, events: sample.events.filter(event => event.id === "ai-only" || event.id === "energy-only") });
+    assert.deepEqual(empty.events, []);
+    assert.match(empty.summary, /No direct source/);
+  }
+});

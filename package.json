@@ -23,7 +23,11 @@
     "digest:publish": "tsx --env-file-if-exists=.env.local scripts/publish-report.ts",
     "digest:buttondown": "tsx --env-file-if-exists=.env.local scripts/draft-buttondown.ts",
     "check:seo": "node scripts/check-seo.mjs",
-    "benchmark:record": "node scripts/record-search-observation.mjs"
+    "benchmark:record": "node scripts/record-search-observation.mjs",
+    "demo:record": "npm --prefix demo run record",
+    "demo:render": "npm --prefix demo run render",
+    "demo:check": "npm --prefix demo run check",
+    "demo:launch": "npm --prefix demo run launch"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

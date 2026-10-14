@@ -28,3 +28,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+  - package-ecosystem: npm
+    directory: /demo
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      remotion:
+        patterns: ["remotion", "@remotion/*"]
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]

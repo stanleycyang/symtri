@@ -16,6 +16,19 @@ test("successful Ask requests keep their response and clear the timeout",async()
   await new Promise(resolve=>setTimeout(resolve,10));assert.equal(signal?.aborted,false);
 });
 test("provider work cannot hold a step open after its abort deadline",async()=>{
-  const signal=AbortSignal.timeout(5);
-  await assert.rejects(awaitWithinDeadline(new Promise<never>(()=>{}),signal));
+  const controller = new AbortController();
+  const reason = new Error("Provider deadline expired");
+  const timer = setTimeout(() => controller.abort(reason), 5);
+  try { await assert.rejects(awaitWithinDeadline(new Promise<never>(() => {}), controller.signal), reason); }
+  finally { clearTimeout(timer); }
+});
+
+test("provider deadline keeps success and rejection and handles already-aborted work", async () => {
+  const controller = new AbortController();
+  assert.equal(await awaitWithinDeadline(Promise.resolve("supported"), controller.signal), "supported");
+  const failure = new Error("Provider failed");
+  await assert.rejects(awaitWithinDeadline(Promise.reject(failure), controller.signal), failure);
+  const reason = new Error("Cancelled");
+  controller.abort(reason);
+  await assert.rejects(awaitWithinDeadline(Promise.reject(failure), controller.signal), reason);
 });

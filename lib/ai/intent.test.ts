@@ -26,3 +26,16 @@ test("follow-ups resolve bounded prior subjects or request clarification", () =>
   assert.equal(planQuestion("What's happening with AI agents that use tools?").needsClarification, false);
   assert.equal(planQuestion("What is IT security?").needsClarification, false);
 });
+
+test("connection intent recognizes 'connected' and 'related' phrasing", () => {
+  const connected = planQuestion("How is AI connected to energy?");
+  assert.equal(connected.intent, "connection");
+  const related = planQuestion("How is AI related to energy?");
+  assert.equal(related.intent, "connection");
+});
+
+test("connection adjectives do not hijack single-subject explanations or updates", () => {
+  assert.equal(planQuestion("Explain connected devices").intent, "explanation");
+  assert.equal(planQuestion("What is the latest related work on AI agents?").intent, "update");
+  assert.equal(planQuestion("How are AI and energy connected?").intent, "connection");
+});

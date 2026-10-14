@@ -1,5 +1,6 @@
 "use client";
 
+import { startFeedRefresh } from "@/lib/data/feed-refresh";
 import {sourceHasDayPrecision} from "@/lib/data/source-presentation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -67,6 +68,7 @@ export default function Experience() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [liveFeed, setLiveFeed] = useState<SignalFeed | null>(null);
   const [feedError, setFeedError] = useState(false);
+  const [feedRetrying, setFeedRetrying] = useState(false);
   const [feedRetry, setFeedRetry] = useState(0);
   const [topicArchive, setTopicArchive] = useState<{ key: string; events: SignalEvent[]; error: boolean } | null>(null);
   const unavailableStories = useRef(new Set<string>());
@@ -95,6 +97,10 @@ export default function Experience() {
   const [askSteps, setAskSteps] = useState<AskResult["pathSteps"]>([]);
   const askPath = useMemo(() => askSteps.map((step) => step.regionId).filter((id, index, ids) => index === 0 || id !== ids[index - 1]), [askSteps]);
   const displayFeed = selectedDay && historicalFeed?.day === selectedDay ? historicalFeed.feed : liveFeed;
+  const feedUnavailable = !displayFeed && feedError && !feedRetrying;
+  const regionCountLabel = (count: number | undefined, unit: string) => count === undefined
+    ? feedUnavailable ? "UNAVAILABLE" : "CONNECTING"
+    : count === 0 ? "QUIET" : `${count} ${unit}`;
   const catalog = displayFeed?.catalog ?? seedCatalog;
   const topics = catalog.topics;
   const sourceLabels = catalog.sourceLabels;
@@ -329,9 +335,8 @@ export default function Experience() {
   useEffect(() => {
     if (!entered && !new URLSearchParams(window.location.search).has("point")) return;
     const controller = new AbortController();
-    const load = () => {
-      if (document.visibilityState === "hidden") return;
-      fetch("/api/signals", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) }).then(async (response) => {
+    const load = async () => {
+      await fetch("/api/signals", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]) }).then(async (response) => {
         if (!response.ok) throw new Error("Signal feed unavailable");
         const feed: SignalFeed = await response.json();
         if (!Array.isArray(feed.events)) throw new Error("Invalid signal feed");
@@ -363,14 +368,18 @@ export default function Experience() {
               }
             }
           }
-          setLiveFeed(feed); setFeedError(false);
+          setLiveFeed(feed); setFeedError(false); setFeedRetrying(false);
         }
-      }).catch(() => { if (!controller.signal.aborted) setFeedError(true); });
+      });
     };
-    load();
-    const timer = window.setInterval(load, 15 * 60 * 1000);
-    document.addEventListener("visibilitychange", load);
-    return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", load); };
+    const refresh = startFeedRefresh({
+      signal: controller.signal,
+      load,
+      isVisible: () => document.visibilityState !== "hidden",
+      onFailure: (retrying) => { setFeedError(true); setFeedRetrying(retrying); },
+    });
+    document.addEventListener("visibilitychange", refresh);
+    return () => { controller.abort(); document.removeEventListener("visibilitychange", refresh); };
   }, [entered, feedRetry]);
   useEffect(() => {
     if (!entered) return;
@@ -422,7 +431,7 @@ export default function Experience() {
   }, [entered, selectedDay, signalId]);
 
   return <section id="universe" tabIndex={-1} aria-label="Interactive knowledge map" className={`experience ${entered ? "experience--entered" : ""}`}>
-    {entered ? <Universe readableRelationships={selectedDay ? regionRelationships(displayFeed?.events ?? []) : displayFeed?.publishedEvidence?.archiveRelationships} catalog={overviewCatalog} entered={entered} askOpen={askOpen} focusedId={focusedId} selectedChildId={childId} selectedSignalId={signalId} hoveredId={hoveredId} signalMarkers={signalMarkers.map((item) => ({ id: item.id, source: item.source }))} regionActivity={measuredActivity} childCounts={counts} countsReady={Boolean(displayFeed)} countPeriod={countPeriod} connectedRegionId={connectionId} onConnection={(from, to) => { if (!connectionsFor(from,displayFeed,catalog).some(link=>link.topic.id===to && (link.availableRecent>0 || link.availableArchive>0))) return; chooseTopic(from); setConnectionId(to); }} regionRelationships={measuredRelationships} archiveRelationships={archiveRelationships} semanticRelationships={displayFeed?.semanticRelationships ?? null} askPathIds={askPath} askSteps={askSteps} onFocus={chooseTopic} onChild={(id) => { setConnectionId(null); setChildId(id); setSignalId(null); }} onSignal={setSignalId} onHover={setHoveredId} reducedMotion={reducedMotion} /> : <EntrancePreview />}
+    {entered ? <Universe feedUnavailable={feedUnavailable} readableRelationships={selectedDay ? regionRelationships(displayFeed?.events ?? []) : displayFeed?.publishedEvidence?.archiveRelationships} catalog={overviewCatalog} entered={entered} askOpen={askOpen} focusedId={focusedId} selectedChildId={childId} selectedSignalId={signalId} hoveredId={hoveredId} signalMarkers={signalMarkers.map((item) => ({ id: item.id, source: item.source }))} regionActivity={measuredActivity} childCounts={counts} countsReady={Boolean(displayFeed)} countPeriod={countPeriod} connectedRegionId={connectionId} onConnection={(from, to) => { if (!connectionsFor(from,displayFeed,catalog).some(link=>link.topic.id===to && (link.availableRecent>0 || link.availableArchive>0))) return; chooseTopic(from); setConnectionId(to); }} regionRelationships={measuredRelationships} archiveRelationships={archiveRelationships} semanticRelationships={displayFeed?.semanticRelationships ?? null} askPathIds={askPath} askSteps={askSteps} onFocus={chooseTopic} onChild={(id) => { setConnectionId(null); setChildId(id); setSignalId(null); }} onSignal={setSignalId} onHover={setHoveredId} reducedMotion={reducedMotion} /> : <EntrancePreview />}
     <div className="grain" aria-hidden="true" />
     <div className="edge-vignette" aria-hidden="true" />
 
@@ -439,9 +448,9 @@ export default function Experience() {
     </section>
 
     <div className="universe-ui" aria-hidden={!entered} inert={!entered}>
-      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "PAST 14 DAYS" : displayFeed ? "OBSERVED ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div>{selectedDay && <button type="button" className="mobile-history-status" onClick={returnToNow}>{shortDay(selectedDay)} <span>NOW ↗</span></button>}<div className="topbar-actions"><a className="github-link" href="#browse-knowledge" onClick={() => {setAskOpen(false); setMobileGuideOpen(false); requestAnimationFrame(() => document.getElementById("browse-knowledge")?.focus({preventScroll: true}));}}>BROWSE</a><Link className="github-link" href="/about">ABOUT ↗</Link><a className="github-link" href="https://github.com/stanleycyang/symtri" target="_blank" rel="noopener noreferrer" aria-label="View and contribute to SYMTRI on GitHub">GITHUB ↗</a>{feedError && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button ref={askTrigger} type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { if(!askOpen){askOpener.current=askTrigger.current;setAskInitial("");} setAskOpen((open) => !open); setMobileGuideOpen(false); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
+      <header className="topbar"><button className="brand" onClick={() => chooseTopic(null)} aria-label="Return to universe">SYMTRI<span>.</span></button><div className="topbar-center" role="status"><span className={`live-pulse ${feedError && !feedRetrying && !selectedDay ? "live-pulse--error" : ""}`} /> {selectedDay ? `${displayFeed?.partial ? "PARTIAL HISTORY" : "HISTORY"} · ${shortDay(selectedDay)}` : feedRetrying ? liveFeed ? "RECONNECTING TO SOURCES" : "CONNECTING TO SOURCES" : feedError ? liveFeed ? "SOURCE FEED DELAYED" : "SOURCE FEED UNAVAILABLE" : liveFeed ? liveFeed.scope === "archive" ? "ARCHIVED STORIES" : liveFeed.partial ? "PARTIAL LIVE FEED" : "LIVE STORIES" : "CONNECTING TO SOURCES"} <span className="topbar-separator">/</span> {displayFeed?.scope === "rolling" ? "PAST 14 DAYS" : displayFeed ? "OBSERVED ACTIVITY" : feedError ? "EXPLORE THE MAP" : "ACTIVITY LOADING"}</div>{selectedDay && <button type="button" className="mobile-history-status" onClick={returnToNow}>{shortDay(selectedDay)} <span>NOW ↗</span></button>}<div className="topbar-actions"><a className="github-link" href="#browse-knowledge" onClick={() => {setAskOpen(false); setMobileGuideOpen(false); requestAnimationFrame(() => document.getElementById("browse-knowledge")?.focus({preventScroll: true}));}}>BROWSE</a><Link className="github-link" href="/about">ABOUT ↗</Link><a className="github-link" href="https://github.com/stanleycyang/symtri" target="_blank" rel="noopener noreferrer" aria-label="View and contribute to SYMTRI on GitHub">GITHUB ↗</a>{feedError && !feedRetrying && !selectedDay && <button type="button" className="feed-retry" onClick={() => { setFeedError(false); setFeedRetrying(false); setFeedRetry((attempt) => attempt + 1); }}>RETRY FEED</button>}<button ref={askTrigger} type="button" className="ask-trigger" aria-expanded={askOpen} onClick={() => { if(!askOpen){askOpener.current=askTrigger.current;setAskInitial("");} setAskOpen((open) => !open); setMobileGuideOpen(false); if (askOpen) setAskSteps([]); }}>ASK SYMTRI <span>↗</span></button></div></header>
       {entered && <AskSymtri open={askOpen} signalId={signal?.live ? signal.id : undefined} initialQuestion={askInitial} key={selectedDay ?? "now"} day={selectedDay} subject={signal?.title ?? child?.name ?? focus?.name} sourceLabels={sourceLabels} onClose={() => { setAskInitial("");setAskOpen(false); setAskSteps([]); restoreControlFocus(askOpener.current,askTrigger.current); }} onResult={followAnswer} onNavigate={(id, subtopicId) => { setConnectionId(null); setFocusedId(id); setChildId(subtopicId); setSignalId(null); setHoveredId(null); }} />}
-      {!focus && <div className="scene-heading"><p className="eyebrow">{displayFeed ? feedProvenance : "EXPLORE THE SIGNAL"}</p><h2>A map of what matters.</h2><p>Ideas gather. Connections form. Attention moves.</p>{feedError && !selectedDay && !liveFeed && <p className="feed-error-copy">Live observations could not load. Explore the map or retry the feed.</p>}{displayFeed?.archiveCount ? <p className="archive-total">{displayFeed.archiveCount.toLocaleString()} UNIQUE SIGNALS OBSERVED {selectedDay ? "BY THIS SNAPSHOT" : "SINCE LAUNCH"}</p> : null}{!selectedDay && liveFeed?.lastIngestedAt ? <div className="feed-freshness">LAST INGEST · {ageOf(liveFeed.lastIngestedAt, now).toUpperCase()}</div> : null}{leadingRegion && leadingRegionActivity && leadingRegionActivity.count > 0 && <button type="button" className="scene-leader" onClick={() => chooseTopic(leadingRegion.id)}><span>{displayFeed?.activity ? "MOST ACTIVE · PAST 14 DAYS" : "MOST ACTIVE IN CURRENT OBSERVATIONS"}</span><strong>{leadingRegion.name}</strong><b aria-hidden="true">↗</b></button>}</div>}
+      {!focus && <div className="scene-heading"><p className="eyebrow">{displayFeed ? feedProvenance : "EXPLORE THE SIGNAL"}</p><h2>A map of what matters.</h2><p>Ideas gather. Connections form. Attention moves.</p>{feedError && !selectedDay && !liveFeed && <p className="feed-error-copy">{feedRetrying ? "Connecting to live observations. Retrying automatically…" : "Live observations could not load. Explore the map or retry the feed."}</p>}{displayFeed?.archiveCount ? <p className="archive-total">{displayFeed.archiveCount.toLocaleString()} UNIQUE SIGNALS OBSERVED {selectedDay ? "BY THIS SNAPSHOT" : "SINCE LAUNCH"}</p> : null}{!selectedDay && liveFeed?.lastIngestedAt ? <div className="feed-freshness">LAST INGEST · {ageOf(liveFeed.lastIngestedAt, now).toUpperCase()}</div> : null}{leadingRegion && leadingRegionActivity && leadingRegionActivity.count > 0 && <button type="button" className="scene-leader" onClick={() => chooseTopic(leadingRegion.id)}><span>{displayFeed?.activity ? "MOST ACTIVE · PAST 14 DAYS" : "MOST ACTIVE IN CURRENT OBSERVATIONS"}</span><strong>{leadingRegion.name}</strong><b aria-hidden="true">↗</b></button>}</div>}
       <nav className="breadcrumbs" aria-label="Current location"><button onClick={() => chooseTopic(null)}>UNIVERSE</button>{focus && <><span>/</span><button onClick={() => { setConnectionId(null); setChildId(null); setSignalId(null); }}>{focus.short}</button></>}{child && <><span>/</span><span>{child.name.toUpperCase()}</span></>}{connection && <><span>/</span><span>{connection.topic.short}</span></>}</nav>
 
       {hover && !focus && <div className="hover-card" aria-live="polite"><span className="hover-card-label">REGION IN FOCUS · {hoverActivity ? feedProvenance : "AWAITING OBSERVATIONS"}</span><strong>{hover.name}</strong><span><b>{hoverActivity ? hoverActivity.momentum.toUpperCase() : "PENDING"}</b> activity <i /> {hoverActivity ? hoverActivity.count : 0} signals</span></div>}
@@ -478,13 +487,20 @@ export default function Experience() {
           </button>
           <button className="mobile-guide-ask" type="button" onClick={() => { setMobileGuideOpen(false); askOpener.current=askTrigger.current;setAskInitial("");setAskOpen(true); }}>ASK<br />SYMTRI <span>↗</span></button>
         </div>
-          <div className="mobile-guide-shortcuts" aria-label="Explore leading regions">{rankedRegions.slice(0, 3).map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.short}</strong><small>{measuredActivity?.[topic.id]?.count ?? 0} seen</small></button>)}</div>
+          <div className="mobile-guide-shortcuts" aria-label="Explore leading regions">{rankedRegions.slice(0, 3).map((topic) => {
+            const count = measuredActivity?.[topic.id]?.count;
+            return <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.short}</strong><small>{regionCountLabel(count, "seen")}</small></button>;
+          })}</div>
         {mobileGuideOpen && <div className="mobile-guide-content" id="mobile-guide-content">
           <div className="mobile-guide-search"><label htmlFor="mobile-map-search">Find a subject or region</label><input id="mobile-map-search" type="search" value={mapSearch} onKeyDown={searchKeys} onChange={(event) => setMapSearch(event.target.value)} placeholder="Try fusion, robotics, security…" autoComplete="off" />{mapSearch.trim().length >= 2 && !searchMatches.length && <p className="map-search-empty" role="status">No map point found. Try another subject or Ask Symtri.</p>}{searchMatches.length > 0 && <div className="mobile-guide-search-results">{searchMatches.map((item) => <button key={item.childId ?? item.id} type="button" onClick={() => { chooseTopic(item.id); setChildId(item.childId); setMapSearch(""); }}>{item.name}<small>{item.region}</small></button>)}</div>}</div>
           {historyDays.length > 1 && <div className="mobile-guide-time"><h3>Through time</h3><div>{[...historyDays].reverse().map((item) => <button key={item.day} type="button" aria-pressed={selectedDay === item.day} onClick={() => { setPendingDay(item.day); setMobileGuideOpen(false); }}>{shortDay(item.day)}</button>)}<button type="button" aria-pressed={!selectedDay} onClick={returnToNow}>NOW</button></div></div>}
 
           <div className="mobile-guide-stories"><h3>From the sources</h3>{mobileLatest.length ? mobileLatest.map((event) => <button key={event.id} type="button" onClick={() => followNearby(event)}><span>{(sourceLabels[event.source] ?? event.source).toUpperCase()} · {sourceHasDayPrecision(event.source) ? shortDay(event.publishedAt.slice(0, 10)) : ageOf(event.publishedAt, ageReference).toUpperCase()}</span><strong>{event.title}</strong><b aria-hidden="true">↗</b></button>) : <p>Fresh signals will appear here as the sources connect.</p>}</div>
-          <div className="mobile-guide-regions"><h3>More regions</h3><div>{rankedRegions.slice(3 + shownMobileRegionPage * 12, 3 + (shownMobileRegionPage + 1) * 12).map((topic) => <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.name}</strong><small>{measuredActivity?.[topic.id]?.count ?? 0} {displayFeed?.activity ? "signals" : "observed"}</small></button>)}</div>{rankedRegions.length > 15 && <div className="thread-pages"><button type="button" disabled={shownMobileRegionPage === 0} onClick={() => setMobileRegionPage(shownMobileRegionPage - 1)}>PREVIOUS</button><span>{shownMobileRegionPage + 1} / {Math.ceil((rankedRegions.length - 3) / 12)}</span><button type="button" disabled={3 + (shownMobileRegionPage + 1) * 12 >= rankedRegions.length} onClick={() => setMobileRegionPage(shownMobileRegionPage + 1)}>NEXT</button></div>}</div>
+          <div className="mobile-guide-regions"><h3>More regions</h3><div>{rankedRegions.slice(3 + shownMobileRegionPage * 12, 3 + (shownMobileRegionPage + 1) * 12).map((topic) => {
+            const count = measuredActivity?.[topic.id]?.count;
+            const label = regionCountLabel(count, displayFeed?.activity ? "signals" : "observed");
+            return <button key={topic.id} type="button" onClick={() => chooseTopic(topic.id)}><span className="mobile-guide-region-dot" style={{ background: topic.color }} /><strong>{topic.name}</strong><small>{label}</small></button>;
+          })}</div>{rankedRegions.length > 15 && <div className="thread-pages"><button type="button" disabled={shownMobileRegionPage === 0} onClick={() => setMobileRegionPage(shownMobileRegionPage - 1)}>PREVIOUS</button><span>{shownMobileRegionPage + 1} / {Math.ceil((rankedRegions.length - 3) / 12)}</span><button type="button" disabled={3 + (shownMobileRegionPage + 1) * 12 >= rankedRegions.length} onClick={() => setMobileRegionPage(shownMobileRegionPage + 1)}>NEXT</button></div>}</div>
         </div>}
       </section>}
       <div className="controls-hint">DRAG TO ORBIT <span>·</span> SCROLL TO ZOOM <span>·</span> CLICK TO EXPLORE</div>
