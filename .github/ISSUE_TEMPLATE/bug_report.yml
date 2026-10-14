@@ -1,0 +1,37 @@
+name: Bug report
+description: Help us reproduce a broken interaction, API response, or local setup.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for helping improve SYMTRI. Search existing issues first. Remove secrets and personal data from all examples; report vulnerabilities privately."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the page, map location, or command and the smallest sequence that triggers the problem.
+      placeholder: "1. Open…
+2. Select…
+3. Observe…"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser and version, OS, viewport/device, and live site or local checkout. For local failures, include Node.js version and commit SHA.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or logs
+      description: Optional supporting evidence. Remove tokens, email addresses, connection strings, and other private data.

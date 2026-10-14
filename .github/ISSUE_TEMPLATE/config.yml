@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/stanleycyang/symtri/security/advisories/new
+    about: Please do not publish vulnerabilities, credentials, or exploit details in public issues.
+  - name: Read the contributor guide
+    url: https://github.com/stanleycyang/symtri/blob/main/CONTRIBUTING.md
+    about: Local setup, code layout, and verification requirements.
