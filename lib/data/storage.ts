@@ -47,7 +47,9 @@ export function database() {
   if (connection && now - lastDatabaseUse > 15_000) {
     const stale = connection;
     connection = undefined;
-    void stale.end({ timeout: 0 }).catch(() => {});
+    // A long query can span the idle threshold while another request arrives.
+    // Retire its client without destroying that request's pending result.
+    void stale.end({ timeout: 30 }).catch(() => {});
   }
   lastDatabaseUse = now;
   const endpoint = new URL(url);
