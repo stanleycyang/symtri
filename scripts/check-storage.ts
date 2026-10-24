@@ -22,6 +22,7 @@ import { questionTopics } from "../lib/ai/ask";
 import { fetchActiveFeeds, pollTrialFeeds } from "../lib/data/feed-registry";
 import { recoverPausedFeeds } from "../lib/data/feed-registry";
 import { checkAskRateLimit, pruneAskRateLimits } from "../lib/data/ask-limit";
+import { database } from "../lib/data/storage";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -1244,7 +1245,23 @@ async function main() {
     } finally {
       if(priorGateway===undefined) delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=priorGateway;
     }
-    console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, snapshot preservation, and canonical source evidence passed");
+    const retiringClient = database();
+    await retiringClient`select 1`;
+    const inFlight = Promise.resolve(retiringClient<{ value: number }[]>`select 7 as value from pg_sleep(0.2)`.execute());
+    await new Promise(resolve => setTimeout(resolve, 20));
+    const originalNow = Date.now;
+    let replacement: ReturnType<typeof database>;
+    try {
+      Date.now = () => originalNow() + 16_000;
+      replacement = database();
+    } finally { Date.now = originalNow; }
+    try {
+      assert.notEqual(replacement, retiringClient, "An idle gap still replaces a potentially frozen socket");
+      const [pending, fresh] = await Promise.all([inFlight, replacement<{ value: number }[]>`select 8 as value`]);
+      assert.equal(pending[0].value, 7, "Recycling must not destroy a request still using the old client");
+      assert.equal(fresh[0].value, 8, "New requests use the replacement client");
+    } finally { await Promise.all([retiringClient.end(), replacement.end()]); }
+    console.log("Postgres migrations, API table protection, signal upsert, archive-backed map and Ask, topic lookup, semantic retrieval, relationships, snapshot preservation, canonical source evidence, and graceful client recycling passed");
   } finally {
     await sql`delete from signal_events where id in (${id}, ${unclassifiedId}, ${relatedId}, ${weakParentId}, ${sharedThreadId}, ${foreignId}, ${quantumId}, ${cosmicId}, ${archiveId})`;
     await sql`delete from signal_events where id like ${`${crowdPrefix}%`}`;

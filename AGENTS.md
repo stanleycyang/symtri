@@ -81,6 +81,7 @@ When Ask focuses a map location at 756×469, keep the focused scene visible besi
 
 Postgres.js uses one connection per function instance in this app. Keep database reads sequential within an invocation and keep `idle_timeout` finite so warm Vercel Workflow and API functions release pooled connections. Repeated status or signals stalls are a runtime failure: check Vercel logs for the 300-second timeout, then verify both endpoints after deployment.
 Supabase documents that frozen serverless functions can resume with a dead Postgres.js socket while the idle timer was paused. The shared client is recycled after an idle gap; keep this safeguard when changing pooling, and verify `/api/status` and `/api/signals` after a warm-instance pause.
+Retire recycled clients with a bounded graceful shutdown. A query can outlast the idle threshold while another request arrives; `end({ timeout: 0 })` destroyed pending status queries in production. Keep the in-flight query case in the local Postgres check.
 
 Postgres.js query results are untyped `Row` values unless the SQL call has a generic row shape. Type rows before passing them to typed helpers, or validate optional fields inside the helper; TypeScript has caught this twice in storage changes.
 
