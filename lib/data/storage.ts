@@ -12,6 +12,7 @@ import { unavailableSources, type RelatedSignal, type SignalEvent, type SignalFe
 import { evidenceFingerprint } from "./enrichment-policy";
 import { readySignal } from "./publication";
 import { ENRICHMENT_VERSION } from "./reading-note-version";
+import type { SourceCheckpoint } from "./ingestion-checkpoint";
 import { isCalendarDay } from "./dates";
 
 let connection: ReturnType<typeof postgres> | undefined;
@@ -172,6 +173,40 @@ export async function withStoredEvidence(events:SignalEvent[]): Promise<SignalEv
     const row=retained.get(event.id);
     return row && row.title===event.title && row.summary===event.summary ? {...event,evidence:row.body} : event;
   });
+}
+
+/** Rehydrate at capture, never while serving an already historical snapshot. */
+export async function withSnapshotEvidence(events: SignalEvent[], checkpoint: SourceCheckpoint): Promise<SignalEvent[]> {
+  const fresh = new Map(checkpoint.events.map(event => [event.id, event]));
+  // Rolling archive details may use the evidence available at capture time.
+  const archived = await withStoredEvidence(events.filter(event => !fresh.has(event.id)));
+  const retained = new Map(archived.map(event => [event.id, event]));
+  const references = events.flatMap(event => {
+    const observation = fresh.get(event.id);
+    const ref = checkpoint.evidenceRefs?.[event.id];
+    return observation && ref ? [{ id: event.id, source: observation.source,
+      external_id: observation.externalId, content_hash: ref.contentHash }] : [];
+  });
+  if (references.length) {
+    const sql = database();
+    // Canonical deduplication can store an observation under another signal ID.
+    // Its own source identity and fingerprint still identify the captured body.
+    const rows = await sql<{ id: string; body: SourceEvidence }[]>`
+      select incoming.id, evidence.body
+      from jsonb_to_recordset(${sql.json(references)}::jsonb)
+        as incoming(id text, source text, external_id text, content_hash text)
+      join signal_evidence evidence on evidence.source = incoming.source
+        and evidence.external_id = incoming.external_id and evidence.content_hash = incoming.content_hash
+      join source_catalog source on source.id = evidence.source and source.status = 'active'`;
+    const bodies = new Map(rows.map(row => [row.id, row.body]));
+    for (const event of events) {
+      const body = bodies.get(event.id);
+      const ref = checkpoint.evidenceRefs?.[event.id];
+      if (body && ref) retained.set(event.id, { ...event, evidence: { ...body, retrievedAt: ref.retrievedAt } });
+    }
+  }
+  // A missing or changed fresh observation must not borrow newer canonical text.
+  return events.map(event => retained.get(event.id) ?? event);
 }
 
 export async function getCisaEntryHashes(): Promise<Record<string, string>> {

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import { sourceCheckpoint } from "./ingestion-checkpoint";
 import type { SignalFeed } from "./model";
 
 const source = readFileSync(new URL("../../workflows/ingest-universe.ts", import.meta.url), "utf8");
@@ -25,6 +26,7 @@ test("source checkpoints persist all observations before dropping evidence from 
   let persisted = false;
   const testModule = { exports: {} as { checkpoint: (slot: string) => Promise<SignalFeed> } };
   const dependencies: Record<string, unknown> = {
+    "@/lib/data/ingestion-checkpoint": { sourceCheckpoint },
     "@/lib/data/feed": { getSignalFeed: async () => feed },
     "@/lib/data/feed-registry": {
       fetchActiveFeeds: async () => ({ events: [], sources: {} }),
