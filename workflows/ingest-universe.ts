@@ -1,6 +1,8 @@
 import { runProductionHealthCheck } from "@/lib/data/health";
 import { randomUUID } from "node:crypto";
 import { start } from "workflow/api";
+import { getStepMetadata } from "workflow";
+import { embeddingStepError } from "@/lib/data/workflow-retry";
 import { dispatchReadingNotes } from "@/lib/data/enrichment-dispatch";
 import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
@@ -41,13 +43,19 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
   if (Object.values(feed.sources).every((status) => status === "unavailable")) {
     throw new Error("All sources unavailable");
   }
-  return feed;
+  // Retain every observation and its original classification/evidence input
+  // before returning a small checkpoint to the workflow's event log.
+  await seedUniverseCatalog();
+  await persistSignals(feed);
+  return { ...feed, events: feed.events.map((event) => {
+    const visible = { ...event };
+    delete visible.evidence;
+    return visible;
+  }) };
 }
 
 async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]>; archiveCount: number; childCounts: Record<string, number> }> {
   "use step";
-  await seedUniverseCatalog();
-  await persistSignals(feed);
   // The queue is committed by database triggers before dispatch. Failure to
   // wake a worker never loses work or fails source persistence.
   try { await dispatchReadingNotes(`ingest-enrich:${slot}`,(wakeSlot,lane)=>start(enrichReadingNotes,[wakeSlot,lane])); }
@@ -75,16 +83,26 @@ async function embedBacklog(owner?:string): Promise<{ embedded: number; embeddin
   if(!owned) return {embedded:0,embeddingStatus:"backlog",hasMore:true};
   try {
     const pending = await getPendingEmbeddingEvents();
-    const embedded = await persistEmbeddings({
-      observedAt: new Date().toISOString(), events: pending, scope: "archive", partial: false,
-      sources: unavailableSources(),
-    }, embedTexts);
+    let embedded: number;
+    try {
+      embedded = await persistEmbeddings({
+        observedAt: new Date().toISOString(), events: pending, scope: "archive", partial: false,
+        sources: unavailableSources(),
+      }, embedTexts);
+    } catch (error) { throw await embeddingStepError(error, getStepMetadata().attempt); }
     return { embedded, embeddingStatus: "ok", hasMore: (await getPendingEmbeddingEvents(1)).length > 0 };
   } finally { if(!owner) await releaseReadingNoteWorker(5,runId); }
 }
 
-async function enrichSources(lane: number, runId: string, preferRetries = false, preferOldest = false): Promise<Awaited<ReturnType<typeof enrichOwnedBatch>>> {
+async function enrichSources(lane: number, runId: string, preferRetries = false, preferOldest = false, first = false): Promise<Awaited<ReturnType<typeof enrichOwnedBatch>>> {
   "use step";
+  if (first) {
+    // First delivery claims once; retries must renew the existing ownership
+    // rather than treating their already-started worker as a competing run.
+    const retry = getStepMetadata().attempt > 1;
+    const owned = retry ? await renewReadingNoteWorker(lane, runId) : await claimReadingNoteWorker(lane, runId);
+    if (!owned) return { status: retry ? "lease-lost" : "busy", processed: 0, ready: 0, failed: 0 };
+  }
   return enrichOwnedBatch(lane, runId, preferRetries, preferOldest);
 }
 
@@ -106,11 +124,12 @@ async function releaseReadingNotes(lane:number, runId:string):Promise<void> {
 export async function enrichReadingNotes(slot:string, lane:number) {
   "use workflow";
   const runId = `${slot}:${lane}`;
-  if (!await claimReadingNotes(lane, runId)) return {status:"busy",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
   const result={status:"complete",ready:0,failed:0,processed:0,embedded:0,embeddingStatus:"not-run"};
+  let release = true;
   try {
     for(let batch=0;batch<2;batch++) {
-      const next=await enrichSources(lane, runId, lane === 0 && batch === 0, lane === 3);
+      const next=await enrichSources(lane, runId, lane === 0 && batch === 0, lane === 3, batch === 0);
+      if(next.status==="busy") { release=false; result.status="busy"; return result; }
       // Return through finally so cleanup still runs, without letting failed-note
       // or embedding status overwrite lease loss or continuing work unowned.
       result.processed+=next.processed;result.ready+=next.ready;result.failed+=next.failed;
@@ -119,7 +138,7 @@ export async function enrichReadingNotes(slot:string, lane:number) {
       if(!next.processed) break;
     }
     if(result.failed) result.status="partial";
-  } finally {await releaseReadingNotes(lane, runId);}
+  } finally {if(release) await releaseReadingNotes(lane, runId);}
   return result;
 }
 
