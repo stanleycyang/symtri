@@ -13,15 +13,17 @@ const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 
-function harness(options: { ownedBatches?: number; busy?: boolean; fail?: boolean; empty?: boolean; unconfigured?: boolean; throwProcessing?: boolean } = {}) {
+function harness(options: { ownedBatches?: number; busy?: boolean; fail?: boolean; empty?: boolean; unconfigured?: boolean; throwProcessing?: boolean; attempt?: number; lostOnRetry?: boolean } = {}) {
   const calls: string[] = [];
   let renewals = 0;
   const testModule = { exports: {} as { enrichReadingNotes: (slot: string, lane: number) => Promise<{
     status: string; processed: number; ready: number; failed: number; embeddingStatus: string;
   }> } };
   const dependencies: Record<string, unknown> = {
+    "workflow": { getStepMetadata: () => ({ attempt: options.attempt ?? 1 }) },
     "@/lib/data/enrichment": {
       claimReadingNoteWorker: async () => { calls.push("claim"); return !options.busy; },
+      renewReadingNoteWorker: async () => { calls.push("retry-renew"); return !options.lostOnRetry; },
       releaseReadingNoteWorker: async () => { calls.push("release"); },
     },
     "@/lib/data/enrichment-worker": {
@@ -61,6 +63,20 @@ test("a full retry lane keeps ten-note capacity and retry reservations", async (
     ...Array(5).fill("process:1:true:false"), ...Array(5).fill("process:1:false:false"),
   ]);
   assert.equal(calls.at(-1), "release");
+});
+
+test("a retried first batch renews ownership instead of attempting a second claim", async () => {
+  const { calls, run } = harness({ attempt: 2 });
+  assert.equal((await run("slot", 0)).processed, 10);
+  assert.equal(calls[0], "retry-renew");
+  assert.ok(!calls.includes("claim"));
+  assert.equal(calls.at(-1), "release");
+});
+
+test("a retried first batch cannot process after ownership is lost", async () => {
+  const { calls, run } = harness({ attempt: 2, lostOnRetry: true });
+  assert.equal((await run("slot", 0)).status, "lease-lost");
+  assert.deepEqual(calls, ["retry-renew", "release"]);
 });
 
 test("lease loss preserves failed-note counts, skips embeddings, and releases the lane", async () => {
