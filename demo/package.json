@@ -11,8 +11,8 @@
     "capture:launch": "node capture-launch.mjs"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.535",
-    "remotion": "4.0.535",
+    "@remotion/cli": "4.0.538",
+    "remotion": "4.0.538",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
