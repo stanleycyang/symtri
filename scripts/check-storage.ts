@@ -22,7 +22,8 @@ import { questionTopics } from "../lib/ai/ask";
 import { fetchActiveFeeds, pollTrialFeeds } from "../lib/data/feed-registry";
 import { recoverPausedFeeds } from "../lib/data/feed-registry";
 import { checkAskRateLimit, pruneAskRateLimits } from "../lib/data/ask-limit";
-import { database } from "../lib/data/storage";
+import { database, withSnapshotEvidence } from "../lib/data/storage";
+import { sourceCheckpoint } from "../lib/data/ingestion-checkpoint";
 
 const testUrl = process.env.SYMTRI_TEST_DATABASE_URL;
 if (!testUrl || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(testUrl).hostname)) {
@@ -873,6 +874,16 @@ async function main() {
       { ...event, id: `cisa:${externalId}`, source: "cisa", externalId, evidence: { ...evidenceInput, kind: "advisory", attribution: "CISA", metadata: { entryHash: "fixture-hash" } } },
     ];
     assert.equal(await persistSignals({ ...feed, events: evidenceEvents }), 0);
+    const evidenceCheckpoint = sourceCheckpoint({ ...feed, events: evidenceEvents });
+    const capturedObservations = await withSnapshotEvidence(evidenceCheckpoint.events, evidenceCheckpoint);
+    assert.deepEqual(capturedObservations.map(item => item.id), evidenceEvents.map(item => item.id));
+    assert.ok(capturedObservations.every(item => item.evidence?.text === evidenceInput.text),
+      "Snapshots retain original observation evidence even when canonical storage uses another signal ID");
+    await persistSignals({ ...feed, events: [{ ...evidenceEvents[0], evidence: {
+      ...evidenceEvents[0].evidence!, text: "Newer changed evidence must not enter an older source checkpoint." } }] });
+    const changedCapture = await withSnapshotEvidence(evidenceCheckpoint.events, evidenceCheckpoint);
+    assert.equal(changedCapture[0].evidence, undefined, "Do not replace a checkpoint's changed source evidence");
+    await persistSignals({ ...feed, events: evidenceEvents });
     const evidenceRows = await sql<{ signal_id: string; body: { text: string }; content_hash: string }[]>`
       select signal_id, body, content_hash from signal_evidence where signal_id = ${id} order by source`;
     assert.equal(evidenceRows.length, 3);

@@ -7,8 +7,9 @@ import { dispatchReadingNotes } from "@/lib/data/enrichment-dispatch";
 import { getSignalFeed, selectFeedEvents } from "@/lib/data/feed";
 import { embedTexts } from "@/lib/ai/embed";
 import { gatewayConfigured } from "@/lib/ai/gateway";
+import { sourceCheckpoint, type SourceCheckpoint } from "@/lib/data/ingestion-checkpoint";
 import { rollingFeed } from "@/lib/data/rolling";
-import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getIngestionStatus, getPersistedCurrentFeed, getKnowledgeGraph, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
+import { acquireIngestionLease, backfillSnapshotMetadata, countNewSignalsForRun, finishIngestionRun, getArchiveActivity, getArchiveChildCounts, getArchiveCount, getIngestionStatus, getPersistedCurrentFeed, getKnowledgeGraph, getArchiveRelationships, getPendingEmbeddingEvents, getStoredFeed, withSnapshotEvidence, persistCurrentFeed, persistEmbeddings, persistSignals, persistSnapshot, rebuildKnowledgeGraph, refreshStoredClassifications, releaseIngestionLease, startIngestionRun, type IngestionResult } from "@/lib/data/storage";
 import { unavailableSources, type SignalFeed } from "@/lib/data/model";
 import { catalogMatches, getUniverseCatalog, getGrowthStatus, seedUniverseCatalog } from "@/lib/data/catalog";
 import { discoverConcepts, retireInactiveConcepts, syncArchiveConcepts } from "@/lib/data/discovery";
@@ -30,7 +31,7 @@ async function begin(slot: string): Promise<boolean> {
   return true;
 }
 
-async function fetchSources(slot: string): Promise<SignalFeed> {
+async function fetchSources(slot: string): Promise<SourceCheckpoint> {
   "use step";
   const feed = await getSignalFeed({ includeUnclassified: true, forIngestion: true, slot });
   const registered = await fetchActiveFeeds(new Date(feed.observedAt));
@@ -47,15 +48,13 @@ async function fetchSources(slot: string): Promise<SignalFeed> {
   // before returning a small checkpoint to the workflow's event log.
   await seedUniverseCatalog();
   await persistSignals(feed);
-  return { ...feed, events: feed.events.map((event) => {
-    const visible = { ...event };
-    delete visible.evidence;
-    return visible;
-  }) };
+  return sourceCheckpoint(feed);
 }
 
-async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]>; archiveCount: number; childCounts: Record<string, number> }> {
+async function storeFeed(slot: string, checkpoint: SourceCheckpoint): Promise<{ added: number; mapped: number; activity: NonNullable<SignalFeed["activity"]>; archiveCount: number; childCounts: Record<string, number> }> {
   "use step";
+  // References are private workflow metadata, never part of public feeds.
+  const { evidenceRefs, ...feed } = checkpoint;
   // The queue is committed by database triggers before dispatch. Failure to
   // wake a worker never loses work or fails source persistence.
   try { await dispatchReadingNotes(`ingest-enrich:${slot}`,(wakeSlot,lane)=>start(enrichReadingNotes,[wakeSlot,lane])); }
@@ -69,7 +68,10 @@ async function storeFeed(slot: string, feed: SignalFeed): Promise<{ added: numbe
   const archiveCount = await getArchiveCount();
   const mapped = selectFeedEvents(feed.events.map((event) => ({ ...event, topics: catalogMatches(event, catalog) })), 300);
   const snapshot = rollingFeed({ ...feed, events: mapped }, await getStoredFeed(), archiveCount);
-  await persistSnapshot({ ...snapshot, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships, catalog });
+  // Freeze source passages when capturing the snapshot, not when historical Ask
+  // reads it later. Keep evidence out of durable checkpoints and the live feed.
+  const snapshotEvents = await withSnapshotEvidence(snapshot.events, { ...feed, evidenceRefs });
+  await persistSnapshot({ ...snapshot, events: snapshotEvents, observedAt: feed.observedAt, sources: feed.sources, partial: feed.partial, activity, relationships, catalog });
   await persistCurrentFeed({ ...snapshot, observedAt: feed.observedAt, archiveCount, activity, childCounts,
     catalog, sources: feed.sources, partial: feed.partial });
   return { added: await countNewSignalsForRun(slot), mapped: mapped.length, activity, archiveCount, childCounts };
