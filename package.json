@@ -37,7 +37,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "ai": "^7.0.139",
-    "fast-xml-parser": "^5.11.2",
+    "fast-xml-parser": "^5.12.0",
     "ipaddr.js": "2.5.0",
     "next": "16.4.2",
     "parse5": "^8.0.1",
